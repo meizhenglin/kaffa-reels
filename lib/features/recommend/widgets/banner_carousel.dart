@@ -194,7 +194,7 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
               child: Row(
-                children: [
+                children: [ 
                   _ActionButton(
                     // icon: Icons.search_rounded,
                     onTap: () => widget.onSearchTap?.call(),
