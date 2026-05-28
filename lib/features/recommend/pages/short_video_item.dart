@@ -16,7 +16,7 @@ class ShortVideoItem extends StatefulWidget {
   final VideoInfo videoInfo;
 
   /// 是否自动播放
-  final bool autoPlay;
+  final bool autoPlay; 
 
   const ShortVideoItem({
     super.key,

@@ -19,7 +19,7 @@ class ShortVideoUtil {
       final response = await _dio.get(url);
       if (response.data == null) {
         debugPrint("Error: Video info response is null for URL: $url");
-        return [];
+        return []; 
       }
       if (response.data is List) {
         final List<dynamic> jsonData = response.data;

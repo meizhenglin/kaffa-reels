@@ -2,7 +2,7 @@
 //
 // Author: keria
 // Date: 2025/2/28
-// Brief: 滑动窗口模版类
+// Brief: 滑动窗口模版类 
 
 /// A generic class that manages sliding window loading and cancellation for a collection of items.
 ///

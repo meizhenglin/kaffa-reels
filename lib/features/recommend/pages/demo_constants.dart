@@ -9,4 +9,4 @@ class DemoConstants {
       "https://alivc-demo-cms.alicdn.com/versionProduct/resources/shortdrama/drama-info-list-total.json";
 
   static const String keyDramaInfoListUrl = "dramaInfoListUrl";
-}
+} 
