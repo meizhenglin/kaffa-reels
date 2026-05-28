@@ -1,0 +1,91 @@
+import 'package:equatable/equatable.dart';
+
+import 'drama_badge.dart';
+
+/// ============================================================================
+/// 短剧数据模型
+///
+/// 【功能】定义短剧/短视频的完整数据结构
+/// 【如何修改】添加新字段时需在构造函数和 fromJson/toJson 中同步添加
+/// ============================================================================
+class Drama extends Equatable {
+  const Drama({
+    required this.id,
+    required this.title,
+    required this.coverUrl,
+    required this.views,
+    required this.rating,
+    required this.description,
+    required this.episodeCount,
+    required this.isVipOnly,
+    this.videoUrl,
+    this.badge,
+    this.aspectRatio = 0.72,
+  });
+
+  /// 唯一标识符
+  final String id;
+  /// 标题
+  final String title;
+  /// 封面图片 URL
+  final String coverUrl;
+  /// 播放量
+  final int views;
+  /// 评分（0-10）
+  final double rating;
+  /// 描述
+  final String description;
+  /// 集数
+  final int episodeCount;
+  /// 是否 VIP 专属
+  final bool isVipOnly;
+  /// 视频地址
+  final String? videoUrl;
+  /// 标签（Hot/New/VIP）
+  final DramaBadge? badge;
+  /// 瀑布流卡片比例
+  final double aspectRatio;
+
+  /// 播放量
+  String get formattedViews => views.toString();
+
+  /// 从 JSON 创建 Drama 对象
+  factory Drama.fromJson(Map<String, dynamic> json) {
+    return Drama(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      coverUrl: json['coverUrl'] as String,
+      views: json['views'] as int,
+      rating: (json['rating'] as num).toDouble(),
+      description: json['description'] as String,
+      episodeCount: json['episodeCount'] as int,
+      isVipOnly: json['isVipOnly'] as bool? ?? false,
+      videoUrl: json['videoUrl'] as String?,
+      badge: json['badge'] != null
+          ? DramaBadge.values.firstWhere(
+              (e) => e.name == json['badge'],
+              orElse: () => DramaBadge.hot,
+            )
+          : null,
+      aspectRatio: (json['aspectRatio'] as num?)?.toDouble() ?? 0.72,
+    );
+  }
+
+  /// 转换为 JSON
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'coverUrl': coverUrl,
+    'views': views,
+    'rating': rating,
+    'description': description,
+    'episodeCount': episodeCount,
+    'isVipOnly': isVipOnly,
+    'videoUrl': videoUrl,
+    'badge': badge?.name,
+    'aspectRatio': aspectRatio,
+  };
+
+  @override
+  List<Object?> get props => [id, title, coverUrl, views, rating];
+}

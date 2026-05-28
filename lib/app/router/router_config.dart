@@ -1,0 +1,437 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../features/auth/pages/forgot_password_page.dart';
+import '../../features/auth/pages/login_page.dart';
+import '../../features/auth/pages/register_page.dart';
+import '../../features/auth/providers/auth_provider.dart';
+import '../../features/explore/pages/explore_tab.dart';
+import '../../features/games/pages/games_tab.dart';
+import '../../features/home/pages/home_tab.dart';
+import '../../features/home/pages/main_page.dart';
+import '../../features/home/models/navigation_item.dart';
+import '../../features/player/presentation/player_page.dart';
+import '../../features/player/presentation/test_player_page.dart';
+import '../../features/payment/pages/membership_page.dart';
+import '../../features/profile/pages/profile_tab.dart';
+import '../../features/profile/pages/change_name_page.dart';
+import '../../features/profile/pages/history_page.dart';
+import '../../features/recommend/pages/recommend_tab.dart';
+import '../../features/recommend/models/drama_list_type.dart';
+import '../../features/home/pages/drama_list_page.dart';
+import '../../features/search/pages/search_page.dart';
+import '../../features/splash/pages/splash_page.dart';
+
+/// ============================================================================
+/// 路由配置文件
+///
+/// 【功能说明】
+/// 定义应用中所有的页面路由规则，使用 GoRouter 实现：
+/// - 首页、发现、推荐、游戏、我的（底部导航栏 Tab）
+/// - 播放器页面
+/// - 认证相关页面（登录、注册、忘记密码）
+/// - 会员页面
+///
+/// 【路由结构】
+/// /splash              - 启动页（初始页面）
+/// /                    - 首页 Tab
+/// /explore             - 发现 Tab
+/// /recommend           - 推荐 Tab（视频推荐）
+/// /recommend/hot       - 热门短剧列表页
+/// /recommend/all       - 全部推荐列表页
+/// /games               - 游戏 Tab
+/// /profile             - 我的 Tab
+/// /player              - 视频播放器页面
+/// /auth/login          - 登录页
+/// /auth/register       - 注册页
+/// /auth/forgot-password - 忘记密码页
+/// /membership          - 会员订阅页
+///
+/// 【路由守卫】
+/// - 已登录用户访问认证页面会自动重定向到首页
+/// - 未登录用户访问需要认证的页面会跳转到登录页
+///
+/// 【如何修改】
+/// - 添加新页面：1) 创建页面文件 2) 在这里添加 GoRoute
+/// - 修改路由路径：修改 path 参数
+/// - 添加路由参数：在 path 中使用 :paramName 格式
+/// ============================================================================
+
+/// 需要登录才能访问的认证相关路由
+/// 【作用】当用户已登录时，访问这些路由会自动重定向到首页
+/// 【修改提示】如果添加新的认证页面，需要在这里添加路径
+const _authRoutes = ['/auth/login', '/auth/register', '/auth/forgot-password'];
+
+// ==================== 导航键定义 ====================
+/// 根导航器键（用于全屏页面，如播放器、登录等）
+final rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+
+/// 首页 Tab 导航器键
+final shellNavigatorHomeKey =
+    GlobalKey<NavigatorState>(debugLabel: 'shellHome');
+
+/// 推荐 Tab 导航器键
+final shellNavigatorRecommendKey =
+    GlobalKey<NavigatorState>(debugLabel: 'shellRecommend');
+
+/// 发现 Tab 导航器键
+final shellNavigatorExploreKey =
+    GlobalKey<NavigatorState>(debugLabel: 'shellExplore');
+
+/// 游戏 Tab 导航器键
+final shellNavigatorGamesKey =
+    GlobalKey<NavigatorState>(debugLabel: 'shellGames');
+
+/// 我的 Tab 导航器键
+final shellNavigatorProfileKey =
+    GlobalKey<NavigatorState>(debugLabel: 'shellProfile');
+
+/// ============================================================================
+/// 路由刷新通知器
+///
+/// 【功能】
+/// 监听认证状态变化，当用户登录/登出时自动触发路由重定向检查
+///
+/// 【工作原理】
+/// 实现了 ChangeNotifier，当 authProvider 状态变化时会通知 GoRouter
+/// GoRouter 会重新执行 redirect 逻辑来决定是否需要重定向
+/// ============================================================================
+class _RouterRefreshNotifier extends ChangeNotifier {
+  _RouterRefreshNotifier(this._ref) {
+    // 监听 authProvider，当认证状态变化时通知监听器
+    _ref.listen(authProvider, (_, __) => notifyListeners());
+  }
+
+  final Ref _ref;
+}
+
+// ==================== 路由 Provider ====================
+/// 路由配置 Provider
+///
+/// 【功能】创建并提供 GoRouter 实例
+///
+/// 【参数说明】
+/// - initialLocation：初始路由为启动页
+/// - refreshListenable：监听认证状态变化
+/// - redirect：路由守卫逻辑
+final routerProvider = Provider<GoRouter>((ref) {
+  final refreshNotifier = _RouterRefreshNotifier(ref);
+
+  return GoRouter(
+    navigatorKey: rootNavigatorKey,
+    // 初始页面为启动页
+    initialLocation: '/splash',
+    // 监听状态变化，自动刷新路由
+    refreshListenable: refreshNotifier,
+
+    /// 路由守卫：每次路由变化时都会执行
+    /// 【功能】
+    /// - 已登录用户访问登录/注册页 → 重定向到首页
+    /// - 未登录用户访问需要认证的页面 → 重定向到登录页
+    redirect: (context, state) {
+      // 获取当前认证状态
+      final auth = ref.read(authProvider);
+      final location = state.matchedLocation;
+      final isAuthenticated = auth.isAuthenticated;
+      final isAuthRoute = _authRoutes.any(location.startsWith);
+      final isAuthenticating = auth.status == AuthStatus.authenticating;
+
+      // 正在验证中，不做重定向
+      if (isAuthenticating) return null;
+
+      // 已登录用户访问认证页面 → 跳转到首页或 redirect 参数指定的页面
+      if (isAuthenticated && isAuthRoute) {
+        final redirect = state.uri.queryParameters['redirect'];
+        if (redirect != null && redirect.isNotEmpty) {
+          return redirect;
+        }
+        return '/';
+      }
+
+      // 其他情况不重定向
+      return null;
+    },
+
+    /// 路由列表
+    routes: [
+      // ==================== 启动页 ====================
+      /// 启动页路由
+      /// 【路径】/splash
+      /// 【功能】显示启动动画，初始化应用，然后跳转到首页
+      GoRoute(
+        path: '/splash',
+        name: 'splash',
+        pageBuilder: (context, state) => const MaterialPage(
+          child: SplashPage(),
+        ),
+      ),
+
+      // ==================== 底部导航 Tab 路由 ====================
+      /// StatefulShellRoute 实现带底部导航栏的页面结构
+      /// 【功能】支持 5 个 Tab，每个 Tab 都有自己的 Navigator
+      /// 【效果】Tab 切换时子页面不会销毁，可以保持状态
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          // MainPage 负责渲染底部导航栏和当前 Tab 页面
+          return MainPage(navigationShell: navigationShell);
+        },
+        branches: [
+          // ----- 首页 Tab -----
+          StatefulShellBranch(
+            navigatorKey: shellNavigatorHomeKey,
+            routes: [
+              GoRoute(
+                path: '/',
+                name: 'home',
+                pageBuilder: (context, state) => const NoTransitionPage(
+                  child: HomeTab(),
+                ),
+              ),
+            ],
+          ),
+
+          // ----- 发现 Tab -----
+          StatefulShellBranch(
+            navigatorKey: shellNavigatorExploreKey,
+            routes: [
+              GoRoute(
+                path: '/explore',
+                name: 'explore',
+                pageBuilder: (context, state) => const NoTransitionPage(
+                  child: ExploreTab(),
+                ),
+              ),
+            ],
+          ),
+
+          // ----- 推荐 Tab -----
+          StatefulShellBranch(
+            navigatorKey: shellNavigatorRecommendKey,
+            routes: [
+              GoRoute(
+                path: '/recommend',
+                name: 'recommend',
+                pageBuilder: (context, state) => const NoTransitionPage(
+                  child: const RecommendTab(),
+                ),
+                // 推荐子页面：热门/全部列表
+                routes: [
+                  /// 热门短剧列表页
+                  /// 【路径】/recommend/hot
+                  /// 【传入参数】DramaListType.hot
+                  GoRoute(
+                    parentNavigatorKey: rootNavigatorKey,
+                    path: 'hot',
+                    name: 'recommend-hot',
+                    builder: (context, state) => const DramaListPage(
+                      type: DramaListType.hot,
+                    ),
+                  ),
+
+                  /// 全部推荐列表页
+                  /// 【路径】/recommend/all
+                  /// 【传入参数】DramaListType.recommended
+                  GoRoute(
+                    parentNavigatorKey: rootNavigatorKey,
+                    path: 'all',
+                    name: 'recommend-all',
+                    builder: (context, state) => const DramaListPage(
+                      type: DramaListType.recommended,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          // ----- 游戏 Tab -----
+          StatefulShellBranch(
+            navigatorKey: shellNavigatorGamesKey,
+            routes: [
+              GoRoute(
+                path: '/games',
+                name: 'games',
+                pageBuilder: (context, state) => const NoTransitionPage(
+                  child: GamesTab(),
+                ),
+              ),
+            ],
+          ),
+
+          // ----- 我的 Tab -----
+          StatefulShellBranch(
+            navigatorKey: shellNavigatorProfileKey,
+            routes: [
+              GoRoute(
+                path: '/profile',
+                name: 'profile',
+                pageBuilder: (context, state) => const NoTransitionPage(
+                  child: ProfileTab(),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+
+      // ==================== 全屏页面路由 ====================
+
+      /// 搜索页面
+      /// 【路径】/search
+      /// 【参数】
+      /// - q：初始搜索词（可选）
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/search',
+        name: 'search',
+        builder: (context, state) {
+          final initialQuery = state.uri.queryParameters['q'];
+          return SearchPage(initialQuery: initialQuery);
+        },
+      ),
+
+      /// 视频播放器页面
+      /// 【路径】/player
+      /// 【参数】
+      /// - url：视频地址（通过 extra 或 query 参数传入）
+      /// - title：视频标题
+      /// - dramaId：短剧ID
+      /// - episodes：剧集列表
+      /// - currentIndex：当前集数索引
+      /// - coverUrl：封面URL
+      /// - isUnlocked：是否已解锁
+      /// - videoUrlOne：高清地址
+      /// - videoUrlTwo：超清地址
+      /// 【使用场景】点击短剧卡片时跳转
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/player',
+        name: 'player',
+        pageBuilder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final query = state.uri.queryParameters;
+          final url = extra?['url'] as String? ?? query['url'] ?? '';
+          final title = extra?['title'] as String? ?? query['title'] ?? 'Video';
+          final dramaId = extra?['dramaId'] as String?;
+          final episodes = extra?['episodes'] as List<dynamic>?;
+          final currentIndex = extra?['currentIndex'] as int? ?? 0;
+          final coverUrl = extra?['coverUrl'] as String?;
+          final isVipOnly = extra?['isVipOnly'] as bool? ?? false;
+          final videoUrlOne = extra?['videoUrlOne'] as String?;
+          final videoUrlTwo = extra?['videoUrlTwo'] as String?;
+
+          return MaterialPage(
+            key: state.pageKey,
+            child: PlayerPage(
+              videoUrl: url,
+              title: title,
+              dramaId: dramaId,
+              allEpisodes: episodes?.cast() ?? const [],
+              currentIndex: currentIndex,
+              coverUrl: coverUrl,
+              isVipOnly: isVipOnly,
+              videoUrlOne: videoUrlOne,
+              videoUrlTwo: videoUrlTwo,
+            ),
+          );
+        },
+      ),
+
+      /// 测试播放器页面
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/test-player',
+        builder: (context, state) => const TestPlayerPage(),
+      ),
+
+      /// 登录页面
+      /// 【路径】/auth/login
+      /// 【参数】
+      /// - redirect：登录成功后重定向的路径（可选）
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/auth/login',
+        name: 'login',
+        builder: (context, state) {
+          final redirect = state.uri.queryParameters['redirect'];
+          return LoginPage(redirect: redirect);
+        },
+      ),
+
+      /// 注册页面
+      /// 【路径】/auth/register
+      /// 【参数】
+      /// - redirect：注册成功后重定向的路径（可选）
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/auth/register',
+        name: 'register',
+        builder: (context, state) {
+          final redirect = state.uri.queryParameters['redirect'];
+          return RegisterPage(redirect: redirect);
+        },
+      ),
+
+      /// 忘记密码页面
+      /// 【路径】/auth/forgot-password
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/auth/forgot-password',
+        name: 'forgot-password',
+        builder: (context, state) => const ForgotPasswordPage(),
+      ),
+
+      /// 会员订阅页面
+      /// 【路径】/membership
+      /// 【功能】显示 VIP 会员订阅计划和权益
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/membership',
+        name: 'membership',
+        builder: (context, state) => const MembershipPage(),
+      ),
+
+      /// 改名页面
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/change-name',
+        name: 'change-name',
+        builder: (context, state) => const ChangeNamePage(),
+      ),
+
+      /// 观看历史页面
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/history',
+        name: 'history',
+        builder: (context, state) => const HistoryPage(),
+      ),
+    ],
+
+    /// 路由错误处理
+    /// 【功能】当路由不存在时显示错误页面
+    errorBuilder: (context, state) => Scaffold(
+      body: Center(
+        child: Text(state.error?.toString() ?? 'Page not found'),
+      ),
+    ),
+  );
+});
+
+/// ============================================================================
+/// Deep Link 路由跳转扩展
+///
+/// 【功能】提供便捷的方法跳转到指定 Tab
+///
+/// 【使用示例】
+/// context.go('/games'); // 跳转到游戏 Tab
+/// ============================================================================
+extension GoRouterTabExtension on GoRouter {
+  /// 跳转到指定 Tab
+  /// [path] 目标 Tab 的路径（如 '/games'）
+  void goToTab(String path) {
+    final index = NavigationConfig.indexForPath(path);
+    go(NavigationConfig.branchPaths[index]);
+  }
+}
