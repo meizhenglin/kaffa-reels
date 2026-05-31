@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../../core/network/dio_client.dart';
 import '../../core/storage/storage_service.dart';
 
@@ -146,6 +147,16 @@ class LocaleNotifier extends StateNotifier<Locale> {
     // 2. 持久化保存到本地存储
     final storage = _ref.read(storageServiceProvider);
     await storage.setString('app_locale', locale.languageCode);
+    // 3. 同步更新 deviceLangKey，下次请求的 X-Client header 立即生效
+    await storage.setString(AppConstants.deviceLangKey, locale.languageCode);
+    // 4. 标记需要重启 App，让 main() 重新初始化所有 Provider 和接口
+    await storage.setString(AppConstants.restartAppKey, 'true');
+  }
+
+  /// 将 Flutter Locale 格式化为 X-Client header 所需格式
+  String _formatLangCode(Locale locale) {
+    // 格式如 "en" / "ar"
+    return locale.languageCode;
   }
 
   /// 从本地存储加载语言设置

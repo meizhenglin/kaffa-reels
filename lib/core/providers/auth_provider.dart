@@ -2,24 +2,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_service.dart';
 
-/// AuthService 全局单例 Provider
+export '../auth/auth_service.dart' show AuthService, RegisterResult, CheckCodeResult;
+
+/// AuthService 全局单例 Provider（必须先调用 init() 加载缓存 token）
 final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService();
 });
 
 /// 匿名游客登录状态
 enum GuestLoginStatus {
-  /// 初始状态（未登录）
   initial,
-  /// 登录中
   loading,
-  /// 登录成功
   success,
-  /// 登录失败
   failure,
 }
 
-/// 匿名游客登录状态 Notifier
 class GuestLoginNotifier extends StateNotifier<GuestLoginStatus> {
   GuestLoginNotifier(this._authService) : super(GuestLoginStatus.initial);
 
@@ -27,20 +24,16 @@ class GuestLoginNotifier extends StateNotifier<GuestLoginStatus> {
 
   Future<void> login() async {
     if (state == GuestLoginStatus.loading) return;
-    if (_authService.isLoggedIn) {
-      state = GuestLoginStatus.success;
-      return;
-    }
 
+    // 强制发起请求，确保使用新的 /api/user/userAuthorization 接口
     state = GuestLoginStatus.loading;
-    final result = await _authService.login();
+    final result = await _authService.login(forceLogin: true);
     state = result != null ? GuestLoginStatus.success : GuestLoginStatus.failure;
   }
 }
 
-/// 匿名游客登录状态 Provider
 final guestLoginProvider =
     StateNotifierProvider<GuestLoginNotifier, GuestLoginStatus>((ref) {
-  final authService = ref.read(authServiceProvider);
+  final authService = ref.watch(authServiceProvider);
   return GuestLoginNotifier(authService);
 });

@@ -104,6 +104,17 @@ class StorageService {
     await _secureStorage.delete(key: 'auth_token');
   }
 
+  // ==================== 设备 UUID 管理 (Secure Storage) ====================
+  /// 保存设备 UUID（用于游客登录标识设备）
+  Future<void> saveDeviceUuid(String uuid) async {
+    await _secureStorage.write(key: 'device_uuid', value: uuid);
+  }
+
+  /// 读取设备 UUID
+  Future<String?> getDeviceUuid() async {
+    return await _secureStorage.read(key: 'device_uuid');
+  }
+
   // ==================== 用户令牌管理 (Secure Storage) ====================
   /// 保存用户令牌（与上面的 AuthToken 类似，用于不同的认证场景）
   Future<void> saveToken(String token) async {
@@ -315,5 +326,39 @@ class StorageService {
   Future<void> clearAllData() async {
     await _prefs?.clear();
     await _secureStorage.deleteAll();
+  }
+
+  // ==================== 系统配置缓存 ====================
+  /// 保存系统配置（从后端获取）
+  Future<void> saveSystemConfig(Map<String, dynamic> config) async {
+    await _prefs?.setString('system_config_linekong', jsonEncode(config));
+  }
+
+  /// 读取系统配置
+  Future<Map<String, dynamic>?> getSystemConfig() async {
+    final jsonString = _prefs?.getString('system_config_linekong');
+    if (jsonString != null) {
+      return jsonDecode(jsonString) as Map<String, dynamic>;
+    }
+    return null;
+  }
+
+  // ==================== K币/解锁提示状态 ====================
+  /// K币充值不再提示
+  Future<void> saveKCionAgreeMore(bool agreed) async {
+    await _prefs?.setBool('k_cion_agree_more_linekong', agreed);
+  }
+
+  Future<bool> getKCionAgreeMore() async {
+    return _prefs?.getBool('k_cion_agree_more_linekong') ?? false;
+  }
+
+  /// 解锁剧集不再提示
+  Future<void> saveEpisodeUnlock(bool agreed) async {
+    await _prefs?.setBool('episode_unlock_linekong', agreed);
+  }
+
+  Future<bool> getEpisodeUnlock() async {
+    return _prefs?.getBool('episode_unlock_linekong') ?? false;
   }
 }

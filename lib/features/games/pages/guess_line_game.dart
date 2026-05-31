@@ -20,12 +20,12 @@ class GuessLineQuestion {
 
 class GuessLineMockData {
   static const _covers = [
-    'https://fastly.picsum.photos/seed/drama1/400/600',
-    'https://fastly.picsum.photos/seed/drama2/400/720',
-    'https://fastly.picsum.photos/seed/drama3/400/540',
-    'https://fastly.picsum.photos/seed/drama4/400/680',
-    'https://fastly.picsum.photos/seed/drama5/400/620',
-    'https://fastly.picsum.photos/seed/drama6/400/700',
+    'https://picsum.photos/seed/drama1/400/600',
+    'https://picsum.photos/seed/drama2/400/720',
+    'https://picsum.photos/seed/drama3/400/540',
+    'https://picsum.photos/seed/drama4/400/680',
+    'https://picsum.photos/seed/drama5/400/620',
+    'https://picsum.photos/seed/drama6/400/700',
   ];
 
   static final _questions = [

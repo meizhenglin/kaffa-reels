@@ -16,6 +16,7 @@ enum MembershipType {
 class UserModel extends Equatable {
   const UserModel({
     required this.id,
+    this.userName,
     this.email,
     this.displayName,
     this.nickname,
@@ -29,6 +30,7 @@ class UserModel extends Equatable {
   });
 
   final String id;
+  final String? userName;
   final String? email;
   final String? displayName;
   final String? nickname;
@@ -78,42 +80,47 @@ class UserModel extends Equatable {
   }
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    final isVip = json['isVip'] as int? ?? 0;
     return UserModel(
-      id: json['id'] as String,
+      id: json['userId']?.toString() ?? json['id']?.toString() ?? '',
+      userName: json['userName'] as String?,
       email: json['email'] as String?,
-      displayName: json['displayName'] as String?,
-      nickname: json['nickname'] as String?,
-      photoURL: json['photoURL'] as String?,
-      avatar: json['avatar'] as String?,
+      displayName: json['nickName'] as String? ?? json['nickname'] as String?,
+      nickname: json['nickName'] as String? ?? json['nickname'] as String?,
+      photoURL: json['userAvatar'] as String? ?? json['avatar'] as String?,
+      avatar: json['userAvatar'] as String? ?? json['avatar'] as String?,
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'] as String)
           : null,
       isEmailVerified: json['isEmailVerified'] as bool? ?? false,
       membershipType:
-          MembershipType.fromString(json['membershipType'] as String?),
-      membershipExpiryDate: json['membershipExpiryDate'] != null
-          ? DateTime.tryParse(json['membershipExpiryDate'] as String)
+          isVip == 1 ? MembershipType.premium : MembershipType.regular,
+      membershipExpiryDate: json['vipEndTime'] != null
+          ? DateTime.tryParse(json['vipEndTime'] as String)
           : null,
       isGuest: json['isGuest'] as bool? ?? false,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
+        'userId': id,
+        'userName': userName,
         'email': email,
+        'nickName': nickname,
         'displayName': displayName,
-        'nickname': nickname,
         'photoURL': photoURL,
         'avatar': avatar,
         'createdAt': createdAt?.toIso8601String(),
         'isEmailVerified': isEmailVerified,
         'membershipType': membershipType.name,
-        'membershipExpiryDate': membershipExpiryDate?.toIso8601String(),
+        'vipEndTime': membershipExpiryDate?.toIso8601String(),
+        'isVip': membershipType == MembershipType.premium ? 1 : 0,
         'isGuest': isGuest,
       };
 
   UserModel copyWith({
     String? id,
+    String? userName,
     String? email,
     String? displayName,
     String? nickname,
@@ -127,6 +134,7 @@ class UserModel extends Equatable {
   }) {
     return UserModel(
       id: id ?? this.id,
+      userName: userName ?? this.userName,
       email: email ?? this.email,
       displayName: displayName ?? this.displayName,
       nickname: nickname ?? this.nickname,

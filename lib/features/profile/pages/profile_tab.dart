@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../app/providers/app_providers.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../auth/models/user_model.dart';
 import 'chat_page.dart';
 import 'settings_page.dart';
 
@@ -16,6 +18,23 @@ class ProfileTab extends ConsumerStatefulWidget {
 
 class _ProfileTabState extends ConsumerState<ProfileTab> {
   @override
+  void initState() {
+    super.initState();
+    // 切换到 Profile Tab 时获取用户信息
+    Future.microtask(_loadUserInfo);
+  }
+
+  Future<void> _loadUserInfo() async {
+    final authService = ref.read(authServiceProvider);
+    await authService.fetchUserInfo();
+    final userData = await authService.getUserData();
+    if (userData != null && mounted) {
+      ref.read(authProvider.notifier).updateUserFromData(userData);
+      // 注意：不要在这里同步后端返回的语言设置！
+      // 语言设置由用户在 LanguagePage 主动切换，重启 App 后从 Storage 读取即可。
+      // 如果在这里 setLocale，会覆盖用户手动选择的语言。
+    }
+  }
   Widget build(BuildContext context) {
     return GradientScaffold(
       body: SafeArea(
@@ -138,7 +157,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                 if (auth.isAuthenticated)
                   Container(
                     height: 18,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    padding: const EdgeInsets.only(right: 5),
                     decoration: BoxDecoration(
                       color: const Color(0x26FFFFFF),
                       borderRadius: BorderRadius.circular(7),
@@ -173,7 +192,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
           ),
           if (!auth.isAuthenticated)
             GestureDetector(
-              onTap: () => context.push('/login'),
+              onTap: () => context.push('/auth/login'),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
@@ -275,7 +294,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             ),
           ),
           GestureDetector(
-            onTap: () => context.push('/membership'),
+            onTap: () => context.go('/membership'),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(

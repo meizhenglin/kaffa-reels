@@ -71,7 +71,7 @@ class ProfilePage extends ConsumerWidget {
         ),
         // 登录按钮
         GestureDetector(
-          onTap: () => context.push('/login'),
+          onTap: () => context.push('/auth/login'),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             decoration: BoxDecoration(
@@ -129,7 +129,7 @@ class ProfilePage extends ConsumerWidget {
             ),
           ),
           GestureDetector(
-            onTap: () => context.push('/membership'),
+            onTap: () => context.go('/membership'),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(

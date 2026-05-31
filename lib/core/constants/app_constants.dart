@@ -21,7 +21,8 @@ class AppConstants {
   // ==================== API 配置 ====================
   /// API 服务器基础地址，所有 API 请求都会基于此地址
   /// 【修改提示】部署到生产环境时替换为实际的服务器地址
-  static const String apiBaseUrl = 'https://dev.qahwatv.com/api';
+  /// 注意：API 地址请在 AppConfig (core/config/app_config.dart) 中修改
+  static const String apiBaseUrl = 'https://xemphimhay.vn';
 
   /// 连接超时时间（毫秒），请求超过此时间未响应则视为连接失败
   /// 【修改提示】网络较差时可适当增大此值
@@ -46,8 +47,23 @@ class AppConstants {
   static const int maxSearchHistoryItems = 10;
   /// 应用语言设置的键名
   static const String localeKey = 'app_locale';
+  /// 设备语言设置的键名（游客登录时获取并存储，用于 X-Client header）
+  static const String deviceLangKey = 'device_lang';
+  /// App 重启标记（切换语言后设为 true，main.dart 检测到后重新 runApp）
+  static const String restartAppKey = 'app_need_restart';
   /// 应用主题模式设置的键名（亮色/暗色）
   static const String themeModeKey = 'theme_mode';
+
+  /// 客户端参数（投放平台传入）
+  static const String clientParamsKey = 'client_params_linekong';
+  /// 设备系统名称
+  static const String osNameKey = 'os_name_linekong';
+  /// K币充值不再提示
+  static const String kCionAgreeMoreKey = 'k_cion_agree_more_linekong';
+  /// 解锁剧集不再提示
+  static const String episodeUnlockKey = 'episode_unlock_linekong';
+  /// 系统配置缓存
+  static const String systemConfigKey = 'system_config_linekong';
 
   // ==================== 国际化配置 ====================
   /// 支持的应用语言列表

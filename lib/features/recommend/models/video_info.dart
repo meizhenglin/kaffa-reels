@@ -1,24 +1,26 @@
-// Video information data class — matches API response from /api/video/recommendVideo
+// Video information data class — matches API response from /api/episodes/recommendIndex
 class VideoInfo {
-  final int id;
-  final int videoId;
-  final String videoUrl;
-  final String? videoUrlOne;
-  final String? videoUrlTwo;
-  final int serialNum;
-  final int longTime;
-  final int collectNum;
-  final int likeNum;
-  final int shareNum;
-  final int isCollect;
-  final int isLike;
-  final int totalEpisodes;
-  final String title;
+  final int id;           // episodesId
+  final int videoId;      // videoId
+  final String videoUrl;  // episodesUrl
+  final String? coverUrl; // videoPicture
+  final String? videoUrlOne;   // vipEpisodesUrl1080
+  final String? videoUrlTwo;   // vipEpisodesUrl1440
+  final int serialNum;    // episodesNum
+  final int longTime;     // 0 (not in API)
+  final int collectNum;   // 0 (not in API)
+  final int likeNum;      // thumbsNum
+  final int shareNum;     // 0 (not in API)
+  final int isCollect;    // isChasing
+  final int isLike;       // isLike
+  final int totalEpisodes; // videoEpisodes
+  final String title;     // videoName
 
   const VideoInfo({
     required this.id,
     required this.videoId,
     required this.videoUrl,
+    this.coverUrl,
     this.videoUrlOne,
     this.videoUrlTwo,
     this.serialNum = 0,
@@ -34,20 +36,21 @@ class VideoInfo {
 
   factory VideoInfo.fromJson(Map<String, dynamic> json) {
     return VideoInfo(
-      id: json['id'] as int? ?? 0,
+      id: json['episodesId'] as int? ?? 0,
       videoId: json['videoId'] as int? ?? 0,
-      videoUrl: json['videoUrl'] as String? ?? '',
-      videoUrlOne: json['videoUrlOne'] as String?,
-      videoUrlTwo: json['videoUrlTwo'] as String?,
-      serialNum: json['serialNum'] as int? ?? 0,
+      videoUrl: json['episodesUrl'] as String? ?? '',
+      coverUrl: json['videoPicture'] as String?,
+      videoUrlOne: json['vipEpisodesUrl1080'] as String?,
+      videoUrlTwo: json['vipEpisodesUrl1440'] as String?,
+      serialNum: json['episodesNum'] as int? ?? 0,
       longTime: json['longTime'] as int? ?? 0,
       collectNum: json['collectNum'] as int? ?? 0,
-      likeNum: json['likeNum'] as int? ?? 0,
+      likeNum: json['thumbsNum'] as int? ?? 0,
       shareNum: json['shareNum'] as int? ?? 0,
-      isCollect: json['isCollect'] as int? ?? 0,
+      isCollect: json['isChasing'] as int? ?? 0,
       isLike: json['isLike'] as int? ?? 0,
-      totalEpisodes: json['totalEpisodes'] as int? ?? 0,
-      title: json['title'] as String? ?? '',
+      totalEpisodes: json['videoEpisodes'] as int? ?? 0,
+      title: json['videoName'] as String? ?? '',
     );
   }
 
@@ -55,6 +58,7 @@ class VideoInfo {
         'id': id,
         'videoId': videoId,
         'videoUrl': videoUrl,
+        'coverUrl': coverUrl,
         'videoUrlOne': videoUrlOne,
         'videoUrlTwo': videoUrlTwo,
         'serialNum': serialNum,
@@ -72,6 +76,7 @@ class VideoInfo {
     int? id,
     int? videoId,
     String? videoUrl,
+    String? coverUrl,
     String? videoUrlOne,
     String? videoUrlTwo,
     int? serialNum,
@@ -88,6 +93,7 @@ class VideoInfo {
       id: id ?? this.id,
       videoId: videoId ?? this.videoId,
       videoUrl: videoUrl ?? this.videoUrl,
+      coverUrl: coverUrl ?? this.coverUrl,
       videoUrlOne: videoUrlOne ?? this.videoUrlOne,
       videoUrlTwo: videoUrlTwo ?? this.videoUrlTwo,
       serialNum: serialNum ?? this.serialNum,

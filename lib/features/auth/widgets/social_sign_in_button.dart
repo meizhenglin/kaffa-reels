@@ -49,33 +49,52 @@ class SocialSignInButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: isLoading ? null : onPressed,
-      style: OutlinedButton.styleFrom(
-        backgroundColor: backgroundColor,
-        foregroundColor: foregroundColor,
-        minimumSize: const Size(double.infinity, 52),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        side: BorderSide(
-          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
+    return Container(
+      decoration: BoxDecoration(
+        color: backgroundColor ?? Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: const Color(0xFFEEEEEE),
+          width: 1,
         ),
       ),
-      child: isLoading
-          ? const SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                icon,
-                const SizedBox(width: 12),
-                Text(label),
-              ],
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: isLoading ? null : onPressed,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            height: 50,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Center(
+              child: isLoading
+                  ? SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: foregroundColor ?? Colors.black,
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        icon,
+                        const SizedBox(width: 10),
+                        Text(
+                          label,
+                          style: TextStyle(
+                            color: foregroundColor ?? Colors.black,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
             ),
+          ),
+        ),
+      ),
     );
   }
 }

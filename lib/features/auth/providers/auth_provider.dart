@@ -2,8 +2,11 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers/app_providers.dart';
+import '../../../core/providers/auth_provider.dart';
 import '../models/user_model.dart';
 import '../repositories/auth_repository.dart';
+
+export '../../../core/providers/auth_provider.dart' show AuthService, RegisterResult, CheckCodeResult, authServiceProvider;
 
 /// ============================================================================
 /// 认证状态管理
@@ -142,6 +145,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(user: state.user!.copyWith(avatar: path));
       _repository.saveUserData(state.user!.toJson());
     }
+  }
+
+  /// 从后端 /api/user/userPersonalCenter 返回的数据更新用户信息
+  void updateUserFromData(Map<String, dynamic> data) {
+    final user = UserModel.fromJson(data);
+    state = state.copyWith(status: AuthStatus.authenticated, user: user);
   }
 
   /// 更新昵称

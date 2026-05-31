@@ -5,32 +5,17 @@ import '../../../l10n/app_localizations.dart';
 import '../../home/pages/main_page.dart';
 import '../../recommend/models/drama.dart';
 import '../../recommend/utils/drama_navigation.dart';
+import '../models/category.dart';
 import '../providers/explore_provider.dart';
 import '../providers/search_provider.dart';
-import '../widgets/category_chips_bar.dart';
 import '../widgets/explore_drama_grid_card.dart';
 import '../widgets/explore_search_bar.dart';
 import '../widgets/search_suggestions_panel.dart';
 
-/// ============================================================================
-/// 探索页
-///
-/// 【功能】
-/// - 搜索栏（支持搜索建议）
-/// - 分类标签栏
-/// - 短剧网格展示
-/// - 下拉刷新、上拉加载更多
-///
-/// 【如何修改】
-/// - 修改网格列数：_gridColumnCount 方法
-/// - 修改搜索逻辑：修改 search_provider.dart
-/// - 修改分类逻辑：修改 explore_provider.dart
-/// ============================================================================
 class ExplorePage extends ConsumerStatefulWidget {
   const ExplorePage({super.key, this.scrollController});
   final ScrollController? scrollController;
 
-  /// 在切 tab 前调用，清除搜索框焦点
   static void unfocusSearch(BuildContext context) {
     final state = context.findAncestorStateOfType<_ExplorePageState>();
     state?._searchFocusNode.unfocus();
@@ -42,6 +27,19 @@ class ExplorePage extends ConsumerStatefulWidget {
 class _ExplorePageState extends ConsumerState<ExplorePage> {
   late final ScrollController _scrollController = widget.scrollController ?? ScrollController();
   final _searchFocusNode = FocusNode();
+  final _moreButtonKey = GlobalKey();
+  final _rightPanelKey = GlobalKey();
+  final _filterBarKey = GlobalKey();
+  OverlayEntry? _dropdownOverlay;
+
+  @override
+  void dispose() {
+    _dropdownOverlay?.remove();
+    _dropdownOverlay = null;
+    if (widget.scrollController == null) _scrollController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -51,14 +49,6 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
     });
   }
 
-  @override
-  void dispose() {
-    if (widget.scrollController == null) _scrollController.dispose();
-    _searchFocusNode.dispose();
-    super.dispose();
-  }
-
-  /// 根据屏幕宽度计算网格列数
   int _gridColumnCount(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     if (width >= 900) return 4;
@@ -66,7 +56,6 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
     return 3;
   }
 
-  /// 滚动监听 - 触发加载更多
   bool _onScrollNotification(ScrollNotification notification) {
     if (notification is ScrollEndNotification) {
       final metrics = notification.metrics;
@@ -79,15 +68,54 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
     return false;
   }
 
-  /// 下拉刷新
   Future<void> _onRefresh() async {
     final search = ref.read(searchProvider);
     if (search.hasActiveSearch) await ref.read(searchProvider.notifier).submitSearch(search.debouncedQuery);
     else await ref.read(exploreProvider.notifier).refresh();
   }
 
-  /// 搜索建议点击
   void _onSuggestionTap(String keyword) { _searchFocusNode.unfocus(); ref.read(searchProvider.notifier).submitSearch(keyword); }
+
+  void _showMoreCategoriesMenu(BuildContext context, List<Category> categories, String selectedId) {
+    if (_dropdownOverlay != null) {
+      _dropdownOverlay?.remove();
+      _dropdownOverlay = null;
+      return;
+    }
+
+    final RenderBox moreButtonBox = _moreButtonKey.currentContext!.findRenderObject() as RenderBox;
+    final Offset moreButtonOffset = moreButtonBox.localToGlobal(Offset.zero);
+    final double arrowCenterX = moreButtonOffset.dx + moreButtonBox.size.width / 2;
+
+    final RenderBox filterBarBox = _filterBarKey.currentContext!.findRenderObject() as RenderBox;
+    final Offset filterBarOffset = filterBarBox.localToGlobal(Offset.zero);
+    final double filterBarWidth = filterBarBox.size.width;
+    final double dropdownWidth = filterBarWidth - 32;
+    final double dropdownLeft = filterBarOffset.dx + 16;
+    final double dropdownTop = moreButtonOffset.dy + moreButtonBox.size.height;
+
+    _dropdownOverlay = OverlayEntry(
+      builder: (ctx) => _CategoriesDropdown(
+        categories: categories,
+        selectedId: selectedId,
+        left: dropdownLeft,
+        top: dropdownTop,
+        arrowCenterX: arrowCenterX,
+        barWidth: dropdownWidth,
+        onClose: () {
+          _dropdownOverlay?.remove();
+          _dropdownOverlay = null;
+        },
+        onSelect: (id) {
+          ref.read(exploreProvider.notifier).selectCategory(id);
+          _dropdownOverlay?.remove();
+          _dropdownOverlay = null;
+        },
+      ),
+    );
+
+    Overlay.of(context).insert(_dropdownOverlay!);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -102,14 +130,102 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
 
     return GradientScaffold(
       body: SafeArea(
-        child: GestureDetector(onTap: () => _searchFocusNode.unfocus(), child: Column(children: [
-          Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 8), child: ExploreSearchBar(focusNode: _searchFocusNode, onSubmitted: (_) => _searchFocusNode.unfocus())),
-          if (showSuggestions) Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: SearchSuggestionsPanel(onSuggestionTap: _onSuggestionTap)),
-          if (!showSearchResults && explore.categories.isNotEmpty) ...[
-            CategoryChipsBar(categories: explore.categories, selectedId: explore.selectedCategoryId, onSelected: ref.read(exploreProvider.notifier).selectCategory),
-            const SizedBox(height: 8)],
-          Expanded(child: _buildContent(context, l10n, dramas: dramas, isLoading: isLoading, isLoadingMore: isLoadingMore, showSearchResults: showSearchResults, explore: explore, search: search)),
-        ])),
+        child: GestureDetector(
+          onTap: () => _searchFocusNode.unfocus(),
+          child: Column(children: [
+            Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 8), child: ExploreSearchBar(focusNode: _searchFocusNode, onSubmitted: (_) => _searchFocusNode.unfocus())),
+            if (showSuggestions) Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: SearchSuggestionsPanel(onSuggestionTap: _onSuggestionTap)),
+            if (!showSearchResults && explore.categories.isNotEmpty) ...[
+              _buildFilterBar(context, l10n, explore),
+              const SizedBox(height: 8),
+            ],
+            Expanded(child: _buildContent(context, l10n, dramas: dramas, isLoading: isLoading, isLoadingMore: isLoadingMore, showSearchResults: showSearchResults, explore: explore, search: search)),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  /// 筛选栏：左边64%滚动分类chips，右边36%固定Hot/New/更多
+  Widget _buildFilterBar(BuildContext context, AppLocalizations l10n, ExploreState explore) {
+    final locale = Localizations.localeOf(context);
+
+    return SizedBox(
+      key: _filterBarKey,
+      // height: 24,
+      child: Row(
+        children: [
+          // 左边64%：可滚动的分类chips
+          Expanded(
+            flex: 64,
+            child: Padding(
+              padding: const EdgeInsetsDirectional.only(start: 16, end: 16),
+              child: ClipRect(
+                child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 24),
+                    child: Row(
+                      children: [
+                        for (int i = 0; i < explore.categories.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 10),
+                          _CategoryChip(
+                            category: explore.categories[i],
+                            isSelected: explore.categories[i].id == explore.selectedCategoryId,
+                            onTap: () => ref.read(exploreProvider.notifier).selectCategory(explore.categories[i].id),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // 右边36%：固定的更多/Hot/New
+          Expanded(
+            flex: 36,
+            child: Padding(
+              key: _rightPanelKey,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: SizedBox(
+                height: 30,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    GestureDetector(
+                      key: _moreButtonKey,
+                      onTap: () => _showMoreCategoriesMenu(context, explore.categories, explore.selectedCategoryId),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Text(
+                            l10n.all,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Image(
+                            image: AssetImage('assets/images/more_icon.png'),
+                            width: 20,
+                            height: 20,
+                          ),
+                        ],
+                      ),
+                    ),
+                    _FilterTab(label: l10n.hot, isSelected: true, onTap: () {}),
+                    _FilterTab(label: 'New', isSelected: false, onTap: () {}),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -128,6 +244,180 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
           delegate: SliverChildBuilderDelegate((context, index) => ExploreDramaGridCard(drama: dramas[index], highlightQuery: showSearchResults ? search.debouncedQuery : null, onTap: () => openDramaPlayer(context, dramas[index])), childCount: dramas.length))),
         if (isLoadingMore) const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))),
       ])));
+  }
+}
+
+class _CategoriesDropdown extends StatelessWidget {
+  const _CategoriesDropdown({
+    required this.categories,
+    required this.selectedId,
+    required this.left,
+    required this.top,
+    required this.arrowCenterX,
+    required this.barWidth,
+    required this.onClose,
+    required this.onSelect,
+  });
+
+  final List<Category> categories;
+  final String selectedId;
+  final double left;
+  final double top;
+  final double arrowCenterX;
+  final double barWidth;
+  final VoidCallback onClose;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
+
+    return Stack(
+      children: [
+        // 点击阴影区域关闭
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: onClose,
+            child: Container(color: Colors.transparent),
+          ),
+        ),
+        // 正三角：直接定位在按钮正下方
+        Positioned(
+          left: arrowCenterX - 10,
+          top: top,
+          child: CustomPaint(
+            size: const Size(20, 10),
+            painter: _UpTrianglePainter(color: const Color(0xFFFFFFFF)),
+          ),
+        ),
+        // 弹框：紧贴三角下方
+        Positioned(
+          left: left,
+          top: top + 10,
+          child: Material(
+            color: const Color(0xFFFFFFFF),
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: barWidth,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: categories.map((cat) {
+                    final isSelected = cat.id == selectedId;
+                    return GestureDetector(
+                      onTap: () => onSelect(cat.id),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFF8F4EFF) : const Color(0xFFF5F5F5),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          cat.localizedName(locale),
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.black87,
+                            fontSize: 13,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _UpTrianglePainter extends CustomPainter {
+  _UpTrianglePainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final path = Path()
+      ..moveTo(0, size.height)
+      ..lineTo(size.width, size.height)
+      ..lineTo(size.width / 2, 0)
+      ..close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _FilterTab extends StatelessWidget {
+  const _FilterTab({required this.label, required this.isSelected, required this.onTap});
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Text(
+        label,
+        style: TextStyle(
+          color: isSelected
+              ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          fontSize: 13,
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryChip extends StatelessWidget {
+  const _CategoryChip({
+    required this.category,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final Category category;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF8F4EFF) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          category.localizedName(Localizations.localeOf(context)),
+          style: TextStyle(
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected
+                ? Colors.white
+                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -5,7 +5,9 @@ import 'package:dio/io.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter/foundation.dart';
 
+import '../config/app_config.dart';
 import '../constants/app_constants.dart';
+import '../storage/storage_service.dart';
 
 /// ============================================================================
 /// HTTP 网络客户端配置
@@ -15,132 +17,185 @@ import '../constants/app_constants.dart';
 /// - 配置全局 HTTP 请求参数（超时、头部等）
 /// - 添加请求/响应日志拦截器
 /// - 管理认证令牌
+/// - 自动注入 X-Client 平台标识头
+/// - Token 过期时自动跳转登录页
 ///
-/// 【工作流程】
-/// 1. 所有 API 请求通过 Dio 实例发送
-/// 2. 请求拦截器在发送前记录日志
-/// 3. 响应拦截器在收到响应后记录日志
-/// 4. 错误拦截器统一处理请求错误
-///
-/// 【如何修改】
-/// - 添加请求头：在 BaseOptions.headers 中添加
-/// - 修改超时时间：在 app_constants.dart 中修改
-/// - 添加新的拦截器：在 interceptors 中添加
+/// 【小程序原版对应】
+/// 对应小程序的 common/http.js，核心逻辑完全对齐：
+/// - X-Client 头 → 小程序 uni.request header
+/// - Token 自动注入 → 小程序 header.token
+/// - reLoad 重登录 → 小程序 reLoad() 跳转登录页
 /// ============================================================================
 class DioClient {
-  /// 构造函数
-  /// [dio] 可选，自定义的 Dio 实例；如果不传则使用默认实例
-  /// [logger] 可选，自定义的日志记录器；如果不传则使用默认 Logger
   DioClient({Dio? dio, Logger? logger})
       : _logger = logger ?? Logger(),
-        _dio = dio ?? Dio() {
-    // 配置 Dio 选项
+        _dio = dio ?? Dio(),
+        _storage = StorageService() {
     _dio
       ..options = BaseOptions(
-        // API 基础地址，所有请求都会基于此地址
-        // 【修改提示】在 app_constants.dart 中修改 AppConstants.apiBaseUrl
-        baseUrl: AppConstants.apiBaseUrl,
-
-        // 连接超时时间：与服务器建立连接的最大等待时间
-        // 【修改提示】在 app_constants.dart 中修改 AppConstants.connectTimeout
+        baseUrl: AppConfig.apiBaseUrl,
         connectTimeout:
             const Duration(milliseconds: AppConstants.connectTimeout),
-
-        // 接收超时时间：等待服务器返回数据的最大时间
-        // 【修改提示】在 app_constants.dart 中修改 AppConstants.receiveTimeout
         receiveTimeout:
             const Duration(milliseconds: AppConstants.receiveTimeout),
-
-        // 全局请求头
         headers: {
-          // 指定请求数据类型为 JSON
           'Content-Type': 'application/json',
-          // 期望接受的响应数据类型
           'Accept': 'application/json',
+          // X-Client 在每次请求时动态构建（见 onRequest 拦截器）
         },
       )
-      // 在 Debug 模式下跳过 SSL 证书验证，解决开发环境证书过期问题
-      // 【重要】生产环境默认不跳过，请确保生产服务器证书有效
       ..httpClientAdapter = _buildHttpClientAdapter()
       ..interceptors.add(
         InterceptorsWrapper(
-          /// 请求拦截器：在请求发送之前执行
-          onRequest: (options, handler) {
-            // 打印请求日志：[METHOD] => URL
-            // 【示例】REQUEST[GET] => https://api.example.com/dramas
-            _logger.d('REQUEST[${options.method}] => ${options.uri}');
-            // 打印 Authorization 头
-            final auth = options.headers['Authorization'];
-            if (auth != null) {
-              _logger.d('AUTHORIZATION: $auth');
+          onRequest: (options, handler) async {
+            // 每次请求动态构建 X-Client header（语言取自 Storage）
+            options.headers['X-Client'] = _buildXClientHeader();
+
+            final token = await _storage.getToken();
+            if (token != null && token.isNotEmpty) {
+              options.headers['token'] = token;
             }
-            // 必须调用 handler.next(options) 才能继续发送请求
+            final clientParams = _storage.getString(AppConstants.clientParamsKey) ?? '';
+            if (clientParams.isNotEmpty) {
+              options.headers['client_params'] = clientParams;
+              options.headers['clientparams'] = clientParams;
+            }
+
+            // ==================== 完整请求日志 ====================
+            _logger.d('');
+            _logger.d('【REQUEST】${options.method} ${options.uri}');
+            _logger.d('【HEADERS】');
+            options.headers.forEach((key, value) {
+              if (key.toLowerCase() == 'token') {
+                _logger.d('  $key: ****（已隐藏）');
+              } else {
+                _logger.d('  $key: $value');
+              }
+            });
+            final requestData = options.data;
+            if (requestData is Map) {
+              _logger.d('【BODY】$requestData');
+            } else if (requestData is FormData) {
+              _logger.d('【BODY】FormData(${requestData.fields.length} fields)');
+            } else if (requestData != null) {
+              _logger.d('【BODY】$requestData');
+            }
+            _logger.d('');
+
             handler.next(options);
           },
-
-          /// 响应拦截器：在收到响应之后执行
           onResponse: (response, handler) {
-            // 打印响应日志：[状态码] => URL
-            // 【示例】RESPONSE[200] => https://api.example.com/dramas
-            _logger.d(
-              'RESPONSE[${response.statusCode}] => ${response.requestOptions.uri}',
-            );
-            // 必须调用 handler.next(response) 才能继续处理响应
+            // ==================== 完整响应日志 ====================
+            final data = response.data;
+            int? code;
+            String? msg;
+            if (data is Map) {
+              code = data['code'] as int?;
+              msg = data['msg'] as String?;
+            }
+            _logger.d('');
+            _logger.d('【RESPONSE】${response.statusCode} ${response.requestOptions.uri}');
+            _logger.d('【CODE】$code  【MSG】$msg');
+            if (data != null) {
+              _logger.d('【DATA】$data');
+            }
+            _logger.d('');
+
             handler.next(response);
           },
+          onError: (error, handler) async {
+            // ==================== 完整错误日志 ====================
+            final statusCode = error.response?.statusCode;
+            final data = error.response?.data;
+            int? code;
+            String? msg;
+            if (data is Map) {
+              code = data['code'] as int?;
+              msg = data['msg'] as String?;
+            }
+            _logger.e('');
+            _logger.e('【ERROR】${error.type}');
+            _logger.e('【HTTP STATUS】$statusCode');
+            _logger.e('【URL】${error.requestOptions.uri}');
+            _logger.e('【CODE】$code  【MSG】$msg');
+            if (data != null) {
+              _logger.e('【RESPONSE DATA】$data');
+            }
+            _logger.e('【ERROR MESSAGE】${error.message}');
+            _logger.e('');
 
-          /// 错误拦截器：在请求出错时执行
-          onError: (error, handler) {
-            // 打印错误日志：[状态码] => URL
-            // 【示例】ERROR[401] => https://api.example.com/user/profile
-            _logger.e(
-              'ERROR[${error.response?.statusCode}] => ${error.requestOptions.uri}',
-              error: error,
-            );
-            // 【扩展点】可以在这里统一处理错误，如：
-            // - 401 未授权：跳转到登录页
-            // - 403 禁止访问：显示无权限提示
-            // - 500 服务器错误：显示服务器异常提示
-            handler.next(error);
+            if (statusCode != 200) {
+              handler.next(error);
+            } else {
+              handler.next(error);
+            }
           },
         ),
       );
   }
 
-  /// Dio 实例
   final Dio _dio;
-
-  /// Logger 实例，用于日志记录
   final Logger _logger;
+  final StorageService _storage;
+  bool _isRefreshing = false;
 
-  /// 获取 Dio 实例，外部可通过此访问 Dio 的 GET/POST 等方法
   Dio get dio => _dio;
 
-  /// 设置认证令牌
-  /// [token] 认证令牌，传 null 或空字符串表示清除令牌
-  ///
-  /// 【使用场景】
-  /// - 用户登录成功后：传入从服务器获取的 JWT 令牌
-  /// - 用户登出时：传入 null 清除令牌
-  ///
-  /// 【工作原理】
-  /// 在请求头中添加 Authorization: Bearer {token}
-  /// 后续所有请求都会自动带上这个头部
+  String _buildXClientHeader() {
+    // 优先使用 Storage 中存储的语言（游客登录时保存的设备语言 / 用户设置页切换的语言）
+    final savedLang = _storage.getString(AppConstants.deviceLangKey);
+    final lang = (savedLang != null && savedLang.isNotEmpty)
+        ? savedLang
+        : _defaultLang;
+    final xClient = AppConfig.currentXClient;
+    final version = AppConfig.appVersion;
+    final osName = AppConfig.platformType;
+    return '$xClient;version=$version;osName=$osName;x-lang=$lang';
+  }
+
+  /// 设备默认语言，从系统获取
+  static String get _defaultLang {
+    // 延迟获取，回退到 en-US
+    try {
+      final locale = PlatformDispatcher.instance.locale;
+      final lang = '${locale.languageCode}-${locale.countryCode ?? ''}';
+      return lang.isNotEmpty ? lang : 'en-US';
+    } catch (_) {
+      return 'en-US';
+    }
+  }
+
+  Future<void> _handleTokenExpired() async {
+    if (_isRefreshing) return;
+    _isRefreshing = true;
+    try {
+      await _storage.removeToken();
+      if (_onTokenExpired != null) {
+        _onTokenExpired!();
+      }
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+
+  /// Token 过期回调，由外部（App 级别）注册，处理跳转登录页等全局逻辑
+  void Function()? _onTokenExpired;
+
+  /// 注册 Token 过期回调
+  /// [callback] 触发时执行（如：跳转登录页、清理状态）
+  void setOnTokenExpired(void Function() callback) {
+    _onTokenExpired = callback;
+  }
+
   void setAuthToken(String? token) {
     if (token == null || token.isEmpty) {
-      // 清除 Authorization 头部
-      _dio.options.headers.remove('Authorization');
+      _dio.options.headers.remove('token');
     } else {
-      // 设置 Bearer 令牌
-      _dio.options.headers['authToken'] = '$token';
+      _dio.options.headers['token'] = token;
       _dio.options.headers['language'] = 'en';
     }
   }
 
-  /// 构建 HTTP 客户端适配器，根据环境配置 SSL 行为
-  ///
-  /// Debug 模式：跳过 SSL 证书验证（用于开发环境证书过期的情况）
-  /// Release 模式：使用系统默认 SSL 验证（保持生产环境安全性）
   HttpClientAdapter _buildHttpClientAdapter() {
     return IOHttpClientAdapter(
       createHttpClient: () {

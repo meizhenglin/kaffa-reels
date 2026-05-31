@@ -10,7 +10,6 @@ import '../../recommend/models/drama.dart';
 import '../../recommend/models/drama_list_type.dart';
 import '../../recommend/providers/recommend_provider.dart';
 import '../../recommend/utils/drama_navigation.dart';
-import '../../recommend/widgets/drama_card.dart';
 
 /// 短剧列表页面
 ///
@@ -35,9 +34,9 @@ class DramaListPage extends ConsumerWidget {
   List<Drama> _dramas(RecommendState state) {
     switch (type) {
       case DramaListType.hot:
-        return state.hotDramas;
+        return state.hotPicks;
       case DramaListType.recommended:
-        return state.recommendedDramas;
+        return state.newEpisodes;
     }
   }
 
@@ -70,9 +69,9 @@ class DramaListPage extends ConsumerWidget {
           GestureDetector(
             onTap: () => context.pop(),
             child: Image.asset(
-              'assets/images/back.png',
-              width: 24,
-              height: 24,
+              'assets/images/back_icon.png',
+              width: 20,
+              height: 20,
             ),
           ),
           Expanded(
@@ -124,29 +123,96 @@ class DramaListPage extends ConsumerWidget {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: () => ref.read(recommendProvider.notifier).refresh(),
-      child: GridView.builder(
-        padding: const EdgeInsets.all(15),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          mainAxisSpacing: 15,
-          crossAxisSpacing: 15,
-          childAspectRatio: 165 / 224,
-        ),
-        itemCount: dramas.length,
-        itemBuilder: (context, index) {
-          final drama = dramas[index];
-          return DramaCard(
-            drama: drama,
+    return GridView.builder(
+      padding: const EdgeInsets.all(15),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 15,
+        crossAxisSpacing: 15,
+        childAspectRatio: 106 / 165,
+      ),
+      itemCount: dramas.length,
+      itemBuilder: (context, index) {
+        final drama = dramas[index];
+        return _buildCard(
+          context,
+          ref,
+          index,
+          drama,
+        );
+      },
+    );
+  }
+
+  Widget _buildCard(
+    BuildContext context,
+    WidgetRef ref,
+    int index,
+    Drama drama,
+  ) {
+    final coverUrl = drama.coverUrl;
+
+    return SizedBox(
+      width: 106,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
             onTap: () => openDramaPlayerWithVipCheck(
               context: context,
               drama: drama,
               authState: ref.watch(authProvider),
               memberState: ref.watch(memberStateProvider),
             ),
-          );
-        },
+            child: Stack(
+              children: [
+                Container(
+                  height: 150,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(16),
+                    image: coverUrl != null
+                        ? DecorationImage(
+                            image: NetworkImage(coverUrl),
+                            fit: BoxFit.cover,
+                          )
+                        : null,
+                  ),
+                  child: coverUrl == null
+                      ? const Center(
+                          child: Icon(
+                            Icons.movie_outlined,
+                            size: 40,
+                            color: Colors.white54,
+                          ),
+                        )
+                      : null,
+                ),
+                // 前5名角标
+                if (index < 5)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    child: Image.asset(
+                      'assets/images/top_${index + 1}_icon.png',
+                      width: 22,
+                      height: 22,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            drama.title.split(' / ').first,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white,fontSize: 13,
+                ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

@@ -7,6 +7,7 @@ import 'package:logger/logger.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/network/api_service.dart';
 import '../../../core/storage/storage_service.dart';
 import '../models/user_model.dart';
 
@@ -65,6 +66,25 @@ class AuthRepository {
       membershipType: cached?.membershipType ?? MembershipType.regular,
       membershipExpiryDate: cached?.membershipExpiryDate,
     );
+  }
+
+  /// 调用后端登录接口，同步 Firebase Token 到后端
+  Future<bool> _syncBackendToken(Future<ApiResponse> Function() apiCall) async {
+    try {
+      final resp = await apiCall();
+      if (resp.isSuccess && resp.data != null) {
+        final data = resp.data as Map<String, dynamic>;
+        final backendToken = data['token'] as String?;
+        if (backendToken != null) {
+          await _storage.saveToken(backendToken);
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      _logger.e('[_syncBackendToken] error: $e');
+      return false;
+    }
   }
 
   Future<UserModel> signInWithEmail(String email, String password) async {
@@ -128,6 +148,11 @@ class AuthRepository {
       throw FirebaseAuthException(code: 'user-not-found');
     }
 
+    // 同步 Firebase Token 到后端，获取后端 Token
+    await _syncBackendToken(() => apiServiceProvider.googleIdToken(
+      idToken: googleAuth.idToken ?? '',
+    ));
+
     final model = await _userModelFromFirebaseUser(user);
     await cacheUser(model);
     return model;
@@ -159,7 +184,19 @@ class AuthRepository {
       throw FirebaseAuthException(code: 'user-not-found');
     }
 
-    // 首次登录时 Apple 可能返回姓名，需手动更新 displayName
+    // 同步 Apple Token 到后端
+    await _syncBackendToken(() => apiServiceProvider.appleLogin(
+      identityToken: appleCredential.identityToken ?? '',
+      authorizationCode: appleCredential.authorizationCode,
+      fullName: [
+        appleCredential.givenName,
+        if (appleCredential.familyName != null) appleCredential.familyName,
+      ].join(' ').trim().isEmpty ? null : [
+        appleCredential.givenName,
+        if (appleCredential.familyName != null) appleCredential.familyName,
+      ].join(' '),
+    ));
+
     final givenName = appleCredential.givenName;
     final familyName = appleCredential.familyName;
     if (givenName != null && user.displayName == null) {
@@ -188,7 +225,6 @@ class AuthRepository {
     await clearCache();
   }
 
-  /// 创建游客用户
   Future<UserModel> createGuestUser() async {
     final guestId = 'guest_${DateTime.now().millisecondsSinceEpoch}';
     final guestUser = UserModel.guest(guestId);
@@ -204,7 +240,6 @@ class AuthRepository {
     return model;
   }
 
-  // ========== Profile Update Methods ==========
   Future<void> saveLanguage(String languageCode) async {
     await _storage.setString('language_code', languageCode);
   }

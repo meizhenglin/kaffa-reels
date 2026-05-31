@@ -66,13 +66,13 @@ class _MatchingGamePageState extends ConsumerState<MatchingGamePage> {
   void _initGame() {
     final pairs = [
       _createPair('d1', 'Desert Love / حب الصحراء',
-          'https://fastly.picsum.photos/seed/drama1/200/280'),
+          'https://picsum.photos/seed/drama1/200/280'),
       _createPair('d2', 'Cairo Nights / ليالي القاهرة',
-          'https://fastly.picsum.photos/seed/drama2/200/280'),
+          'https://picsum.photos/seed/drama2/200/280'),
       _createPair('d3', 'Golden Sands / الرمال الذهبية',
-          'https://fastly.picsum.photos/seed/drama3/200/280'),
+          'https://picsum.photos/seed/drama3/200/280'),
       _createPair('d4', 'Royal Secret / سر ملكي',
-          'https://fastly.picsum.photos/seed/drama4/200/280'),
+          'https://picsum.photos/seed/drama4/200/280'),
     ];
 
     final allItems = pairs.expand((pair) => pair).toList();

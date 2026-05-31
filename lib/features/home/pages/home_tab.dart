@@ -62,12 +62,12 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 15),
-                itemCount: recommendState.hotDramas.isNotEmpty
-                    ? recommendState.hotDramas.length
-                    : 8,
+                itemCount: recommendState.hotPicks.isNotEmpty
+                    ? recommendState.hotPicks.length.clamp(0, 5)
+                    : 5,
                 itemBuilder: (context, index) {
-                  final drama = recommendState.hotDramas.isNotEmpty
-                      ? recommendState.hotDramas[index]
+                  final drama = recommendState.hotPicks.isNotEmpty
+                      ? recommendState.hotPicks[index]
                       : null;
                   return _buildHorizontalCard(context, index, drama);
                 },
@@ -105,7 +105,7 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
             child: _buildSection(
               context,
               title: l10n.vipZone,
-              onViewAll: () => context.push('/membership'),
+              onViewAll: () => context.go('/membership'),
             ),
           ),
           SliverPadding(
@@ -137,19 +137,19 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     return [
       const BannerItem(
         id: 'banner_1',
-        imageUrl: 'https://fastly.picsum.photos/seed/banner1/800/400',
+        imageUrl: 'https://picsum.photos/seed/banner1/800/400',
         dramaId: 'drama_0',
         // title: 'Desert Rose / وردة الصحراء',
       ),
       const BannerItem(
         id: 'banner_2',
-        imageUrl: 'https://fastly.picsum.photos/seed/banner2/800/400',
+        imageUrl: 'https://picsum.photos/seed/banner2/800/400',
         dramaId: 'drama_5',
         title: 'The Shadow / الظل',
       ),
       const BannerItem(
         id: 'banner_3',
-        imageUrl: 'https://fastly.picsum.photos/seed/banner3/800/400',
+        imageUrl: 'https://picsum.photos/seed/banner3/800/400',
         dramaId: 'drama_10',
         title: 'The Mix-Up / الخلط',
       ),
@@ -209,8 +209,8 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     bool isNewThisMonth = false,
   }) {
     final source = isNewThisMonth
-        ? state.newThisMonthDramas
-        : state.recommendedDramas;
+        ? state.newEpisodes
+        : state.newEpisodes;
     final drama = source.isNotEmpty && index < source.length
         ? source[index]
         : null;
@@ -246,12 +246,10 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
                           decoration: BoxDecoration(
                             color: Colors.grey[300],
                             borderRadius: BorderRadius.circular(16),
-                            image: coverUrl != null
-                                ? DecorationImage(
+                            image: DecorationImage(
                                     image: NetworkImage(coverUrl),
                                     fit: BoxFit.cover,
-                                  )
-                                : null,
+                                  ),
                           ),
                         ),
                         // VIP 角标（仅 isVipOnly 显示）
@@ -295,8 +293,8 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
 
   Widget _buildVipCard(BuildContext context, RecommendState state, int index) {
     // VIP 使用热门数据
-    final drama = state.hotDramas.isNotEmpty && index < state.hotDramas.length
-        ? state.hotDramas[index]
+    final drama = state.hotPicks.isNotEmpty && index < state.hotPicks.length
+        ? state.hotPicks[index]
         : null;
     final coverUrl = drama?.coverUrl;
 
@@ -318,27 +316,30 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
                   : null,
               child: Stack(
                 children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(16),
-                      image: coverUrl != null
-                          ? DecorationImage(
+                  coverUrl != null
+                      ? Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(16),
+                            image: DecorationImage(
                               image: NetworkImage(coverUrl),
                               fit: BoxFit.cover,
-                            )
-                          : null,
-                    ),
-                    child: coverUrl == null
-                        ? const Center(
+                            ),
+                          ),
+                        )
+                      : Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Center(
                             child: Icon(
                               Icons.star,
                               size: 30,
                               color: Colors.amber,
                             ),
-                          )
-                        : null,
-                  ),
+                          ),
+                        ),
                   // VIP 徽章（强制显示，左上角）
                   if (drama != null && drama.isVipOnly)
                     Positioned(
@@ -434,30 +435,34 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
                   : null,
               child: Stack(
                 children: [
-                  Container(
-                    height: 150,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(16),
-                      image: coverUrl != null
-                          ? DecorationImage(
+                  coverUrl != null
+                      ? Container(
+                          height: 150,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(16),
+                            image: DecorationImage(
                               image: NetworkImage(coverUrl),
                               fit: BoxFit.cover,
-                            )
-                          : null,
-                    ),
-                    child: coverUrl == null
-                        ? const Center(
+                            ),
+                          ),
+                        )
+                      : Container(
+                          height: 150,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Center(
                             child: Icon(
                               Icons.movie_outlined,
                               size: 40,
                               color: Colors.white54,
                             ),
-                          )
-                        : null,
-                  ),
-                  // 前3名角标（左上角）
-                  if (drama != null && index < 3)
+                          ),
+                        ),
+                  // 前5名角标
+                  if (drama != null && index < 5)
                     Positioned(
                       top: 0,
                       left: 0,

@@ -3,8 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/pages/forgot_password_page.dart';
+import '../../features/auth/pages/login_email_page.dart';
 import '../../features/auth/pages/login_page.dart';
+import '../../features/auth/pages/register_email_page.dart';
 import '../../features/auth/pages/register_page.dart';
+import '../../features/auth/pages/user_agreement_page.dart';
+import '../../features/auth/pages/privacy_policy_page.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/explore/pages/explore_tab.dart';
 import '../../features/games/pages/games_tab.dart';
@@ -17,8 +21,8 @@ import '../../features/payment/pages/membership_page.dart';
 import '../../features/profile/pages/profile_tab.dart';
 import '../../features/profile/pages/change_name_page.dart';
 import '../../features/profile/pages/history_page.dart';
-import '../../features/recommend/pages/recommend_tab.dart';
 import '../../features/recommend/models/drama_list_type.dart';
+import '../../features/recommend/pages/recommend_tab.dart';
 import '../../features/home/pages/drama_list_page.dart';
 import '../../features/search/pages/search_page.dart';
 import '../../features/splash/pages/splash_page.dart';
@@ -357,6 +361,19 @@ final routerProvider = Provider<GoRouter>((ref) {
           final redirect = state.uri.queryParameters['redirect'];
           return LoginPage(redirect: redirect);
         },
+        routes: [
+          /// 邮箱登录页面
+          /// 【路径】/auth/login/email
+          GoRoute(
+            parentNavigatorKey: rootNavigatorKey,
+            path: 'email',
+            name: 'loginEmail',
+            builder: (context, state) {
+              final redirect = state.extra as String?;
+              return LoginEmailPage(redirect: redirect);
+            },
+          ),
+        ],
       ),
 
       /// 注册页面
@@ -371,6 +388,33 @@ final routerProvider = Provider<GoRouter>((ref) {
           final redirect = state.uri.queryParameters['redirect'];
           return RegisterPage(redirect: redirect);
         },
+      ),
+
+      /// 邮箱注册页面
+      /// 【路径】/auth/register/email
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/auth/register/email',
+        name: 'registerEmail',
+        builder: (context, state) => const RegisterEmailPage(),
+      ),
+
+      /// 用户协议页面
+      /// 【路径】/auth/user-agreement
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/auth/user-agreement',
+        name: 'user-agreement',
+        builder: (context, state) => const UserAgreementPage(),
+      ),
+
+      /// 隐私政策页面
+      /// 【路径】/auth/privacy-policy
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/auth/privacy-policy',
+        name: 'privacy-policy',
+        builder: (context, state) => const PrivacyPolicyPage(),
       ),
 
       /// 忘记密码页面
