@@ -121,6 +121,10 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
 }
 
 /// ============================================================================
+/// 当前可见的 Tab 索引，用于播放器控制
+/// 0=首页, 1=发现, 2=推荐, 3=游戏, 4=我的
+final visibleTabIndexProvider = StateProvider<int>((ref) => 2);
+
 /// 语言/地区状态管理器
 ///
 /// 【功能】处理应用语言的读取、保存和切换逻辑

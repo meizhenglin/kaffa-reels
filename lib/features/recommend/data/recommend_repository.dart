@@ -9,6 +9,28 @@ import '../models/video_info.dart';
 import 'comprehensive_mock_data.dart';
 import 'recommend_mock_data.dart';
 
+/// 单集播放地址缓存，避免同一集重复请求
+class EpisodeUrlCache {
+  final String videoUrl;
+  final String? videoUrlOne;
+  final String? videoUrlTwo;
+  final int isCanPlay;
+  final int isVip;
+  final DateTime fetchTime;
+
+  EpisodeUrlCache({
+    required this.videoUrl,
+    this.videoUrlOne,
+    this.videoUrlTwo,
+    required this.isCanPlay,
+    required this.isVip,
+  }) : fetchTime = DateTime.now();
+
+  bool get isExpired => DateTime.now().difference(fetchTime).inMinutes > 5;
+}
+
+final Map<String, EpisodeUrlCache> _episodeUrlCache = {};
+
 class RecommendRepository {
   RecommendRepository({
     required DioClient dioClient,
@@ -178,5 +200,52 @@ class RecommendRepository {
   Future<List<Drama>> fetchNewUpdates() async {
     await Future<void>.delayed(const Duration(milliseconds: 400));
     return ComprehensiveMockData.newUpdates();
+  }
+
+  // ==================== 单集播放地址 ====================
+
+  /// 根据 videoId + episodesId 获取单集真实播放地址
+  ///
+  /// recommendIndex 返回的 episodesUrl 可能无效，每次滑动都应重新请求。
+  /// 结果会被缓存 5 分钟，同一集不会重复请求。
+  Future<EpisodeUrlCache?> fetchEpisodeUrl({
+    required int videoId,
+    required int episodesId,
+  }) async {
+    final cacheKey = '${videoId}_$episodesId';
+
+    // 缓存未过期直接返回
+    final cached = _episodeUrlCache[cacheKey];
+    if (cached != null && !cached.isExpired) {
+      return cached;
+    }
+
+    final token = await _authService.ensureToken();
+    if (token == null) return null;
+
+    try {
+      _dioClient.setAuthToken(token);
+      final response = await _dioClient.dio.post(
+        '/api/episodes/getEpisodeInfo',
+        data: {'videoId': videoId, 'episodesId': episodesId},
+      );
+      final data = response.data as Map<String, dynamic>;
+
+      if (data['code'] == 0) {
+        final episodeData = data['data'] as Map<String, dynamic>;
+        final cache = EpisodeUrlCache(
+          videoUrl: episodeData['episodesUrl'] as String? ?? '',
+          videoUrlOne: episodeData['vipEpisodesUrl1080'] as String?,
+          videoUrlTwo: episodeData['vipEpisodesUrl1440'] as String?,
+          isCanPlay: episodeData['isCanPlay'] as int? ?? 1,
+          isVip: episodeData['isVip'] as int? ?? 0,
+        );
+        _episodeUrlCache[cacheKey] = cache;
+        return cache;
+      }
+    } on DioException {
+      // ignore
+    }
+    return null;
   }
 }

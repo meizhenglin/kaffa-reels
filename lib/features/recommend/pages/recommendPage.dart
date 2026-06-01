@@ -112,7 +112,7 @@ class _ShortVideoListPageState extends State<ShortVideoListPage> {
   late PreloadPageController _preloadPageController;
   late AliPlayerPreload _aliPlayerPreload;
   late List _itemKeys;
-  int _currentIndex = 0; 
+  int _currentIndex = 0;
 
   @override
   void initState() {

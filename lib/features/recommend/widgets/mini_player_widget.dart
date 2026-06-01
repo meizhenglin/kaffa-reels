@@ -22,8 +22,40 @@ class MiniPlayerWidget extends ConsumerStatefulWidget {
   ConsumerState<MiniPlayerWidget> createState() => _MiniPlayerState();
 }
 
-class _MiniPlayerState extends ConsumerState<MiniPlayerWidget> {
+class _MiniPlayerState extends ConsumerState<MiniPlayerWidget>
+    with WidgetsBindingObserver {
   final Logger _logger = Logger();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) return;
+    final playerState = ref.read(miniPlayerProvider);
+    final controller = ref.read(miniPlayerProvider.notifier);
+    switch (state) {
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        if (playerState.isPlaying) {
+          controller.togglePlay();
+        }
+        break;
+      case AppLifecycleState.resumed:
+        break;
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,20 +74,20 @@ class _MiniPlayerState extends ConsumerState<MiniPlayerWidget> {
         // Player area with action buttons overlay
         Stack(
           children: [
-            // Aliyun player surface
-            SizedBox(
-              width: screenWidth,
-              height: playerHeight,
-              child: AliPlayerView(
-                onCreated: (viewId) {
-                  _logger.d('[MiniPlayer] AliPlayerView onCreated viewId=$viewId');
-                  controller.setViewId(viewId);
-                },
-                x: 0,
-                y: 0,
-                width: screenWidth.toDouble(),
+            RepaintBoundary(
+              child: SizedBox(
+                width: screenWidth,
                 height: playerHeight,
-                aliPlayerViewType: AliPlayerViewTypeForAndroid.surfaceview,
+                child: AliPlayerView(
+                  onCreated: (viewId) {
+                    controller.setViewId(viewId);
+                  },
+                  x: 0,
+                  y: 0,
+                  width: screenWidth.toDouble(),
+                  height: playerHeight,
+                  aliPlayerViewType: AliPlayerViewTypeForAndroid.surfaceview,
+                ),
               ),
             ),
 
@@ -375,15 +407,17 @@ class _WatchButton extends StatelessWidget {
                   ))
               .toList();
           context.push(
-            '/player',
+            '/detail',
             extra: {
               'url': videoUrl,
+              'videoId': dramaId,
               'title': title,
               'dramaId': dramaId,
-              'episodes': episodeList,
+              'allEpisodes': episodeList,
               'currentIndex': 0,
               'coverUrl': coverUrl,
-              'isUnlocked': episodes.isEmpty ? true : episodes.first.isUnlocked,
+              'isVipOnly': episodes.isEmpty ? false : !episodes.first.isUnlocked,
+              'autoPlay': true,
             },
           );
         },

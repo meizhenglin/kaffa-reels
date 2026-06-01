@@ -88,16 +88,28 @@ class MiniPlayerController extends StateNotifier<MiniPlayerState> {
   Timer? _positionTimer;
   int? _viewId;
 
+  /// 热重启检测：static 在热重启后保留旧值，实例 buildId 每次 build 时递增
+  /// 两者对比可判断热重启是否发生
+  static int staticBuildId = 0;
+  int buildId = 0;
+
+  /// 热重启重置中，此时 setViewId 不要自动加载视频
+  bool _resettingForHotRestart = false;
+
   void setViewId(int viewId) {
     _viewId = viewId;
     if (state.videoUrl.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _player?.setPlayerView(viewId);
-        _loadVideo(state.videoUrl);
+        if (!_resettingForHotRestart) {
+          _loadVideo(state.videoUrl);
+        }
+        _resettingForHotRestart = false;
       });
     }
   }
 
+  @override
   void _setupListeners() {
     final player = _player;
     if (player == null) return;
@@ -201,6 +213,18 @@ class MiniPlayerController extends StateNotifier<MiniPlayerState> {
     } else {
       _logger.w('[MiniPlayer] _viewId is null! AliPlayerView.onCreated not called yet');
     }
+  }
+
+  /// 热重启后 AliPlayerView 重建时调用此方法
+  /// 停止旧播放器实例，释放 SurfaceTexture，避免 "already connected to another API" 错误
+  void resetAfterHotRestart() {
+    _resettingForHotRestart = true;
+    _player?.stop();
+    _player?.release();
+    _player = FlutterAliPlayerFactory.createAliPlayer();
+    _setupListeners();
+    _positionTimer?.cancel();
+    _positionTimer = null;
   }
 
   void togglePlay() {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_aliplayer/flutter_aliplayer.dart';
 import 'package:flutter_aliplayer/flutter_aliplayer_factory.dart';
 import 'package:flutter_aliplayer/flutter_aliplayer_global_setting.dart';
 import 'package:flutter_aliplayer/flutter_avpdef.dart';
@@ -29,6 +30,10 @@ void main() async {
   debugPrint('[MAIN] === main() started ===');
   WidgetsFlutterBinding.ensureInitialized();
   debugPrint('[MAIN] WidgetsFlutterBinding ready');
+
+  // 关闭阿里云播放器日志（只保留 API 请求日志）
+  FlutterAliplayer.enableConsoleLog(false);
+  FlutterAliplayer.setLogLevel(LogLevel.AF_LOG_LEVEL_NONE);
 
   // Firebase 初始化
   await _withTimeout(

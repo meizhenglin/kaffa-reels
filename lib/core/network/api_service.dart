@@ -343,10 +343,21 @@ class ApiService {
   }
 
   /// 根据视频 ID 获取剧集列表（正片/花絮等）
-  Future<ApiResponse> getVideoListByVideoId({required String videoId}) {
+  ///
+  /// [episodesNum] 当前集号（从 getEpisodeInfo 的 videoEpisodes 获取，用于定位当前集）
+  /// [pageSize] 每页集数，默认取 videoEpisodes（总集数），即一次性拉全量
+  Future<ApiResponse> getVideoListByVideoId({
+    required String videoId,
+    int? episodesNum,
+    int? pageSize,
+  }) {
     return request(
       ApiEndpoints.playVideo,
-      data: {'videoId': videoId},
+      data: {
+        'videoId': videoId,
+        if (episodesNum != null) 'episodesNum': episodesNum,
+        if (pageSize != null) 'pageSize': pageSize,
+      },
     );
   }
 

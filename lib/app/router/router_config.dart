@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../components/common_video_player.dart';
+import '../../features/detail/pages/detail_page.dart';
 import '../../features/auth/pages/forgot_password_page.dart';
 import '../../features/auth/pages/login_email_page.dart';
 import '../../features/auth/pages/login_page.dart';
@@ -16,6 +18,7 @@ import '../../features/home/pages/home_tab.dart';
 import '../../features/home/pages/main_page.dart';
 import '../../features/home/models/navigation_item.dart';
 import '../../features/player/presentation/player_page.dart';
+import '../../features/player/presentation/player_controller.dart';
 import '../../features/player/presentation/test_player_page.dart';
 import '../../features/payment/pages/membership_page.dart';
 import '../../features/profile/pages/profile_tab.dart';
@@ -338,6 +341,62 @@ final routerProvider = Provider<GoRouter>((ref) {
               videoUrlOne: videoUrlOne,
               videoUrlTwo: videoUrlTwo,
             ),
+          );
+        },
+      ),
+
+      /// 详情页（短视频点击 Watch 跳转）
+      /// 【路径】/detail
+      /// 【参数】
+      /// - videoUrl：视频地址
+      /// - videoId：视频唯一标识
+      /// - title：标题
+      /// - coverUrl：封面
+      /// - allEpisodes：剧集列表
+      /// - currentIndex：当前集数索引
+      /// - videoUrlOne：高清地址
+      /// - videoUrlTwo：超清地址
+      /// - isVipOnly：是否VIP专属
+      /// - initialProgress：初始播放进度
+      /// - autoPlay：是否自动播放
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/detail',
+        name: 'detail',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final rawEpisodes = extra?['allEpisodes'] as List<dynamic>?;
+          final episodes = rawEpisodes
+              ?.map((e) {
+                if (e is EpisodeData) {
+                  return CommonEpisode(
+                    id: e.id,
+                    title: e.title,
+                    videoUrl: e.videoUrl,
+                    coverUrl: e.coverUrl,
+                    isUnlocked: e.isUnlocked,
+                  );
+                }
+                if (e is CommonEpisode) {
+                  return e;
+                }
+                return null;
+              })
+              .whereType<CommonEpisode>()
+              .toList() ??
+          const [];
+          return DetailPage(
+            videoUrl: extra?['url'] as String? ?? '',
+            videoId: extra?['videoId'] as String? ?? extra?['dramaId'] as String? ?? '',
+            title: extra?['title'] as String?,
+            coverUrl: extra?['coverUrl'] as String?,
+            allEpisodes: episodes,
+            currentIndex: extra?['currentIndex'] as int? ?? 0,
+            videoUrlOne: extra?['videoUrlOne'] as String?,
+            videoUrlTwo: extra?['videoUrlTwo'] as String?,
+            isVipOnly: extra?['isVipOnly'] as bool? ?? false,
+            initialProgress: extra?['initialProgress'] as Duration?,
+            autoPlay: extra?['autoPlay'] as bool? ?? false,
           );
         },
       ),

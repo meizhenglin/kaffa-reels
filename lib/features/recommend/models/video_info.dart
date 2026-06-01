@@ -2,7 +2,7 @@
 class VideoInfo {
   final int id;           // episodesId
   final int videoId;      // videoId
-  final String videoUrl;  // episodesUrl
+  final String videoUrl;  // episodesUrl (may be invalid, use getEpisodeInfo for real URL)
   final String? coverUrl; // videoPicture
   final String? videoUrlOne;   // vipEpisodesUrl1080
   final String? videoUrlTwo;   // vipEpisodesUrl1440
@@ -15,6 +15,7 @@ class VideoInfo {
   final int isLike;       // isLike
   final int totalEpisodes; // videoEpisodes
   final String title;     // videoName
+  final int isCanPlay;   // isCanPlay（0=需解锁，1=可播放）
 
   const VideoInfo({
     required this.id,
@@ -32,6 +33,7 @@ class VideoInfo {
     this.isLike = 0,
     this.totalEpisodes = 0,
     this.title = '',
+    this.isCanPlay = 1,
   });
 
   factory VideoInfo.fromJson(Map<String, dynamic> json) {
@@ -51,6 +53,7 @@ class VideoInfo {
       isLike: json['isLike'] as int? ?? 0,
       totalEpisodes: json['videoEpisodes'] as int? ?? 0,
       title: json['videoName'] as String? ?? '',
+      isCanPlay: json['isCanPlay'] as int? ?? 1,
     );
   }
 
@@ -70,6 +73,7 @@ class VideoInfo {
         'isLike': isLike,
         'totalEpisodes': totalEpisodes,
         'title': title,
+        'isCanPlay': isCanPlay,
       };
 
   VideoInfo copyWith({
@@ -88,6 +92,7 @@ class VideoInfo {
     int? isLike,
     int? totalEpisodes,
     String? title,
+    int? isCanPlay,
   }) {
     return VideoInfo(
       id: id ?? this.id,
@@ -105,6 +110,7 @@ class VideoInfo {
       isLike: isLike ?? this.isLike,
       totalEpisodes: totalEpisodes ?? this.totalEpisodes,
       title: title ?? this.title,
+      isCanPlay: isCanPlay ?? this.isCanPlay,
     );
   }
 
