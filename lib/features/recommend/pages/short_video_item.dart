@@ -4,9 +4,9 @@
 // Date: 2025/2/19
 // Brief: 单个播放项组件
 
+import 'dart:async';
 import 'package:aliplayer_widget/aliplayer_widget_lib.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -32,14 +32,12 @@ class ShortVideoItem extends StatefulWidget {
   State<ShortVideoItem> createState() => ShortVideoItemState();
 }
 
-class ShortVideoItemState extends State<ShortVideoItem>
-    with WidgetsBindingObserver {
+class ShortVideoItemState extends State<ShortVideoItem> {
   static const String _tag = "ShortVideoItem";
 
-  AliPlayerWidgetController? _controller;
+  late AliPlayerWidgetController _controller;
 
-  VoidCallback? _preparedListener;
-
+  /// 当前正在使用的视频 URL
   String _currentUrl = '';
 
   @override
@@ -51,98 +49,19 @@ class ShortVideoItemState extends State<ShortVideoItem>
 
     _controller = AliPlayerWidgetController(context);
 
-    final videoSource = VideoSourceFactory.createUrlSource(_currentUrl);
+    final videoSource = VideoSourceFactory.createUrlSource(widget.videoInfo.videoUrl);
     final data = AliPlayerWidgetData(
       sceneType: SceneType.listPlayer,
       videoSource: videoSource,
       coverUrl: widget.videoInfo.coverUrl ?? '',
       autoPlay: widget.autoPlay,
     );
-    _controller!.configure(data).then((_) {
-      debugPrint("[$_tag][configure done] id=${widget.videoInfo.id}");
-      if (widget.autoPlay) {
-        _schedulePlay();
-      }
-    });
-
-    if (widget.autoPlay) {
-      _subscribePrepared();
-    }
-
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  void _subscribePrepared() {
-    if (_controller == null) return;
-    if (_controller!.isPreparedNotifier.value) {
-      _schedulePlay();
-      return;
-    }
-
-    _preparedListener = () {
-      if (!mounted || _controller == null) return;
-      if (_controller!.isPreparedNotifier.value) {
-        _controller!.isPreparedNotifier.removeListener(_preparedListener!);
-        _preparedListener = null;
-        debugPrint("[$_tag] isPrepared 变为 true，触发播放");
-        _schedulePlay();
-      }
-    };
-    _controller?.isPreparedNotifier.addListener(_preparedListener!);
-  }
-
-  void _cancelPreparedListener() {
-    if (_preparedListener != null && _controller != null) {
-      _controller!.isPreparedNotifier.removeListener(_preparedListener!);
-      _preparedListener = null;
-    }
-  }
-
-  void _schedulePlay() {
-    if (!mounted) return;
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      debugPrint("[$_tag][play postFrame] id=${widget.videoInfo.id}");
-      _controller?.play();
-    });
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    debugPrint(
-        "[$_tag][AppLifecycleState] state=$state autoPlay=${widget.autoPlay}");
-    switch (state) {
-      case AppLifecycleState.inactive:
-      case AppLifecycleState.paused:
-      case AppLifecycleState.hidden:
-      case AppLifecycleState.detached:
-        if (widget.autoPlay && _controller != null) {
-          _controller!.pause();
-        }
-        break;
-      case AppLifecycleState.resumed:
-        if (widget.autoPlay && _controller != null) {
-          _controller!.play();
-        }
-        break;
-    }
+    _controller.configure(data);
   }
 
   @override
   void didUpdateWidget(ShortVideoItem oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    if (widget.autoPlay && !oldWidget.autoPlay) {
-      debugPrint("[$_tag] autoPlay: false→true id=${widget.videoInfo.id}");
-      _subscribePrepared();
-      _schedulePlay();
-    }
-
-    if (!widget.autoPlay && oldWidget.autoPlay) {
-      debugPrint("[$_tag] autoPlay: true→false id=${widget.videoInfo.id}");
-      _cancelPreparedListener();
-      _controller?.pause();
-    }
 
     // 视频 URL 变化（来自 getEpisodeInfo 更新）
     if (widget.videoInfo.videoUrl != oldWidget.videoInfo.videoUrl &&
@@ -187,9 +106,11 @@ class ShortVideoItemState extends State<ShortVideoItem>
     debugPrint(
         "[$_tag][applyNewUrl] ${widget.videoInfo.id}: $_currentUrl → $newUrl");
 
-    _cancelPreparedListener();
-    _controller?.stop();
+    _controller.stop();
+    _controller.destroy();
     _currentUrl = newUrl;
+
+    _controller = AliPlayerWidgetController(context);
 
     final videoSource = VideoSourceFactory.createUrlSource(newUrl);
     final data = AliPlayerWidgetData(
@@ -198,40 +119,51 @@ class ShortVideoItemState extends State<ShortVideoItem>
       coverUrl: widget.videoInfo.coverUrl ?? '',
       autoPlay: widget.autoPlay,
     );
-    _controller?.configure(data).then((_) {
-      if (mounted && widget.autoPlay) {
-        _schedulePlay();
-        _subscribePrepared();
-      }
-    });
+    _controller.configure(data);
+  }
+
+  /// 切换到指定集：直接替换当前播放器内容并播放（不重建 widget）
+  void switchTo(VideoInfo newInfo) {
+    if (!mounted) return;
+    debugPrint("[$_tag][switchTo] ${widget.videoInfo.id} → ${newInfo.id} url=${newInfo.videoUrl}");
+
+    _controller.stop();
+    _controller.destroy();
+    _currentUrl = newInfo.videoUrl;
+
+    _controller = AliPlayerWidgetController(context);
+
+    if (newInfo.videoUrl.isEmpty) return;
+    final videoSource = VideoSourceFactory.createUrlSource(newInfo.videoUrl);
+    final data = AliPlayerWidgetData(
+      sceneType: SceneType.listPlayer,
+      videoSource: videoSource,
+      coverUrl: newInfo.coverUrl ?? '',
+      autoPlay: true,
+    );
+    _controller.configure(data);
   }
 
   @override
   void dispose() {
     debugPrint("[$_tag][dispose] id=${widget.videoInfo.id}");
-    WidgetsBinding.instance.removeObserver(this);
-    _cancelPreparedListener();
-    _controller?.stop();
-    _controller?.destroy();
+    _controller.stop();
+    _controller.destroy();
     super.dispose();
   }
 
   void pause() {
     debugPrint("[$_tag][pause] id=${widget.videoInfo.id}");
-    _controller?.pause();
+    _controller.pause();
   }
 
   void resume() {
     debugPrint("[$_tag][resume] id=${widget.videoInfo.id}");
-    _controller?.play();
+    _controller.play();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_controller == null) {
-      return Container(color: Colors.black);
-    }
-
     return Container(
       color: Colors.black,
       alignment: Alignment.center,
@@ -240,7 +172,7 @@ class ShortVideoItemState extends State<ShortVideoItem>
               fit: StackFit.expand,
               children: [
                 AliPlayerWidget(
-                  _controller!,
+                  _controller,
                   slotBuilders: {
                     SlotType.overlays: (context) => const SizedBox.shrink(),
                   },
@@ -257,7 +189,7 @@ class ShortVideoItemState extends State<ShortVideoItem>
 
   Widget _buildPlayWidget() {
     return AliPlayerWidget(
-      _controller!,
+      _controller,
       slotBuilders: {
         SlotType.overlays: (context) => _buildRightSideActionsOverlay(context),
       },
@@ -331,25 +263,20 @@ class ShortVideoItemState extends State<ShortVideoItem>
     );
   }
 
-  void _navigateToPlayer(BuildContext context) async {
-    _controller?.pause();
-
+  void _navigateToPlayer(BuildContext context) {
+    _controller.pause();
     final info = widget.videoInfo;
-    await context.push('/detail', extra: {
-      'url': _currentUrl,
-      'videoId': info.videoId.toString(),
-      'videoUrlOne': info.videoUrlOne,
-      'videoUrlTwo': info.videoUrlTwo,
-      'title': info.title,
-      'dramaId': info.videoId.toString(),
-      'currentIndex': info.serialNum > 0 ? info.serialNum - 1 : 0,
-      'isVipOnly': false,
-      'autoPlay': true,
-    });
-
-    if (widget.autoPlay) {
-      debugPrint("[$_tag] 从详情页返回，触发恢复播放");
-      _subscribePrepared();
-    }
+    context.push(
+      '/detail',
+      extra: {
+        'url': info.videoUrl,
+        'videoUrlOne': info.videoUrlOne,
+        'videoUrlTwo': info.videoUrlTwo,
+        'title': info.title,
+        'dramaId': info.videoId.toString(),
+        'currentIndex': info.serialNum > 0 ? info.serialNum - 1 : 0,
+        'isVipOnly': false,
+      },
+    );
   }
 }

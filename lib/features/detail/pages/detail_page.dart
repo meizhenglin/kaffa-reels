@@ -95,19 +95,20 @@ class _DetailPageState extends ConsumerState<DetailPage> {
   void _onPageChanged() {
     final newIndex = _preloadPageController.page?.round() ?? 0;
     if (_currentIndex == newIndex) return;
+
+    final oldIndex = _currentIndex;
     _currentIndex = newIndex;
     _aliPlayerPreload.moveTo(newIndex);
-    _pauseAllExceptCurrent(newIndex);
-  }
 
-  /// 完全按照 ShortVideoListPage 的 _pauseAllExceptCurrent 逻辑
-  void _pauseAllExceptCurrent(int currentIndex) {
-    for (int i = 0; i < _itemKeys.length; i++) {
-      if (i != currentIndex) {
-        _itemKeys[i].currentState?.pause();
-      } else {
-        _itemKeys[i].currentState?.resume();
-      }
+    // 暂停旧视频
+    if (oldIndex < _itemKeys.length) {
+      _itemKeys[oldIndex].currentState?.pause();
+    }
+
+    // 播放新视频，并获取实时播放地址
+    if (newIndex < _itemKeys.length) {
+      _itemKeys[newIndex].currentState?.resume();
+      _itemKeys[newIndex].currentState?.refreshUrl();
     }
   }
 
@@ -137,70 +138,197 @@ class _DetailPageState extends ConsumerState<DetailPage> {
   Future<void> _fetchAll() async {
     final videoIdStr = widget.videoId;
 
-    final String episodesId = widget.allEpisodes.isNotEmpty
-        ? widget.allEpisodes[_currentIndex].id.toString()
-        : videoIdStr;
-
     try {
-      final epInfoFuture = _apiService.getEpisodeInfo(
-        videoId: videoIdStr,
-        episodesId: episodesId,
-      );
-      final dirFuture = _apiService.getEpisodesDirectoryByVideoId(
+      // 1. 先拿 directory（选集列表）
+      final dirResp = await _apiService.getEpisodesDirectoryByVideoId(
         videoId: videoIdStr,
       );
-      final playFuture = _apiService.getVideoListByVideoId(
-        videoId: videoIdStr,
-        episodesNum: 50,
-        pageSize: 50,
-      );
+      debugPrint("[DetailPage][fetchAll] dirResp success=${dirResp.isSuccess}");
 
-      final results = await Future.wait([epInfoFuture, dirFuture, playFuture]);
-      final epInfoData = results[0];
-
-      String currentEpId = episodesId;
-      if (epInfoData.isSuccess && epInfoData.data != null) {
-        final d = epInfoData.data as Map<String, dynamic>;
-        currentEpId = _toString(d['episodesId']) ?? episodesId;
+      if (!dirResp.isSuccess || dirResp.data == null) {
+        _setError('Failed to load episodes list');
+        return;
       }
 
-      final eps = _parseEpisodes(results[1], results[2], videoIdStr);
+      // 解析出所有集 ID
+      final dirData = dirResp.data as Map<String, dynamic>;
+      final voList = dirData['voList'] as List?;
+      final dirItems = <Map>[];
 
-      int matchedIndex = 0;
-      for (int i = 0; i < eps.length; i++) {
-        if (eps[i].id.toString() == currentEpId) {
-          matchedIndex = i;
-          break;
+      if (voList is List) {
+        for (final group in voList) {
+          if (group is Map) {
+            final dirList = group['directoryList'] as List?;
+            if (dirList is List) {
+              for (final item in dirList) {
+                if (item is Map) dirItems.add(item);
+              }
+            }
+          }
         }
+      }
+      if (dirItems.isEmpty) {
+        final flat = dirData['directoryList'] as List?;
+        if (flat is List) {
+          for (final item in flat) {
+            if (item is Map) dirItems.add(item);
+          }
+        }
+      }
+      debugPrint("[DetailPage] directory episodes count=${dirItems.length}");
+
+      if (dirItems.isEmpty) {
+        _setError('No episodes found');
+        return;
+      }
+
+      // 2. 尝试 playVideo（批量获取 URL）
+      List<Map>? playList;
+      final playResp = await _apiService.getVideoListByVideoId(
+        videoId: videoIdStr,
+        episodesNum: 1,
+        pageSize: 50,
+      );
+      debugPrint("[DetailPage][fetchAll] playResp success=${playResp.isSuccess}");
+
+      if (playResp.isSuccess && playResp.data is List) {
+        final rawList = playResp.data as List;
+        for (final item in rawList) {
+          if (item is Map) {
+            playList ??= [];
+            playList.add(item);
+          }
+        }
+      }
+
+      // 3. 构建 episodesId → playItem 映射（playVideo 成功时）
+      final Map<String, Map> playById = {};
+      if (playList != null) {
+        for (final item in playList) {
+          final id = _toString(item['episodesId']);
+          if (id != null) playById[id] = item;
+        }
+        debugPrint("[DetailPage] playVideo loaded ${playById.length} URLs");
+      }
+
+      // 4. 构建 VideoInfo 列表
+      final List<VideoInfo> eps = [];
+
+      if (playById.isNotEmpty) {
+        // playVideo 成功：用 playVideo 的 URL（完整数据）
+        for (final m in dirItems) {
+          final epId = _toString(m['episodesId']) ?? '';
+          final playItem = playById[epId];
+          eps.add(VideoInfo(
+            id: int.tryParse(epId) ?? 0,
+            videoId: int.tryParse(videoIdStr) ?? 0,
+            title: _toString(m['episodesName']) ?? '',
+            videoUrl: playItem != null ? (_toString(playItem['episodesUrl']) ?? '') : '',
+            coverUrl: playItem != null ? _toString(playItem['videoPicture']) : null,
+            videoUrlOne: playItem != null ? _toString(playItem['vipEpisodesUrl1080']) : null,
+            videoUrlTwo: playItem != null ? _toString(playItem['vipEpisodesUrl1440']) : null,
+            serialNum: m['episodesNum'] as int? ?? 0,
+            isCanPlay: playItem != null ? (playItem['isCanPlay'] as int? ?? 1) : (m['isCanPlay'] as int? ?? 1),
+          ));
+        }
+      } else {
+        // playVideo 失败：逐集调 getEpisodeInfo 获取 URL
+        debugPrint("[DetailPage] playVideo failed, falling back to getEpisodeInfo per episode");
+        for (final m in dirItems) {
+          final epId = _toString(m['episodesId']) ?? '';
+          try {
+            final epResp = await _apiService.getEpisodeInfo(
+              videoId: videoIdStr,
+              episodesId: epId,
+            );
+            if (epResp.isSuccess && epResp.data != null) {
+              final d = epResp.data as Map<String, dynamic>;
+              eps.add(VideoInfo(
+                id: int.tryParse(epId) ?? 0,
+                videoId: int.tryParse(videoIdStr) ?? 0,
+                title: _toString(m['episodesName']) ?? '',
+                videoUrl: _toString(d['episodesUrl']) ?? '',
+                coverUrl: _toString(d['videoPicture']),
+                videoUrlOne: _toString(d['vipEpisodesUrl1080']),
+                videoUrlTwo: _toString(d['vipEpisodesUrl1440']),
+                serialNum: m['episodesNum'] as int? ?? 0,
+                isCanPlay: d['isCanPlay'] as int? ?? 1,
+              ));
+            } else {
+              eps.add(VideoInfo(
+                id: int.tryParse(epId) ?? 0,
+                videoId: int.tryParse(videoIdStr) ?? 0,
+                title: _toString(m['episodesName']) ?? '',
+                videoUrl: '',
+                serialNum: m['episodesNum'] as int? ?? 0,
+                isCanPlay: m['isCanPlay'] as int? ?? 1,
+              ));
+            }
+          } catch (_) {
+            eps.add(VideoInfo(
+              id: int.tryParse(epId) ?? 0,
+              videoId: int.tryParse(videoIdStr) ?? 0,
+              title: _toString(m['episodesName']) ?? '',
+              videoUrl: '',
+              serialNum: m['episodesNum'] as int? ?? 0,
+              isCanPlay: m['isCanPlay'] as int? ?? 1,
+            ));
+          }
+        }
+      }
+
+      debugPrint("[DetailPage][fetchAll] parsed episodes count=${eps.length}");
+      for (final ep in eps.take(3)) {
+        debugPrint("[DetailPage] ep: id=${ep.id} title=${ep.title} url=${ep.videoUrl}");
       }
 
       if (!mounted) return;
 
       _episodes.clear();
       _episodes.addAll(eps);
-      _currentIndex = matchedIndex;
 
-      // 完全按照 ShortVideoListPage.initState 的逻辑
+      int startIndex = widget.currentIndex.clamp(0, eps.isEmpty ? 0 : eps.length - 1);
+
       _aliPlayerPreload.setItems(eps.cast<VideoInfo>());
-      _aliPlayerPreload.moveTo(matchedIndex);
+      _aliPlayerPreload.moveTo(startIndex);
       _itemKeys = List.generate(
         _episodes.length,
         (_) => GlobalKey<ShortVideoItemState>(),
       );
 
       if (!mounted) return;
+      _currentIndex = startIndex;
       setState(() {
         _isLoading = false;
       });
+
+      // 初始集获取实时播放地址（URL 可能已过期）
+      if (startIndex < _itemKeys.length) {
+        _itemKeys[startIndex].currentState?.refreshUrl();
+      }
     } catch (e) {
+      debugPrint("[DetailPage][fetchAll] error: $e");
       _setError(e.toString());
     }
   }
 
-  /// 选集/上下集切换：滚动到目标集（和推荐页滑动行为完全一致）
+  /// 选集/上下集切换：直接换当前播放器内容（和推荐页滑动行为完全一致）
   void _animateToEpisode(int index) {
     if (index < 0 || index >= _episodes.length) return;
+
+    final oldIndex = _currentIndex;
+    _currentIndex = index;
+
     _aliPlayerPreload.moveTo(index);
+
+    // 暂停旧集
+    if (oldIndex < _itemKeys.length) {
+      _itemKeys[oldIndex].currentState?.pause();
+    }
+
+    // 切换到新集
+    _itemKeys[index].currentState?.switchTo(_episodes[index]);
+
     _preloadPageController.animateToPage(
       index,
       duration: const Duration(milliseconds: 300),
@@ -218,86 +346,6 @@ class _DetailPageState extends ConsumerState<DetailPage> {
   }
 
   String? _toString(Object? v) => v?.toString();
-
-  List<VideoInfo> _parseEpisodes(
-    ApiResponse dirResp,
-    ApiResponse playResp,
-    String videoIdStr,
-  ) {
-    final Map<String, Map> playById = {};
-    if (playResp.isSuccess && playResp.data != null && playResp.data is List) {
-      for (final item in playResp.data as List) {
-        if (item is! Map) continue;
-        final id = _toString(item['episodesId']);
-        if (id != null) playById[id] = item;
-      }
-    }
-
-    List<dynamic> dirItems = [];
-    if (dirResp.isSuccess && dirResp.data != null) {
-      final d = dirResp.data as Map<String, dynamic>;
-      final voList = d['voList'] as List?;
-      if (voList is List) {
-        for (final group in voList) {
-          if (group is Map) {
-            final dirList = group['directoryList'] as List?;
-            if (dirList is List) dirItems.addAll(dirList);
-          }
-        }
-      }
-      if (dirItems.isEmpty) {
-        final flat = d['directoryList'] as List?;
-        if (flat is List) dirItems = flat;
-      }
-    }
-
-    final episodes = <VideoInfo>[];
-
-    for (final item in dirItems) {
-      if (item is! Map) continue;
-      final m = item;
-      final epId = _toString(m['episodesId']) ?? '';
-      final epNum = m['episodesNum'] as int? ?? 0;
-      final playItem = playById[epId];
-      final isCanPlay = playItem != null
-          ? (playItem['isCanPlay'] as int? ?? 1)
-          : (m['isCanPlay'] as int? ?? 1);
-
-      episodes.add(VideoInfo(
-        id: int.tryParse(epId) ?? 0,
-        videoId: int.tryParse(videoIdStr) ?? 0,
-        title: _toString(m['episodesName']) ?? (epNum > 0 ? 'EP.$epNum' : ''),
-        videoUrl: playItem != null ? (_toString(playItem['episodesUrl']) ?? '') : '',
-        coverUrl: playItem != null ? _toString(playItem['videoPicture']) : null,
-        videoUrlOne: playItem != null ? _toString(playItem['vipEpisodesUrl1080']) : null,
-        videoUrlTwo: playItem != null ? _toString(playItem['vipEpisodesUrl1440']) : null,
-        serialNum: epNum,
-        isCanPlay: isCanPlay,
-      ));
-    }
-
-    if (episodes.isEmpty && playResp.data is List) {
-      for (final item in playResp.data as List) {
-        if (item is! Map) continue;
-        final m = item;
-        final epId = _toString(m['episodesId']) ?? '';
-        final epNum = m['episodesNum'] as int? ?? 0;
-        episodes.add(VideoInfo(
-          id: int.tryParse(epId) ?? 0,
-          videoId: int.tryParse(videoIdStr) ?? 0,
-          title: _toString(m['episodesName']) ?? (epNum > 0 ? 'EP.$epNum' : epId),
-          videoUrl: _toString(m['episodesUrl']) ?? '',
-          coverUrl: _toString(m['videoPicture']),
-          videoUrlOne: _toString(m['vipEpisodesUrl1080']),
-          videoUrlTwo: _toString(m['vipEpisodesUrl1440']),
-          serialNum: epNum,
-          isCanPlay: m['isCanPlay'] as int? ?? 1,
-        ));
-      }
-    }
-
-    return episodes;
-  }
 
   Widget _buildDetailOverlay(BuildContext context, VideoInfo vi, int index) {
     final isFirst = index == 0;

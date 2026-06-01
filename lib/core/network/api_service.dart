@@ -348,14 +348,14 @@ class ApiService {
   /// [pageSize] 每页集数，默认取 videoEpisodes（总集数），即一次性拉全量
   Future<ApiResponse> getVideoListByVideoId({
     required String videoId,
-    int? episodesNum,
+    int episodesNum = 1,
     int? pageSize,
   }) {
     return request(
       ApiEndpoints.playVideo,
       data: {
         'videoId': videoId,
-        if (episodesNum != null) 'episodesNum': episodesNum,
+        'episodesNum': episodesNum,
         if (pageSize != null) 'pageSize': pageSize,
       },
     );
