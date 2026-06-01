@@ -38,22 +38,22 @@ class VideoInfo {
 
   factory VideoInfo.fromJson(Map<String, dynamic> json) {
     return VideoInfo(
-      id: json['episodesId'] as int? ?? 0,
-      videoId: json['videoId'] as int? ?? 0,
-      videoUrl: json['episodesUrl'] as String? ?? '',
-      coverUrl: json['videoPicture'] as String?,
-      videoUrlOne: json['vipEpisodesUrl1080'] as String?,
-      videoUrlTwo: json['vipEpisodesUrl1440'] as String?,
-      serialNum: json['episodesNum'] as int? ?? 0,
-      longTime: json['longTime'] as int? ?? 0,
-      collectNum: json['collectNum'] as int? ?? 0,
-      likeNum: json['thumbsNum'] as int? ?? 0,
-      shareNum: json['shareNum'] as int? ?? 0,
-      isCollect: json['isChasing'] as int? ?? 0,
-      isLike: json['isLike'] as int? ?? 0,
-      totalEpisodes: json['videoEpisodes'] as int? ?? 0,
-      title: json['videoName'] as String? ?? '',
-      isCanPlay: json['isCanPlay'] as int? ?? 1,
+      id: (json['id'] as int?) ?? (json['episodesId'] as int?) ?? 0,
+      videoId: (json['videoId'] as int?) ?? 0,
+      videoUrl: (json['videoUrl'] as String?) ?? (json['url'] as String?) ?? (json['episodesUrl'] as String?) ?? '',
+      coverUrl: (json['coverUrl'] as String?) ?? (json['videoPicture'] as String?),
+      videoUrlOne: (json['videoUrlOne'] as String?) ?? (json['vipEpisodesUrl1080'] as String?),
+      videoUrlTwo: (json['videoUrlTwo'] as String?) ?? (json['vipEpisodesUrl1440'] as String?),
+      serialNum: (json['serialNum'] as int?) ?? (json['episodesNum'] as int?) ?? 0,
+      longTime: (json['longTime'] as int?) ?? 0,
+      collectNum: (json['collectNum'] as int?) ?? 0,
+      likeNum: (json['likeNum'] as int?) ?? (json['thumbsNum'] as int?) ?? 0,
+      shareNum: (json['shareNum'] as int?) ?? 0,
+      isCollect: (json['isCollect'] as int?) ?? (json['isChasing'] as int?) ?? 0,
+      isLike: (json['isLike'] as int?) ?? 0,
+      totalEpisodes: (json['totalEpisodes'] as int?) ?? (json['videoEpisodes'] as int?) ?? 0,
+      title: (json['title'] as String?) ?? (json['videoName'] as String?) ?? '',
+      isCanPlay: (json['isCanPlay'] as int?) ?? 1,
     );
   }
 

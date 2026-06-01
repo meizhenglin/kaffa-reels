@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../components/common_video_player.dart';
 import '../../features/detail/pages/detail_page.dart';
+import '../../features/commonAliPlayer/short_video_page.dart';
+import '../../features/recommend/models/video_info.dart';
 import '../../features/auth/pages/forgot_password_page.dart';
 import '../../features/auth/pages/login_email_page.dart';
 import '../../features/auth/pages/login_page.dart';
@@ -342,6 +344,25 @@ final routerProvider = Provider<GoRouter>((ref) {
               videoUrlTwo: videoUrlTwo,
             ),
           );
+        },
+      ),
+
+      /// 阿里云沉浸式播放器（demo 版，点击 Banner Watch Now 跳转）
+      /// 【路径】/short-video
+      /// 【参数】
+      /// - episodes（extra）：VideoInfo 列表（可选，有则直接用，无则走 mock）
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/short-video',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>?;
+          final rawList = extra?['episodes'] as List<dynamic>?;
+          final episodes = rawList
+              ?.map((e) => VideoInfo.fromJson(e as Map<String, dynamic>))
+              .toList();
+          debugPrint('[router] /short-video received ${episodes?.length ?? 0} episodes, '
+              'first url=${episodes?.firstOrNull?.videoUrl ?? "null"}');
+          return ShortVideoPage(episodes: episodes);
         },
       ),
 

@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers/app_providers.dart';
+import '../../../core/network/api_service.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../data/recommend_repository.dart';
 import '../models/banner.dart';
@@ -232,10 +234,17 @@ class RecommendNotifier extends StateNotifier<RecommendState> {
   /// 根据 ID 获取短剧详情
   Future<Drama?> getDramaById(String id) async {
     try {
-      return await _repository.getDramaById(id);
-    } catch (_) {
-      return null;
+      final resp = await apiServiceProvider.getVideoListByVideoId(videoId: id);
+      debugPrint('[getDramaById] videoId=$id isSuccess=${resp.isSuccess} data=${resp.data}');
+      if (resp.isSuccess && resp.data != null) {
+        final data = resp.data as Map<String, dynamic>;
+        debugPrint('[getDramaById] parsed drama: $data');
+        return Drama.fromJson(data);
+      }
+    } catch (e) {
+      debugPrint('[getDramaById] error=$e');
     }
+    return null;
   }
 }
 

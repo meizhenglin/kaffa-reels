@@ -126,7 +126,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
       context,
       episodes: episodes,
       currentIndex: currentIdx,
-      isVipOnly: false,
+      isVipOnly: widget.isVipOnly,
       authState: ref.read(authProvider),
       memberState: ref.read(memberStateProvider),
       onEpisodeTap: _animateToEpisode,
@@ -151,6 +151,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
 
       // 解析出所有集 ID
       final dirData = dirResp.data as Map<String, dynamic>;
+      final videoEpisodes = dirData['videoEpisodes'] as int? ?? 1;
       final voList = dirData['voList'] as List?;
       final dirItems = <Map>[];
 
@@ -186,7 +187,7 @@ class _DetailPageState extends ConsumerState<DetailPage> {
       final playResp = await _apiService.getVideoListByVideoId(
         videoId: videoIdStr,
         episodesNum: 1,
-        pageSize: 50,
+        pageSize: videoEpisodes,
       );
       debugPrint("[DetailPage][fetchAll] playResp success=${playResp.isSuccess}");
 

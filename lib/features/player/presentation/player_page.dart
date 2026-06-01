@@ -395,6 +395,7 @@ class _EpisodeCardState extends State<_EpisodeCard> {
         Container(
           width: MediaQuery.sizeOf(context).width,
           height: MediaQuery.sizeOf(context).height,
+          color: Colors.black,
           child: AliPlayerView(
             onCreated: (viewId) => widget.player.attachView(viewId),
             x: 0,

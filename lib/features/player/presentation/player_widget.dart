@@ -112,7 +112,9 @@ class _PlayerWidgetState extends ConsumerState<PlayerWidget> {
       children: [
         // 播放器视图（AliPlayerWidget — aliplayer_widget 高级封装）
         if (widget.isActive)
-          Positioned.fill(child: AliPlayerWidget(_aliController))
+          Positioned.fill(
+            child: Container(color: Colors.black, child: AliPlayerWidget(_aliController)),
+          )
         else
           Container(color: Colors.black),
 
@@ -390,21 +392,12 @@ class _BottomBar extends StatelessWidget {
         children: [
           SizedBox(
             width: 264,
-            child: SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                activeTrackColor: Colors.white,
-                inactiveTrackColor: Colors.white38,
-                thumbColor: Colors.white,
-                trackHeight: 4,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-              ),
-              child: Slider(
-                value: state.progress,
-                onChangeStart: (_) => controller.showControls(),
-                onChanged: (v) => controller.seekToProgress(v),
-                onChangeEnd: (_) => controller.showControls(),
-              ),
+            child: _BufferedSlider(
+              value: state.progress,
+              bufferedValue: state.bufferedProgress,
+              onChangeStart: (_) => controller.showControls(),
+              onChanged: (v) => controller.seekToProgress(v),
+              onChangeEnd: (_) => controller.showControls(),
             ),
           ),
           const SizedBox(width: 8),
@@ -530,5 +523,120 @@ class _DouyinEpisodeBtn extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Custom slider that paints a buffered (grey) region behind the playhead.
+class _BufferedSlider extends StatelessWidget {
+  const _BufferedSlider({
+    required this.value,
+    required this.bufferedValue,
+    required this.onChangeStart,
+    required this.onChanged,
+    required this.onChangeEnd,
+  });
+
+  final double value;
+  final double bufferedValue;
+  final ValueChanged<double> onChangeStart;
+  final ValueChanged<double> onChanged;
+  final ValueChanged<double> onChangeEnd;
+
+  @override
+  Widget build(BuildContext context) {
+    return SliderTheme(
+      data: SliderTheme.of(context).copyWith(
+        trackHeight: 4,
+        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+        overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+        trackShape: _BufferedTrackShape(bufferedValue: bufferedValue),
+      ),
+      child: Slider(
+        value: value,
+        onChangeStart: onChangeStart,
+        onChanged: onChanged,
+        onChangeEnd: onChangeEnd,
+        activeColor: Colors.white,
+        inactiveColor: Colors.transparent,
+      ),
+    );
+  }
+}
+
+class _BufferedTrackShape extends SliderTrackShape {
+  const _BufferedTrackShape({required this.bufferedValue});
+
+  final double bufferedValue;
+
+  @override
+  Rect getPreferredRect({
+    required RenderBox parentBox,
+    Offset offset = Offset.zero,
+    required SliderThemeData sliderTheme,
+    bool isEnabled = false,
+    bool isDiscrete = false,
+  }) {
+    final trackHeight = sliderTheme.trackHeight ?? 4;
+    final trackTop = offset.dy + (parentBox.size.height - trackHeight) / 2;
+    return Rect.fromLTWH(offset.dx, trackTop, parentBox.size.width, trackHeight);
+  }
+
+  @override
+  void paint(
+    Painting context,
+    Offset offset, {
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required Animation<double> enableAnimation,
+    required TextDirection textDirection,
+    required Offset thumbCenter,
+    Offset? secondaryOffset,
+    bool isDiscrete = false,
+    bool isEnabled = false,
+  }) {
+    final canvas = context.canvas;
+    final trackRect = getPreferredRect(
+      parentBox: parentBox,
+      offset: offset,
+      sliderTheme: sliderTheme,
+      isEnabled: isEnabled,
+      isDiscrete: isDiscrete,
+    );
+
+    final bufferedFraction = bufferedValue.clamp(0.0, 1.0);
+    final bufferedRight = trackRect.left + trackRect.width * bufferedFraction;
+    final playedRight = thumbCenter.dx;
+
+    final inactivePaint = Paint()
+      ..color = sliderTheme.inactiveTrackColor ?? Colors.white38
+      ..style = PaintingStyle.fill;
+
+    final activePaint = Paint()
+      ..color = sliderTheme.activeTrackColor ?? Colors.white
+      ..style = PaintingStyle.fill;
+
+    final rRadius = trackRect.height / 2;
+
+    // Buffered region (full track)
+    final bufferedRect = RRect.fromRectAndRadius(trackRect, Radius.circular(rRadius));
+    canvas.drawRRect(bufferedRect, inactivePaint);
+
+    // Active/played region
+    if (playedRight > trackRect.left) {
+      final activeRect = Rect.fromLTRB(
+        trackRect.left,
+        trackRect.top,
+        playedRight.clamp(trackRect.left, trackRect.right),
+        trackRect.bottom,
+      );
+      final activeRRect = RRect.fromRectAndCorners(
+        activeRect,
+        topLeft: Radius.circular(rRadius),
+        bottomLeft: Radius.circular(rRadius),
+        topRight: playedRight >= trackRect.right ? Radius.circular(rRadius) : Radius.zero,
+        bottomRight: playedRight >= trackRect.right ? Radius.circular(rRadius) : Radius.zero,
+      );
+      canvas.drawRRect(activeRRect, activePaint);
+    }
   }
 }

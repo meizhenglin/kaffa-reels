@@ -88,17 +88,36 @@ class AuthRepository {
   }
 
   Future<UserModel> signInWithEmail(String email, String password) async {
-    final credential = await _auth.signInWithEmailAndPassword(
+    _logger.d('[AuthRepo] signInWithEmail: calling backend API...');
+    final resp = await apiServiceProvider.login(
       email: email.trim(),
-      password: password,
+      passportPassword: password,
     );
-    final user = credential.user;
-    if (user == null) {
-      throw FirebaseAuthException(code: 'user-not-found');
+    _logger.d('[AuthRepo] login resp: ${resp.data}');
+
+    if (!resp.isSuccess) {
+      throw Exception(resp.error ?? 'Login failed');
     }
-    final model = await _userModelFromFirebaseUser(user);
-    await cacheUser(model);
-    return model;
+
+    // 保存后端返回的 Token
+    final data = resp.data as Map<String, dynamic>?;
+    final token = data?['token'] as String?;
+    if (token != null) {
+      await _storage.saveToken(token);
+    }
+
+    // 构建本地用户模型
+    final user = UserModel(
+      id: data?['id']?.toString() ?? email,
+      email: email.trim(),
+      nickname: data?['nickname'] as String? ?? email.split('@').first,
+      avatar: data?['avatar'] as String?,
+      membershipType: MembershipType.regular,
+      membershipExpiryDate: null,
+      createdAt: DateTime.now(),
+    );
+    await cacheUser(user);
+    return user;
   }
 
   Future<UserModel> signUpWithEmail({
@@ -106,23 +125,36 @@ class AuthRepository {
     required String password,
     required String username,
   }) async {
-    final credential = await _auth.createUserWithEmailAndPassword(
+    _logger.d('[AuthRepo] signUpWithEmail: calling backend API...');
+    final resp = await apiServiceProvider.register(
       email: email.trim(),
-      password: password,
+      passportPassword: password,
     );
-    final user = credential.user;
-    if (user == null) {
-      throw FirebaseAuthException(code: 'operation-not-allowed');
+    _logger.d('[AuthRepo] register resp: ${resp.data}');
+
+    if (!resp.isSuccess) {
+      throw Exception(resp.error ?? 'Registration failed');
     }
 
-    await user.updateDisplayName(username.trim());
-    await user.sendEmailVerification();
+    // 保存后端返回的 Token
+    final data = resp.data as Map<String, dynamic>?;
+    final token = data?['token'] as String?;
+    if (token != null) {
+      await _storage.saveToken(token);
+    }
 
-    final model = await _userModelFromFirebaseUser(
-      await _reloadUser(user),
+    // 构建本地用户模型
+    final user = UserModel(
+      id: data?['id']?.toString() ?? email,
+      email: email.trim(),
+      nickname: username.trim(),
+      avatar: null,
+      membershipType: MembershipType.regular,
+      membershipExpiryDate: null,
+      createdAt: DateTime.now(),
     );
-    await cacheUser(model);
-    return model;
+    await cacheUser(user);
+    return user;
   }
 
   Future<User> _reloadUser(User user) async {

@@ -1,7 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
-
-import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show PlatformDispatcher;
 import 'package:uuid/uuid.dart';
@@ -158,35 +154,6 @@ class AuthService {
     await _storage.removeToken();
   }
 
-  Future<Map<String, dynamic>> _getDeviceMes() async {
-    if (Platform.isAndroid) {
-      final deviceInfo = DeviceInfoPlugin();
-      final androidInfo = await deviceInfo.androidInfo;
-      return {
-        'brand': androidInfo.brand,
-        'model': androidInfo.model,
-        'system': 'Android ${androidInfo.version.release}',
-        'device': androidInfo.device,
-        'manufacturer': androidInfo.manufacturer,
-      };
-    } else if (Platform.isIOS) {
-      final deviceInfo = DeviceInfoPlugin();
-      final iosInfo = await deviceInfo.iosInfo;
-      return {
-        'brand': 'Apple',
-        'model': iosInfo.model,
-        'system': 'iOS ${iosInfo.systemVersion}',
-        'device': iosInfo.name,
-        'manufacturer': 'Apple',
-      };
-    }
-    return {
-      'brand': 'Unknown',
-      'model': 'Unknown',
-      'system': 'Unknown',
-    };
-  }
-
   /// 校验邮箱验证码
   Future<CheckCodeResult> checkEmailCode({
     required String email,
@@ -236,19 +203,12 @@ class AuthService {
   /// 注册账号
   Future<RegisterResult> register({
     required String email,
-    required String password,
-    required String code,
+    required String passportPassword,
   }) async {
     try {
-      final deviceInfo = await _getDeviceInfo();
-
       final response = await _apiService.register(
         email: email,
-        password: password,
-        code: code,
-        deviceId: deviceInfo['deviceId'],
-        deviceMes: deviceInfo['deviceMes'],
-        uuid: deviceInfo['uuid'],
+        passportPassword: passportPassword,
       );
 
       debugPrint('[AuthService] register response: ${response.data}');
@@ -271,17 +231,6 @@ class AuthService {
       debugPrint('[AuthService] register error: $e');
       return RegisterResult(success: false, message: e.toString());
     }
-  }
-
-  Future<Map<String, String>> _getDeviceInfo() async {
-    final uuid = await _getOrCreateDeviceId();
-    final deviceId = uuid;
-    final deviceMes = jsonEncode(await _getDeviceMes());
-    return {
-      'uuid': uuid,
-      'deviceId': deviceId,
-      'deviceMes': deviceMes,
-    };
   }
 
   /// 获取设备语言并保存到 Storage，用于 X-Client header

@@ -1,10 +1,13 @@
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/network/api_service.dart';
 import '../models/banner.dart';
-import '../providers/recommend_provider.dart';
-import '../../recommend/utils/drama_navigation.dart';
+import '../models/drama.dart';
+import '../../recommend/models/video_info.dart';
+import '../../player/presentation/player_controller.dart';
 
 /// ============================================================================
 /// Banner 轮播图组件
@@ -42,11 +45,105 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
 
   /// 跳转到播放器
   Future<void> _onPlayTap(BannerItem banner) async {
-    final drama = await ref
-        .read(recommendProvider.notifier)
-        .getDramaById(banner.dramaId);
-    if (drama != null && mounted) {
-      openDramaPlayer(context, drama);
+    try {
+      final videoId = banner.videoId ?? banner.dramaId;
+
+      // 1. 请求剧集目录，获取总集数和集数列表
+      final dirResp = await apiServiceProvider.getEpisodesDirectoryByVideoId(videoId: videoId);
+      debugPrint('[Banner play] dirResp.isSuccess=${dirResp.isSuccess} data=${dirResp.data}');
+      if (!dirResp.isSuccess || dirResp.data == null) return;
+
+      final dirData = dirResp.data as Map<String, dynamic>;
+      final videoEpisodes = dirData['videoEpisodes'] as int? ?? 1;
+
+      // 2. 用 videoEpisodes 作为 pageSize 请求所有剧集视频地址
+      final playResp = await apiServiceProvider.getVideoListByVideoId(
+        videoId: videoId,
+        episodesNum: 1,
+        pageSize: videoEpisodes,
+      );
+      debugPrint('[Banner play] playResp.isSuccess=${playResp.isSuccess} data=${playResp.data}');
+      if (!playResp.isSuccess) return;
+
+      // 3. 构建 episodesId → 视频地址映射
+      final Map<String, Map> playById = {};
+      if (playResp.data is List) {
+        for (final item in playResp.data as List) {
+          if (item is Map) {
+            final id = (item['episodesId'] ?? '').toString();
+            if (id.isNotEmpty) playById[id] = item;
+          }
+        }
+      }
+
+      // 4. 构造 Drama 对象
+      final drama = Drama(
+        id: videoId,
+        title: dirData['videoName'] as String? ?? banner.bannerEpisodesName ?? '',
+        coverUrl: dirData['videoPicture'] as String? ?? banner.imageUrl,
+        views: 0,
+        rating: 0.0,
+        description: '',
+        episodeCount: videoEpisodes,
+        isVipOnly: dirData['isVip'] == 1,
+        videoUrl: null,
+        badge: null,
+        aspectRatio: 0.72,
+      );
+
+      // 4. 构造 EpisodeData 列表
+      final episodes = <EpisodeData>[];
+
+      // directory 返回的是 voList[].directoryList[]（嵌套结构），需要展开
+      final List<Map> dirItems = [];
+      final voList = dirData['voList'] as List? ?? [];
+      for (final group in voList) {
+        if (group is! Map) continue;
+        final directoryList = group['directoryList'] as List? ?? [];
+        for (final m in directoryList) {
+          if (m is Map) dirItems.add(m);
+        }
+      }
+
+      for (final m in dirItems) {
+        final epId = (m['episodesId'] ?? '').toString();
+        final playItem = playById[epId];
+        final epNum = m['episodesNum'] as int? ?? 0;
+        final url = playItem != null ? (playItem['episodesUrl'] as String? ?? '') : '';
+        episodes.add(EpisodeData(
+          id: epId,
+          title: '${drama.title} EP.$epNum',
+          videoUrl: url,
+          coverUrl: playItem != null ? (playItem['videoPicture'] as String? ?? drama.coverUrl) : drama.coverUrl,
+          isUnlocked: playItem != null ? (playItem['isCanPlay'] as int? ?? 1) == 1 : true,
+        ));
+      }
+
+      // 6. 跳转阿里云沉浸式播放器
+      if (mounted) {
+        // 过滤掉没有视频地址的集（避免播放器崩溃）
+        final validEpisodes = episodes.where((ep) => ep.videoUrl.isNotEmpty).toList();
+        final videoInfos = validEpisodes.asMap().entries.map((e) {
+          final ep = e.value;
+          return VideoInfo(
+            id: e.key + 1,
+            videoId: int.tryParse(drama.id) ?? 0,
+            videoUrl: ep.videoUrl,
+            coverUrl: ep.coverUrl,
+            title: ep.title,
+            serialNum: e.key + 1,
+            isCanPlay: ep.isUnlocked ? 1 : 0,
+          );
+        }).toList();
+
+        debugPrint('[Banner play] validEpisodes=${validEpisodes.length}, '
+            'first url=${validEpisodes.firstOrNull?.videoUrl ?? "null"}');
+        // 序列化 VideoInfo 列表通过 extra 传递
+        final extraList = videoInfos.map((vi) => vi.toJson()).toList();
+        context.push('/short-video', extra: {'episodes': extraList});
+      }
+    } catch (e) {
+      debugPrint('[Banner play] error=$e');
     }
   }
 

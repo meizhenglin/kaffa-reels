@@ -48,7 +48,9 @@ class ApiEndpoints {
   static const String quickRechargeList = '/api/rechargeGoodsConfig/quickRechargeList';
   static const String userPayEpisodes = '/api/userPayEpisodes/userPayEpisodes';
   static const String userViewAddHistory = '/api/video/userViewAddHistory';
-  static const String episodeInfo = '/api/episodes/getEpisodeInfo';
+  // static const String episodeInfo = '/api/episodes/getEpisodeInfo';
+  static const String directory = '/api/episodes/directory';
+
 
   // ==================== 个人中心 ====================
   static const String userPersonalCenter = '/api/user/userPersonalCenter';
@@ -78,11 +80,11 @@ class ApiEndpoints {
   /// Flutter 匿名设备登录
   static const String flutterGuestLogin = '/login/getUuid';
   /// 发送邮箱验证码
-  static const String sendEmailCode = '/email/sendEmailCode';
+  static const String sendEmailCode = '/api/user/sendCode';
   /// 校验邮箱验证码
-  static const String checkEmailCode = '/login/checkEmailCode';
+  static const String checkEmailCode = '/api/user/verifyCode';
   /// 注册账号
-  static const String register = '/login/register';
+  static const String register = '/api/user/mailRegister';
 }
 
 /// PassportType 登录类型标识

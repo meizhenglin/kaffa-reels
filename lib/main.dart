@@ -34,16 +34,8 @@ void main() async {
     const Duration(seconds: 15),
   );
 
-
-
-  final storage = StorageService();
-  await storage.init();
-
   runApp(
     ProviderScope(
-      overrides: [
-        storageServiceProvider.overrideWithValue(storage),
-      ],
       child: const ArabDramaApp(),
     ),
   );

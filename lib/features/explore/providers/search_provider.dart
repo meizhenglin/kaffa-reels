@@ -2,12 +2,11 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/api_service.dart';
 import '../../recommend/models/drama.dart';
-import '../data/explore_mock_data.dart';
-import '../data/explore_repository.dart';
 import '../data/search_history_storage.dart';
 import '../models/search_suggestion.dart';
-import 'explore_provider.dart';
+import '../../../app/providers/app_providers.dart';
 
 class SearchState {
   const SearchState({
@@ -64,35 +63,44 @@ class SearchState {
   }
 }
 
+final searchHistoryStorageProvider = Provider<SearchHistoryStorage>((ref) {
+  return SearchHistoryStorage(ref.watch(storageServiceProvider));
+});
+
 final searchProvider = StateNotifierProvider<SearchNotifier, SearchState>((ref) {
-  return SearchNotifier(
-    ref.read(exploreRepositoryProvider),
-    ref.read(searchHistoryStorageProvider),
-  );
+  return SearchNotifier(ref.read(searchHistoryStorageProvider));
 });
 
 class SearchNotifier extends StateNotifier<SearchState> {
-  SearchNotifier(this._repository, this._historyStorage)
-      : super(const SearchState()) {
+  SearchNotifier(this._historyStorage) : super(const SearchState()) {
     _loadSuggestions();
   }
 
-  final ExploreRepository _repository;
   final SearchHistoryStorage _historyStorage;
   Timer? _debounceTimer;
 
-  void _loadSuggestions() {
+  Future<void> _loadSuggestions() async {
     final recent = _historyStorage
         .load()
         .map((k) => SearchSuggestion(keyword: k, type: SearchSuggestionType.recent))
         .toList();
-    final hot = ExploreMockData.hotKeywords
-        .map((k) => SearchSuggestion(keyword: k, type: SearchSuggestionType.hot))
-        .toList();
 
-    state = state.copyWith(
-      suggestions: [...recent, ...hot],
-    );
+    // 从后端加载热搜关键词
+    List<SearchSuggestion> hot = [];
+    try {
+      final resp = await apiServiceProvider.getRecommondSearchList();
+      if (resp.isSuccess && resp.data != null) {
+        final list = resp.data as List;
+        hot = list
+            .map((e) => SearchSuggestion(
+                  keyword: e.toString(),
+                  type: SearchSuggestionType.hot,
+                ))
+            .toList();
+      }
+    } catch (_) {}
+
+    state = state.copyWith(suggestions: [...recent, ...hot]);
   }
 
   void setQuery(String value) {
@@ -146,13 +154,19 @@ class SearchNotifier extends StateNotifier<SearchState> {
   }) async {
     state = state.copyWith(isLoadingResults: true, clearError: true);
     try {
-      final result = await _repository.searchDramas(query: query, page: page);
+      final resp = await apiServiceProvider.getSearchList(keyword: query);
+      final List<Drama> results = [];
+      if (resp.isSuccess && resp.data != null) {
+        final list = resp.data as List;
+        for (final json in list) {
+          results.add(Drama.fromJson(json as Map<String, dynamic>));
+        }
+      }
       state = state.copyWith(
-        searchResults:
-            append ? [...state.searchResults, ...result.dramas] : result.dramas,
+        searchResults: append ? [...state.searchResults, ...results] : results,
         isLoadingResults: false,
         page: page,
-        hasMore: result.hasMore,
+        hasMore: results.length >= 12,
       );
     } catch (e) {
       state = state.copyWith(

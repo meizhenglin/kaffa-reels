@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/api_service.dart';
 import '../../recommend/models/drama.dart';
-import '../../explore/data/explore_repository.dart';
 
 class SearchPageState {
   const SearchPageState({
@@ -53,10 +53,17 @@ final searchPageProvider =
   return SearchPageNotifier();
 });
 
-class SearchPageNotifier extends StateNotifier<SearchPageState> {
-  SearchPageNotifier() : _repository = ExploreRepository(), super(const SearchPageState());
+/// 排行列表数据，直接调后端 API
+final rankingDramasProvider = FutureProvider<List<Drama>>((ref) async {
+  final resp = await apiServiceProvider.getRankingList();
+  if (!resp.isSuccess || resp.data == null) return [];
+  final list = resp.data as List;
+  return list.map((json) => Drama.fromJson(json as Map<String, dynamic>)).toList();
+});
 
-  final ExploreRepository _repository;
+class SearchPageNotifier extends StateNotifier<SearchPageState> {
+  SearchPageNotifier() : super(const SearchPageState());
+
   Timer? _debounceTimer;
 
   void setQuery(String value) {
@@ -70,19 +77,16 @@ class SearchPageNotifier extends StateNotifier<SearchPageState> {
   Future<void> _onDebounced(String value) async {
     final trimmed = value.trim();
     state = state.copyWith(debouncedQuery: trimmed);
-
     if (trimmed.isEmpty) {
       state = state.copyWith(searchResults: [], isLoadingResults: false, page: 1, hasMore: false);
       return;
     }
-
     await _performSearch(trimmed, page: 1, append: false);
   }
 
   Future<void> submitSearch([String? keyword]) async {
     final q = (keyword ?? state.query).trim();
     if (q.isEmpty) return;
-
     _debounceTimer?.cancel();
     state = state.copyWith(query: q, debouncedQuery: q);
     await _performSearch(q, page: 1, append: false);
@@ -91,12 +95,19 @@ class SearchPageNotifier extends StateNotifier<SearchPageState> {
   Future<void> _performSearch(String query, {required int page, required bool append}) async {
     state = state.copyWith(isLoadingResults: true, clearError: true);
     try {
-      final result = await _repository.searchDramas(query: query, page: page);
+      final resp = await apiServiceProvider.getSearchList(keyword: query);
+      final List<Drama> results = [];
+      if (resp.isSuccess && resp.data != null) {
+        final list = resp.data as List;
+        for (final json in list) {
+          results.add(Drama.fromJson(json as Map<String, dynamic>));
+        }
+      }
       state = state.copyWith(
-        searchResults: append ? [...state.searchResults, ...result.dramas] : result.dramas,
+        searchResults: append ? [...state.searchResults, ...results] : results,
         isLoadingResults: false,
         page: page,
-        hasMore: result.hasMore,
+        hasMore: results.length >= 12,
       );
     } catch (e) {
       state = state.copyWith(isLoadingResults: false, errorMessage: e.toString());

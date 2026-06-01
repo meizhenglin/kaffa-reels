@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../core/network/api_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../payment/providers/membership_provider.dart';
-import '../../recommend/data/comprehensive_mock_data.dart';
 import '../../recommend/models/drama.dart';
 import '../../recommend/utils/drama_navigation.dart';
 import '../../recommend/widgets/drama_card.dart';
@@ -34,7 +34,11 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   late final TextEditingController _searchController;
 
   /// 排行数据（默认显示）
-  List<Drama> get _rankingDramas => ComprehensiveMockData.hotDramas();
+  List<Drama> get _rankingDramas {
+    final search = ref.watch(searchPageProvider);
+    if (search.hasActiveSearch) return [];
+    return ref.watch(rankingDramasProvider).value ?? [];
+  }
 
   @override
   void initState() {

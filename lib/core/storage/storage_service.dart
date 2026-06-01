@@ -112,7 +112,11 @@ class StorageService {
 
   /// 读取设备 UUID
   Future<String?> getDeviceUuid() async {
-    return await _secureStorage.read(key: 'device_uuid');
+    try {
+      return await _secureStorage.read(key: 'device_uuid');
+    } catch (_) {
+      return null;
+    }
   }
 
   // ==================== 用户令牌管理 (Secure Storage) ====================
@@ -123,7 +127,11 @@ class StorageService {
 
   /// 读取用户令牌
   Future<String?> getToken() async {
-    return await _secureStorage.read(key: 'user_token');
+    try {
+      return await _secureStorage.read(key: 'user_token');
+    } catch (_) {
+      return null;
+    }
   }
 
   /// 删除用户令牌

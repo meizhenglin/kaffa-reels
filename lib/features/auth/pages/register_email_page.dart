@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:email_validator/email_validator.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -37,31 +38,40 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
   final _passwordFormKey = GlobalKey<FormState>();
 
   Future<void> _confirmPassword() async {
-    if (!_passwordFormKey.currentState!.validate()) return;
+    debugPrint('[RegisterEmail] _confirmPassword called, email=${_emailController.text}');
+    if (!_passwordFormKey.currentState!.validate()) {
+      debugPrint('[RegisterEmail] form validation failed');
+      return;
+    }
     if (!_agreePolicy) {
       _policyShakeKey.currentState?.shake();
+      debugPrint('[RegisterEmail] policy not agreed');
       return;
     }
 
+    debugPrint('[RegisterEmail] starting signUpWithEmail...');
     setState(() => _isLoading = true);
 
-    final authService = ref.read(authServiceProvider);
-    final result = await authService.register(
+    final success = await ref.read(authProvider.notifier).signUpWithEmail(
       email: _emailController.text.trim(),
       password: _passwordController.text,
-      code: _codeController.text.trim(),
+      username: _emailController.text.split('@').first,
     );
 
+    debugPrint('[RegisterEmail] signUpWithEmail result: $success');
     if (!mounted) return;
 
     setState(() => _isLoading = false);
 
-    if (result.success) {
+    if (success) {
+      debugPrint('[RegisterEmail] success, navigating to home');
       context.go('/');
     } else {
+      final errorMsg = ref.read(authProvider).errorMessage;
+      debugPrint('[RegisterEmail] failed: $errorMsg');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result.message ?? 'Registration failed'),
+          content: Text(errorMsg ?? 'Registration failed'),
           backgroundColor: Colors.red,
         ),
       );

@@ -1,8 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/api_service.dart';
 import '../../recommend/models/drama.dart';
-import '../data/explore_mock_data.dart';
-import '../data/explore_repository.dart';
 import '../models/category.dart';
 
 enum ExploreStatus { initial, loading, success, error }
@@ -11,7 +10,7 @@ class ExploreState {
   const ExploreState({
     this.status = ExploreStatus.initial,
     this.categories = const [],
-    this.selectedCategoryId = ExploreMockData.allCategoryId,
+    this.selectedCategoryId = 'all',
     this.dramas = const [],
     this.page = 1,
     this.hasMore = true,
@@ -60,26 +59,26 @@ class ExploreState {
   }
 }
 
-final exploreRepositoryProvider = Provider<ExploreRepository>((ref) {
-  return ExploreRepository();
-});
-
 final exploreProvider =
     StateNotifierProvider<ExploreNotifier, ExploreState>((ref) {
-  return ExploreNotifier(ref.read(exploreRepositoryProvider));
+  return ExploreNotifier();
 });
 
 class ExploreNotifier extends StateNotifier<ExploreState> {
-  ExploreNotifier(this._repository) : super(const ExploreState()) {
+  ExploreNotifier() : super(const ExploreState()) {
     _init();
   }
-
-  final ExploreRepository _repository;
 
   Future<void> _init() async {
     state = state.copyWith(status: ExploreStatus.loading, clearError: true);
     try {
-      final categories = await _repository.fetchCategories();
+      final resp = await apiServiceProvider.getVideoLabelList();
+      List<Category> categories = _defaultCategories;
+      if (resp.isSuccess && resp.data != null) {
+        final list = resp.data as List;
+        categories = list.map((json) => _categoryFromJson(json as Map<String, dynamic>)).toList();
+        if (categories.isEmpty) categories = _defaultCategories;
+      }
       state = state.copyWith(categories: categories);
       await _loadDramas(page: 1, append: false);
     } catch (e) {
@@ -116,15 +115,19 @@ class ExploreNotifier extends StateNotifier<ExploreState> {
 
   Future<void> _loadDramas({required int page, required bool append}) async {
     try {
-      final result = await _repository.fetchDramasByCategory(
-        categoryId: state.selectedCategoryId,
-        page: page,
+      final resp = await apiServiceProvider.getVideoHotPicks(
+        videoHotListType: state.selectedCategoryId == 'all' ? 1 : 2,
       );
+      List<Drama> dramas = [];
+      if (resp.isSuccess && resp.data != null) {
+        final list = resp.data as List;
+        dramas = list.map((json) => Drama.fromJson(json as Map<String, dynamic>)).toList();
+      }
       state = state.copyWith(
         status: ExploreStatus.success,
-        dramas: append ? [...state.dramas, ...result.dramas] : result.dramas,
+        dramas: append ? [...state.dramas, ...dramas] : dramas,
         page: page,
-        hasMore: result.hasMore,
+        hasMore: dramas.length >= 12,
       );
     } catch (e) {
       state = state.copyWith(
@@ -132,5 +135,26 @@ class ExploreNotifier extends StateNotifier<ExploreState> {
         errorMessage: e.toString(),
       );
     }
+  }
+
+  static List<Category> _defaultCategories = [
+    const Category(id: 'all', name: 'All', nameEn: 'All', nameAr: 'الكل'),
+    const Category(id: 'romance', name: 'Romance', nameEn: 'Romance', nameAr: 'رومانسي'),
+    const Category(id: 'action', name: 'Action', nameEn: 'Action', nameAr: 'أكشن'),
+    const Category(id: 'comedy', name: 'Comedy', nameEn: 'Comedy', nameAr: 'كوميديا'),
+    const Category(id: 'thriller', name: 'Thriller', nameEn: 'Thriller', nameAr: 'إثارة'),
+    const Category(id: 'sci-fi', name: 'Sci-Fi', nameEn: 'Sci-Fi', nameAr: 'خيال علمي'),
+    const Category(id: 'costume', name: 'Costume', nameEn: 'Costume', nameAr: 'تاريخي'),
+    const Category(id: 'urban', name: 'Urban', nameEn: 'Urban', nameAr: 'عصري'),
+  ];
+
+  static Category _categoryFromJson(Map<String, dynamic> json) {
+    // 兼容不同的字段命名
+    return Category(
+      id: (json['id'] ?? json['labelId'] ?? json['categoryId'] ?? '').toString(),
+      name: (json['name'] ?? json['labelName'] ?? json['categoryName'] ?? '').toString(),
+      nameEn: (json['nameEn'] ?? json['name'] ?? '').toString(),
+      nameAr: (json['nameAr'] ?? '').toString(),
+    );
   }
 }

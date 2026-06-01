@@ -47,23 +47,23 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
     setState(() => _isLoading = true);
 
-    final authService = ref.read(authServiceProvider);
-    final result = await authService.register(
+    final success = await ref.read(authProvider.notifier).signUpWithEmail(
       email: _emailController.text.trim(),
       password: _passwordController.text,
-      code: _codeController.text.trim(),
+      username: _emailController.text.split('@').first,
     );
 
     if (!mounted) return;
 
     setState(() => _isLoading = false);
 
-    if (result.success) {
+    if (success) {
       context.go('/');
     } else {
+      final errorMsg = ref.read(authProvider).errorMessage;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result.message ?? 'Registration failed'),
+          content: Text(errorMsg ?? 'Registration failed'),
           backgroundColor: Colors.red,
         ),
       );

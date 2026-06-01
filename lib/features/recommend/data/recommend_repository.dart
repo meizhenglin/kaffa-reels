@@ -1,13 +1,13 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/auth/auth_service.dart';
+import '../../../core/network/api_service.dart';
 import '../../../core/network/dio_client.dart';
+import '../models/banner.dart';
 import '../models/drama.dart';
 import '../models/recommend_feed.dart';
-import '../models/banner.dart';
 import '../models/video_info.dart';
-import 'comprehensive_mock_data.dart';
-import 'recommend_mock_data.dart';
 
 /// 单集播放地址缓存，避免同一集重复请求
 class EpisodeUrlCache {
@@ -44,13 +44,9 @@ class RecommendRepository {
   // ==================== 沉浸式视频流 API ====================
 
   /// 获取推荐视频列表（沉浸式播放页使用）
-  ///
-  /// 复用 /api/episodes/recommendIndex，取 hotPicksList 字段
   Future<List<VideoInfo>> fetchRecommendVideos() async {
     final token = await _authService.ensureToken();
-    if (token == null) {
-      return _mockVideos();
-    }
+    if (token == null) return [];
 
     try {
       _dioClient.setAuthToken(token);
@@ -62,68 +58,77 @@ class RecommendRepository {
 
       if (data['code'] == 0) {
         return _extractVideoListFromRecommend(data);
-      } else {
-        await _authService.login(forceLogin: true);
-        final newToken = _authService.currentToken;
-        if (newToken != null) {
-          _dioClient.setAuthToken(newToken);
-          final retryResp = await _dioClient.dio.post(
-            '/api/episodes/recommendIndex',
-            data: {'pageSize': 10},
-          );
-          final retryData = retryResp.data as Map<String, dynamic>;
-          if (retryData['code'] == 0) {
-            return _extractVideoListFromRecommend(retryData);
-          }
-        }
-        return _mockVideos();
       }
     } on DioException {
-      return _mockVideos();
+      // ignore
     }
+    return [];
   }
 
   List<VideoInfo> _extractVideoListFromRecommend(Map<String, dynamic> data) {
     final records = data['data']?['records'];
-    if (records is! List) return _mockVideos();
+    if (records is! List) return [];
     return records
         .map((json) => VideoInfo.fromJson(json as Map<String, dynamic>))
         .toList();
   }
 
-  List<VideoInfo> _mockVideos() {
-    return RecommendMockData.videos();
-  }
-
   // ==================== 首页推荐 API ====================
 
   /// 获取首页推荐数据
-  /// 对应 /api/episodes/recommendIndex
-  /// 返回: bannerList / hotPicksList / chartsList / newEpisodesList
+  /// 对应 /api/banner/list + /api/episodes/recommendIndex
   Future<RecommendFeed> fetchFeed({int page = 1, int pageSize = 10}) async {
     final token = await _authService.ensureToken();
+    if (token == null) return const RecommendFeed(
+      banners: [],
+      hotPicks: [],
+      charts: [],
+      newEpisodes: [],
+      hasMore: false,
+      page: 1,
+    );
 
-    if (token != null) {
-      try {
-        _dioClient.setAuthToken(token);
-        final response = await _dioClient.dio.post(
-          '/api/episodes/recommendIndex',
-          data: {'pageSize': pageSize},
-        );
-        final data = response.data as Map<String, dynamic>;
+    List<BannerItem> banners = [];
 
-        if (data['code'] == 0) {
-          return _parseRecommendFeed(data, page);
-        }
-      } on DioException {
-        // 网络错误，降级到模拟数据
+    try {
+      _dioClient.setAuthToken(token);
+
+      // 单独请求 /api/banner/list
+      final bannerResp = await apiServiceProvider.getTheaterBanner();
+      debugPrint('[Banner] isSuccess=${bannerResp.isSuccess} data=${bannerResp.data}');
+      if (bannerResp.isSuccess && bannerResp.data != null) {
+        final list = bannerResp.data as List;
+        banners = list
+            .map((json) => BannerItem.fromJson(json as Map<String, dynamic>))
+            .toList();
       }
+
+      // 请求推荐数据
+      final response = await _dioClient.dio.post(
+        '/api/episodes/recommendIndex',
+        data: {'pageSize': pageSize},
+      );
+      final data = response.data as Map<String, dynamic>;
+      debugPrint('[Recommend] code=${data['code']} data=${data['data']}');
+
+      if (data['code'] == 0) {
+        return _parseRecommendFeed(data, page, banners);
+      }
+    } on DioException {
+      // ignore
     }
 
-    return _mockFeed(page);
+    return RecommendFeed(
+      banners: banners,
+      hotPicks: [],
+      charts: [],
+      newEpisodes: [],
+      hasMore: false,
+      page: page,
+    );
   }
 
-  RecommendFeed _parseRecommendFeed(Map<String, dynamic> data, int page) {
+  RecommendFeed _parseRecommendFeed(Map<String, dynamic> data, int page, List<BannerItem> banners) {
     final d = data['data'] as Map<String, dynamic>? ?? {};
 
     List<Drama> parseList(dynamic list) {
@@ -134,7 +139,7 @@ class RecommendRepository {
     }
 
     return RecommendFeed(
-      banners: parseBanners(d['bannerList']),
+      banners: banners.isNotEmpty ? banners : parseBanners(d['bannerList']),
       hotPicks: parseList(d['hotPicksList']),
       charts: parseList(d['chartsList']),
       newEpisodes: parseList(d['newEpisodesList']),
@@ -148,58 +153,6 @@ class RecommendRepository {
     return list
         .map((json) => BannerItem.fromJson(json as Map<String, dynamic>))
         .toList();
-  }
-
-  RecommendFeed _mockFeed(int page) {
-    return RecommendFeed(
-      banners: ComprehensiveMockData.banners(),
-      hotPicks: ComprehensiveMockData.hotDramas(),
-      charts: ComprehensiveMockData.hotDramas(),
-      newEpisodes: ComprehensiveMockData.newUpdates(),
-      hasMore: page < 3,
-      page: page,
-    );
-  }
-
-  // ==================== 其他接口 ====================
-
-  Future<Drama> getDramaById(String id) async {
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    return ComprehensiveMockData.dramaById(id);
-  }
-
-  Future<List<Drama>> fetchHotList() async {
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    return ComprehensiveMockData.hotDramas();
-  }
-
-  Future<List<Drama>> fetchAllRecommended() async {
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    final dramas = <Drama>[];
-    for (int i = 1; i <= 5; i++) {
-      dramas.addAll(ComprehensiveMockData.recommendedPage(i, pageSize: 12));
-    }
-    return dramas;
-  }
-
-  Future<List<Drama>> fetchByCategory(String categoryId, {int page = 1, int pageSize = 12}) async {
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    return ComprehensiveMockData.dramasByCategory(categoryId, page: page, pageSize: pageSize);
-  }
-
-  Future<List<Drama>> searchDramas(String query, {int page = 1, int pageSize = 12}) async {
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    return ComprehensiveMockData.search(query, page: page, pageSize: pageSize);
-  }
-
-  Future<List<Drama>> fetchVipDramas() async {
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    return ComprehensiveMockData.vipDramas();
-  }
-
-  Future<List<Drama>> fetchNewUpdates() async {
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    return ComprehensiveMockData.newUpdates();
   }
 
   // ==================== 单集播放地址 ====================

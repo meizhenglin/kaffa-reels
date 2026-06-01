@@ -131,7 +131,7 @@ void openDramaPlayerWithEpisodes(
   } catch (_) {}
 
   context.push(
-    '/player',
+    '/detail',
     extra: {
       'url': drama.videoUrl ?? AppConstants.testVideoUrl,
       'title': drama.title,

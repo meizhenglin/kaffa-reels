@@ -3,17 +3,70 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../auth/providers/auth_provider.dart';
 import 'language_page.dart';
 import 'message_settings_page.dart';
 import 'recharge_agreement_page.dart';
 import 'delete_account_page.dart';
 import 'about_page.dart';
 
-class SettingsPage extends ConsumerWidget {
+class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends ConsumerState<SettingsPage> {
+  bool _isLoggingOut = false;
+
+  Future<void> _handleLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2C2C2E),
+        title: const Text(
+          'Log out',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: const Text(
+          'Are you sure you want to log out?',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white54),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Log out',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isLoggingOut = true);
+
+    await ref.read(authProvider.notifier).signOut();
+
+    if (mounted) {
+      setState(() => _isLoggingOut = false);
+      context.go('/auth/login');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
 
     return GradientScaffold(
@@ -171,7 +224,7 @@ class SettingsPage extends ConsumerWidget {
 
                     // Log out
                     GestureDetector(
-                      onTap: () {},
+                      onTap: _isLoggingOut ? null : _handleLogout,
                       child: Container(
                         width: double.infinity,
                         height: 50,

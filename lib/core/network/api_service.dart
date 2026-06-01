@@ -67,15 +67,13 @@ class ApiService {
         },
       };
 
-      debugPrint('[ApiService] REQUEST[$method] => $url');
+      debugPrint('[ApiService] REQUEST[$method] => $url body=$data');
 
       final Response response;
       if (isForm) {
         response = await _dio.request(
           url,
-          data: Uri(queryParameters: data?.map(
-            (k, v) => MapEntry(k, v?.toString() ?? ''),
-          )).query,
+          data: FormData.fromMap(data ?? {}),
           options: Options(method: method, headers: headers),
         );
       } else {
@@ -125,11 +123,11 @@ class ApiService {
   /// 邮箱登录
   Future<ApiResponse> login({
     required String email,
-    required String password,
+    required String passportPassword,
   }) {
     return request(
       ApiEndpoints.login,
-      data: {'email': email, 'password': password},
+      data: {'email': email, 'passportPassword': passportPassword},
       isForm: true,
     );
   }
@@ -219,10 +217,11 @@ class ApiService {
   // ==================== Flutter 特有 ====================
 
   /// 发送邮箱验证码
-  Future<ApiResponse> sendEmailCode({required String email}) {
+  /// type: 0 - 登录，1 - 注册
+  Future<ApiResponse> sendEmailCode({required String email, int type = 0}) {
     return request(
       ApiEndpoints.sendEmailCode,
-      data: {'email': email},
+      data: {'email': email, 'type': type},
       isForm: true,
     );
   }
@@ -242,31 +241,26 @@ class ApiService {
   /// 注册账号
   Future<ApiResponse> register({
     required String email,
-    required String password,
-    required String code,
-    String? deviceId,
-    String? deviceMes,
-    String? uuid,
+    required String passportPassword,
   }) {
     return request(
       ApiEndpoints.register,
       data: {
         'email': email,
-        'password': password,
-        'code': code,
-        if (deviceId != null) 'deviceId': deviceId,
-        if (deviceMes != null) 'deviceMes': deviceMes,
-        if (uuid != null) 'uuid': uuid,
+        'passportPassword': passportPassword,
       },
-      isForm: true,
+      isForm: false,
     );
   }
 
   // ==================== TheaterModel 剧场 Tab ====================
 
   /// 剧场 Banner 列表
-  Future<ApiResponse> getTheaterBanner() {
-    return request(ApiEndpoints.theaterBanner, method: 'GET');
+  Future<ApiResponse> getTheaterBanner({int bannerPosition = 0}) {
+    return request(
+      ApiEndpoints.theaterBanner,
+      data: {'bannerPosition': bannerPosition},
+    );
   }
 
   /// 剧场 排行榜列表
@@ -437,8 +431,8 @@ class ApiService {
     required String episodesId,
   }) {
     return request(
-      ApiEndpoints.episodeInfo,
-      data: {'videoId': videoId, 'episodesId': episodesId},
+      ApiEndpoints.episodesDirectory,
+      data: {'videoId': videoId},
     );
   }
 

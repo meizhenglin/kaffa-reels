@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/csv_data_service.dart';
-import '../data/recommend_mock_data.dart';
 import '../models/banner.dart';
 import '../models/drama.dart';
 
