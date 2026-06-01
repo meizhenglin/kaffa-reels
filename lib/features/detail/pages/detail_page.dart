@@ -105,10 +105,9 @@ class _DetailPageState extends ConsumerState<DetailPage> {
       _itemKeys[oldIndex].currentState?.pause();
     }
 
-    // 播放新视频，并获取实时播放地址
+    // 播放新视频（不需要 refreshUrl，URL 已通过 playVideo 完整加载）
     if (newIndex < _itemKeys.length) {
       _itemKeys[newIndex].currentState?.resume();
-      _itemKeys[newIndex].currentState?.refreshUrl();
     }
   }
 
@@ -301,11 +300,6 @@ class _DetailPageState extends ConsumerState<DetailPage> {
       setState(() {
         _isLoading = false;
       });
-
-      // 初始集获取实时播放地址（URL 可能已过期）
-      if (startIndex < _itemKeys.length) {
-        _itemKeys[startIndex].currentState?.refreshUrl();
-      }
     } catch (e) {
       debugPrint("[DetailPage][fetchAll] error: $e");
       _setError(e.toString());
