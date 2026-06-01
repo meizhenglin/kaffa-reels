@@ -1,8 +1,8 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers/app_providers.dart';
-import '../../../core/providers/auth_provider.dart';
 import '../models/user_model.dart';
 import '../repositories/auth_repository.dart';
 
@@ -57,22 +57,31 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) => Aut
 
 /// 认证状态管理器
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._ref) : super(const AuthState()) { _init(); }
+  AuthNotifier(this._ref) : super(const AuthState()) { _startInit(); }
   final Ref _ref;
   StreamSubscription<User?>? _authSubscription;
-
   AuthRepository get _repository => _ref.read(authRepositoryProvider);
+
+  /// 启动初始化（不阻塞 Provider 创建）
+  void _startInit() {
+    _init().catchError((e) {
+      debugPrint('[AuthNotifier] _init error: $e');
+    });
+  }
 
   /// 初始化：检查缓存用户 + 监听 Firebase 状态变化
   Future<void> _init() async {
-    final cached = await _repository.getCachedUser();
+    final cached = await _repository.getCachedUser().timeout(
+      const Duration(seconds: 3),
+      onTimeout: () => null,
+    );
     if (cached != null) state = state.copyWith(status: AuthStatus.authenticated, user: cached);
 
     _authSubscription = _repository.authStateChanges.listen(
       _onFirebaseAuthChanged,
       onError: (Object e) => state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString(), isLoading: false),
     );
-    await checkAuthState();
+    await checkAuthState().timeout(const Duration(seconds: 5));
   }
 
   /// 初始化为游客

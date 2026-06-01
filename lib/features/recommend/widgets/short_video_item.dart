@@ -54,7 +54,7 @@ class ShortVideoItemState extends State<ShortVideoItem> {
     final data = AliPlayerWidgetData(
       sceneType: SceneType.listPlayer,
       videoSource: videoSource,
-      coverUrl: widget.videoInfo.coverUrl,
+      coverUrl: widget.videoInfo.coverUrl ?? '',
       autoPlay: widget.autoPlay,
     );
     _controller.configure(data);

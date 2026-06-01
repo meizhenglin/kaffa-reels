@@ -68,18 +68,18 @@ class _PlayerWidgetState extends ConsumerState<PlayerWidget> {
   void initState() {
     super.initState();
     _aliController = AliPlayerWidgetController(context);
+    final videoSource = VideoSourceFactory.createUrlSource(widget.args.videoUrl);
     final data = AliPlayerWidgetData(
-      videoUrl: widget.args.videoUrl,
-      coverUrl: widget.args.coverUrl,
+      videoSource: videoSource,
+      coverUrl: widget.args.coverUrl ?? '',
       videoTitle: widget.args.title,
     );
     _aliController.configure(data);
-    _aliController.setAutoPlay(true);
   }
 
   @override
   void dispose() {
-    _aliController.dispose();
+    _aliController.destroy();
     super.dispose();
   }
 

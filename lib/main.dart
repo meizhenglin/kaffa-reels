@@ -1,13 +1,7 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_aliplayer/flutter_aliplayer.dart';
-import 'package:flutter_aliplayer/flutter_aliplayer_factory.dart';
-import 'package:flutter_aliplayer/flutter_aliplayer_global_setting.dart';
-import 'package:flutter_aliplayer/flutter_avpdef.dart';
 import 'package:arab_drama_app/l10n/app_localizations.dart';
 
 import 'app/providers/app_providers.dart';
@@ -15,7 +9,6 @@ import 'app/router/router_config.dart';
 import 'app/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
 import 'core/firebase/firebase_service.dart';
-import 'core/auth/auth_service.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/storage/storage_service.dart';
 
@@ -71,7 +64,7 @@ class _ArabDramaAppState extends ConsumerState<ArabDramaApp> {
       ref.read(themeModeProvider.notifier).load();
       ref.read(localeProvider.notifier).load();
       // 初始化 AuthService（加载缓存的 Token 和 UUID）
-      await ref.read(authServiceProvider).init();
+      await ref.read(authServiceProvider).init().timeout(const Duration(seconds: 5), onTimeout: () {});
       // 启动时匿名登录，后续所有需要 Token 的请求直接使用
       ref.read(guestLoginProvider.notifier).login();
     });
