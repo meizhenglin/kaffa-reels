@@ -347,22 +347,27 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      /// 阿里云沉浸式播放器（demo 版，点击 Banner Watch Now 跳转）
+      /// 阿里云沉浸式播放器
       /// 【路径】/short-video
-      /// 【参数】
-      /// - episodes（extra）：VideoInfo 列表（可选，有则直接用，无则走 mock）
+      /// 【参数】二选一：
+      /// - videoId（extra）：视频 ID，播放器自己请求 directory + playVideo（推荐）
+      /// - episodes（extra）：VideoInfo 列表，向后兼容老调用方
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
         path: '/short-video',
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
+          final videoId = extra?['videoId'] as String?;
           final rawList = extra?['episodes'] as List<dynamic>?;
           final episodes = rawList
               ?.map((e) => VideoInfo.fromJson(e as Map<String, dynamic>))
               .toList();
-          debugPrint('[router] /short-video received ${episodes?.length ?? 0} episodes, '
-              'first url=${episodes?.firstOrNull?.videoUrl ?? "null"}');
-          return ShortVideoPage(episodes: episodes);
+
+          debugPrint('[router] /short-video videoId=$videoId episodes=${episodes?.length}');
+          return ShortVideoPage(
+            videoId: videoId,
+            episodes: episodes,
+          );
         },
       ),
 
