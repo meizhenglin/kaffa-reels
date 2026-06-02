@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers/app_providers.dart';
+import '../../../core/providers/auth_provider.dart' show GuestLoginStatus, guestLoginProvider;
+import '../../../core/network/api_service.dart';
 import '../models/user_model.dart';
 import '../repositories/auth_repository.dart';
 
@@ -81,6 +83,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
       _onFirebaseAuthChanged,
       onError: (Object e) => state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString(), isLoading: false),
     );
+
+    // 自动登录：检查是否有保存的凭证，有则自动登录
+    if (await _repository.hasAutoLoginCredentials()) {
+      debugPrint('[AuthNotifier] auto-login credentials found, performing auto-login...');
+      state = state.copyWith(status: AuthStatus.authenticating, isLoading: true, clearError: true);
+      try {
+        final user = await _repository.performAutoLogin();
+        state = state.copyWith(status: AuthStatus.authenticated, user: user, isLoading: false);
+        debugPrint('[AuthNotifier] auto-login succeeded');
+        return;
+      } catch (e) {
+        debugPrint('[AuthNotifier] auto-login failed: $e, clearing credentials');
+        await _repository.clearAutoLoginCredentials();
+        state = state.copyWith(status: AuthStatus.unauthenticated, isLoading: false);
+        return;
+      }
+    }
+
     await checkAuthState().timeout(const Duration(seconds: 5));
   }
 
@@ -144,8 +164,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true);
     try {
       await _repository.signOut();
+      await _repository.clearAutoLoginCredentials();
       state = state.copyWith(status: AuthStatus.unauthenticated, clearUser: true, isLoading: false, clearError: true);
     } catch (e) { state = state.copyWith(isLoading: false, errorMessage: _mapError(e)); }
+  }
+
+  /// 清除游客登录状态（注册完成后调用，防止游客身份残留）
+  void clearGuestLoginStatus() {
+    // ignore: deprecated_member_use_from_same_package
+    _ref.read(guestLoginProvider.notifier).state = GuestLoginStatus.initial;
   }
 
   /// 更新头像
@@ -163,10 +190,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// 更新昵称
-  void updateNickname(String nickname) {
+  Future<void> updateNickname(String nickname) async {
     if (state.user != null) {
+      // 先更新本地
       state = state.copyWith(user: state.user!.copyWith(nickname: nickname));
       _repository.saveUserData(state.user!.toJson());
+      // 同步到后端
+      await apiServiceProvider.updateNickname(nickname: nickname);
     }
   }
 

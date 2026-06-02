@@ -65,6 +65,15 @@ class AppConstants {
   /// 系统配置缓存
   static const String systemConfigKey = 'system_config_linekong';
 
+  /// 自动登录开关
+  static const String autoLoginKey = 'auto_login';
+  /// 自动登录记住的邮箱
+  static const String autoLoginEmailKey = 'auto_login_email';
+  /// 自动登录记住的密码（加密存储）
+  static const String autoLoginPasswordKey = 'auto_login_password';
+  /// 自动登录保存时间戳（毫秒）
+  static const String autoLoginTimestampKey = 'auto_login_timestamp';
+
   // ==================== 国际化配置 ====================
   /// 支持的应用语言列表
   /// 【添加新语言】在此列表中添加新的语言代码（如 'fr', 'zh'）

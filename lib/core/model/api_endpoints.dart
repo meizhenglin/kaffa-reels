@@ -13,7 +13,7 @@ class ApiEndpoints {
   ApiEndpoints._();
 
   // ==================== 登录相关 ====================
-  static const String login = '/api/user/userDYAuthorization';
+  static const String login = '/api/user/userAuthorization';
   static const String douyinLogin = '/api/user/userAuthorization';
   static const String weixinLogin = '/api/user/userAuthorization';
   static const String guestLogin = '/api/user/userAuthorization';
@@ -85,6 +85,10 @@ class ApiEndpoints {
   static const String checkEmailCode = '/api/user/verifyCode';
   /// 注册账号
   static const String register = '/api/user/mailRegister';
+  /// 修改昵称
+  static const String updateNickname = '/api/user/updateNickname';
+  /// 头像列表
+  static const String avatarList = '/api/user/avatarList';
 }
 
 /// PassportType 登录类型标识

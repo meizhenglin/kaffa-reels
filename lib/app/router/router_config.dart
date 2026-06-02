@@ -12,6 +12,7 @@ import '../../features/auth/pages/login_page.dart';
 import '../../features/auth/pages/register_email_page.dart';
 import '../../features/auth/pages/register_page.dart';
 import '../../features/auth/pages/user_agreement_page.dart';
+import '../../features/auth/pages/photo_setting_page.dart';
 import '../../features/auth/pages/privacy_policy_page.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/explore/pages/explore_tab.dart';
@@ -149,8 +150,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       // 正在验证中，不做重定向
       if (isAuthenticating) return null;
 
-      // 已登录用户访问认证页面 → 跳转到首页或 redirect 参数指定的页面
-      if (isAuthenticated && isAuthRoute) {
+      // 已登录用户（且不是游客）访问认证页面 → 跳转到首页或 redirect 参数指定的页面
+      if (isAuthenticated && isAuthRoute && auth.user != null && !auth.user!.isTourist) {
         final redirect = state.uri.queryParameters['redirect'];
         if (redirect != null && redirect.isNotEmpty) {
           return redirect;
@@ -482,6 +483,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/auth/register/email',
         name: 'registerEmail',
         builder: (context, state) => const RegisterEmailPage(),
+      ),
+
+      /// Photo Setting 页面
+      /// 【路径】/auth/photo-setting
+      /// 【功能】注册后设置头像
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/auth/photo-setting',
+        name: 'photo-setting',
+        builder: (context, state) => const PhotoSettingPage(),
       ),
 
       /// 用户协议页面

@@ -2,6 +2,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
 
+import '../../core/constants/app_constants.dart';
+
 /// ============================================================================
 /// 本地存储服务
 ///
@@ -368,5 +370,63 @@ class StorageService {
 
   Future<bool> getEpisodeUnlock() async {
     return _prefs?.getBool('episode_unlock_linekong') ?? false;
+  }
+
+  // ==================== 自动登录 (SharedPreferences) ====================
+  /// 保存自动登录开关状态
+  Future<void> saveAutoLogin(bool enabled) async {
+    await _prefs?.setBool(AppConstants.autoLoginKey, enabled);
+  }
+
+  /// 读取自动登录开关状态
+  Future<bool> getAutoLogin() async {
+    return _prefs?.getBool(AppConstants.autoLoginKey) ?? false;
+  }
+
+  /// 保存自动登录记住的邮箱
+  Future<void> saveAutoLoginEmail(String email) async {
+    await _prefs?.setString(AppConstants.autoLoginEmailKey, email);
+  }
+
+  /// 读取自动登录记住的邮箱
+  Future<String?> getAutoLoginEmail() async {
+    return _prefs?.getString(AppConstants.autoLoginEmailKey);
+  }
+
+  /// 保存自动登录记住的密码（安全存储）
+  Future<void> saveAutoLoginPassword(String password) async {
+    await _secureStorage.write(key: AppConstants.autoLoginPasswordKey, value: password);
+  }
+
+  /// 读取自动登录记住的密码
+  Future<String?> getAutoLoginPassword() async {
+    return await _secureStorage.read(key: AppConstants.autoLoginPasswordKey);
+  }
+
+  /// 保存自动登录时间戳（30天有效期）
+  Future<void> saveAutoLoginTimestamp() async {
+    await _prefs?.setInt(AppConstants.autoLoginTimestampKey, DateTime.now().millisecondsSinceEpoch);
+  }
+
+  /// 读取自动登录时间戳
+  int? getAutoLoginTimestamp() {
+    return _prefs?.getInt(AppConstants.autoLoginTimestampKey);
+  }
+
+  /// 自动登录凭证是否在30天有效期内
+  bool isAutoLoginValid() {
+    final ts = getAutoLoginTimestamp();
+    if (ts == null) return false;
+    final saved = DateTime.fromMillisecondsSinceEpoch(ts);
+    final diff = DateTime.now().difference(saved).inDays;
+    return diff <= 30;
+  }
+
+  /// 清除自动登录记住的凭证
+  Future<void> clearAutoLoginCredentials() async {
+    await _prefs?.remove(AppConstants.autoLoginKey);
+    await _prefs?.remove(AppConstants.autoLoginEmailKey);
+    await _prefs?.remove(AppConstants.autoLoginTimestampKey);
+    await _secureStorage.delete(key: AppConstants.autoLoginPasswordKey);
   }
 }

@@ -1,3 +1,4 @@
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show PlatformDispatcher;
 import 'package:uuid/uuid.dart';
@@ -70,14 +71,32 @@ class AuthService {
     _cachedToken = await _storage.getToken();
   }
 
-  /// 获取或创建持久化的设备 UUID
+  /// 获取或创建持久化的硬件设备 ID
   Future<String> _getOrCreateDeviceId() async {
-    String? uuid = await _storage.getDeviceUuid();
-    if (uuid == null || uuid.isEmpty) {
-      uuid = const Uuid().v4();
-      await _storage.saveDeviceUuid(uuid);
+    final storedId = await _storage.getDeviceUuid();
+    if (storedId != null && storedId.isNotEmpty) {
+      return storedId;
     }
-    return uuid;
+
+    String deviceId;
+    try {
+      final deviceInfo = DeviceInfoPlugin();
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        final androidInfo = await deviceInfo.androidInfo;
+        deviceId = androidInfo.id; // 硬件 Android ID（如 1a2b3c4d5e6f7890）
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        deviceId = iosInfo.identifierForVendor ?? const Uuid().v4();
+      } else {
+        deviceId = const Uuid().v4();
+      }
+    } catch (e) {
+      debugPrint('[AuthService] Failed to get hardware deviceId, fallback to UUID: $e');
+      deviceId = const Uuid().v4();
+    }
+
+    await _storage.saveDeviceUuid(deviceId);
+    return deviceId;
   }
 
   /// 登录成功后获取并保存用户信息

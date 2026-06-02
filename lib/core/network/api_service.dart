@@ -127,8 +127,11 @@ class ApiService {
   }) {
     return request(
       ApiEndpoints.login,
-      data: {'email': email, 'passportPassword': passportPassword},
-      isForm: true,
+      data: {
+        'passportType': 1,
+        'email': email,
+        'passportPassword': passportPassword,
+      },
     );
   }
 
@@ -251,6 +254,19 @@ class ApiService {
       },
       isForm: false,
     );
+  }
+
+  /// 修改昵称
+  Future<ApiResponse> updateNickname({required String nickname}) {
+    return request(
+      ApiEndpoints.updateNickname,
+      data: {'nickname': nickname},
+    );
+  }
+
+  /// 获取头像列表
+  Future<ApiResponse> getAvatarList() {
+    return request(ApiEndpoints.avatarList);
   }
 
   // ==================== TheaterModel 剧场 Tab ====================

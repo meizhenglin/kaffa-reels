@@ -27,6 +27,7 @@ class UserModel extends Equatable {
     this.membershipType = MembershipType.regular,
     this.membershipExpiryDate,
     this.isGuest = false,
+    this.passportType,
   });
 
   final String id;
@@ -41,8 +42,12 @@ class UserModel extends Equatable {
   final MembershipType membershipType;
   final DateTime? membershipExpiryDate;
   final bool isGuest;
+  final int? passportType;
 
   String? get userNickname => nickname ?? displayName;
+
+  /// 同时考虑本地 isGuest 字段和后端返回的 passportType == 0
+  bool get isTourist => isGuest || (passportType != null && passportType == 0);
 
   bool get isPremium =>
       membershipType == MembershipType.premium &&
@@ -99,6 +104,7 @@ class UserModel extends Equatable {
           ? DateTime.tryParse(json['vipEndTime'] as String)
           : null,
       isGuest: json['isGuest'] as bool? ?? false,
+      passportType: json['passportType'] as int?,
     );
   }
 
@@ -116,6 +122,7 @@ class UserModel extends Equatable {
         'vipEndTime': membershipExpiryDate?.toIso8601String(),
         'isVip': membershipType == MembershipType.premium ? 1 : 0,
         'isGuest': isGuest,
+        'passportType': passportType,
       };
 
   UserModel copyWith({
@@ -131,6 +138,7 @@ class UserModel extends Equatable {
     MembershipType? membershipType,
     DateTime? membershipExpiryDate,
     bool? isGuest,
+    int? passportType,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -146,6 +154,7 @@ class UserModel extends Equatable {
       membershipExpiryDate:
           membershipExpiryDate ?? this.membershipExpiryDate,
       isGuest: isGuest ?? this.isGuest,
+      passportType: passportType ?? this.passportType,
     );
   }
 
@@ -162,5 +171,6 @@ class UserModel extends Equatable {
         membershipType,
         membershipExpiryDate,
         isGuest,
+        passportType,
       ];
 }

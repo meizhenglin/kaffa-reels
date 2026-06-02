@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logger/logger.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -9,6 +10,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/storage/storage_service.dart';
+import '../models/user_model.dart';
 import '../models/user_model.dart';
 
 class AuthRepository {
@@ -281,6 +283,37 @@ class AuthRepository {
       AppConstants.userCacheKey,
       jsonEncode(userData),
     );
+  }
+
+  Future<void> clearAutoLoginCredentials() async {
+    await _storage.clearAutoLoginCredentials();
+  }
+
+  /// 自动登录：检查是否开启了自动登录且有保存的凭证（同时检查30天有效期）
+  Future<bool> hasAutoLoginCredentials() async {
+    final enabled = await _storage.getAutoLogin();
+    final email = await _storage.getAutoLoginEmail();
+    final password = await _storage.getAutoLoginPassword();
+    if (!enabled || email == null || email.isEmpty || password == null || password.isEmpty) {
+      return false;
+    }
+    // 检查30天有效期，过期则清除并返回 false
+    if (!_storage.isAutoLoginValid()) {
+      debugPrint('[AuthRepository] auto-login expired (30 days), clearing credentials');
+      await clearAutoLoginCredentials();
+      return false;
+    }
+    return true;
+  }
+
+  /// 自动登录：执行自动登录
+  Future<UserModel> performAutoLogin() async {
+    final email = await _storage.getAutoLoginEmail();
+    final password = await _storage.getAutoLoginPassword();
+    if (email == null || password == null) {
+      throw Exception('No auto-login credentials found');
+    }
+    return signInWithEmail(email, password);
   }
 }
 

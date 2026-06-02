@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/providers/app_providers.dart';
 import '../../../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
 
@@ -23,6 +24,26 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
   bool _autoLogin = false;
 
   @override
+  void initState() {
+    super.initState();
+    _loadAutoLoginSettings();
+  }
+
+  Future<void> _loadAutoLoginSettings() async {
+    final storage = ref.read(storageServiceProvider);
+    final enabled = await storage.getAutoLogin();
+    final savedEmail = await storage.getAutoLoginEmail();
+    if (mounted) {
+      setState(() {
+        _autoLogin = enabled;
+        if (savedEmail != null && savedEmail.isNotEmpty) {
+          _emailController.text = savedEmail;
+        }
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
@@ -39,6 +60,18 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
         );
 
     if (success && mounted) {
+      // 保存或清除自动登录凭证
+      final storage = ref.read(storageServiceProvider);
+      if (_autoLogin) {
+        await storage.saveAutoLogin(true);
+        await storage.saveAutoLoginEmail(_emailController.text.trim());
+        await storage.saveAutoLoginPassword(_passwordController.text);
+        await storage.saveAutoLoginTimestamp();
+      } else {
+        await storage.saveAutoLogin(false);
+        await storage.clearAutoLoginCredentials();
+      }
+
       final r = widget.redirect;
       if (r != null && r.isNotEmpty) {
         context.go(r);

@@ -34,7 +34,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
     final newName = _newNameController.text.trim();
     if (newName.isEmpty) return;
     ref.read(authProvider.notifier).updateNickname(newName);
-    context.pop();
+    context.go('/auth/login');
   }
 
   @override

@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../../app/providers/app_providers.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterEmailPage extends ConsumerStatefulWidget {
@@ -30,6 +31,7 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
   bool _showConfirm = false;
   bool _showPasswordInput = false;
   bool _isLoading = false;
+  bool _isConfirmLoading = false;
   int _countdown = 0;
   Timer? _timer;
 
@@ -63,9 +65,18 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
 
     setState(() => _isLoading = false);
 
-    if (success) {
-      debugPrint('[RegisterEmail] success, navigating to home');
-      context.go('/');
+      if (success) {
+      debugPrint('[RegisterEmail] success, fetching user info...');
+      // 立即拉取后端真实用户信息（包含正确 nickname 和 id）
+      final authService = ref.read(authServiceProvider);
+      await authService.fetchUserInfo();
+      final userData = await authService.getUserData();
+      if (userData != null) {
+        ref.read(authProvider.notifier).updateUserFromData(userData);
+      }
+      if (!mounted) return;
+      // 注册成功后进入设置头像和昵称的引导流程
+      context.go('/auth/photo-setting');
     } else {
       final errorMsg = ref.read(authProvider).errorMessage;
       debugPrint('[RegisterEmail] failed: $errorMsg');
@@ -100,8 +111,6 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
         if (_countdown > 0) {
           _countdown--;
         } else {
-          _showCodeInput = false;
-          _showConfirm = false;
           t.cancel();
         }
       });
@@ -109,13 +118,18 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
   }
 
   Future<void> _sendCode() async {
+    if (_isLoading) return;
     if (!_emailFormKey.currentState!.validate()) return;
     if (!_agreePolicy) {
       _policyShakeKey.currentState?.shake();
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _showCodeInput = true;
+      _showConfirm = true;
+    });
 
     final authService = ref.read(authServiceProvider);
     final result = await authService.sendEmailCode(
@@ -125,14 +139,14 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
     if (!mounted) return;
 
     if (result.success) {
+      _startCountdown();
+      setState(() => _isLoading = false);
+    } else {
       setState(() {
         _isLoading = false;
-        _showCodeInput = true;
-        _showConfirm = true;
+        _showCodeInput = false;
+        _showConfirm = false;
       });
-      _startCountdown();
-    } else {
-      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result.message ?? 'Failed to send code'),
@@ -149,7 +163,7 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isConfirmLoading = true);
 
     final authService = ref.read(authServiceProvider);
     final result = await authService.checkEmailCode(
@@ -161,11 +175,11 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
 
     if (result.success) {
       setState(() {
-        _isLoading = false;
+        _isConfirmLoading = false;
         _showPasswordInput = true;
       });
     } else {
-      setState(() => _isLoading = false);
+      setState(() => _isConfirmLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result.message ?? 'Verification failed'),
@@ -177,7 +191,6 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = ref.watch(authProvider);
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
@@ -287,6 +300,7 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
                               enabled: !_isLoading,
                               isLoading: _isLoading,
                               countdown: _countdown,
+                              onResend: _isLoading ? null : _sendCode,
                               validator: (v) {
                                 if (v == null || v.isEmpty) {
                                   return l10n?.requiredField ?? 'Required';
@@ -295,24 +309,32 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
                               },
                             ),
                           ],
-                          if (auth.errorMessage != null) ...[
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.red.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                auth.errorMessage!,
-                                style: const TextStyle(
-                                  color: Color(0xFFFF6B6B),
-                                  fontSize: 13,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ],
+                          Consumer(
+                            builder: (_, ref, __) {
+                              final msg = ref.watch(authProvider).errorMessage;
+                              if (msg == null) return const SizedBox.shrink();
+                              return Column(
+                                children: [
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      msg,
+                                      style: const TextStyle(
+                                        color: Color(0xFFFF6B6B),
+                                        fontSize: 13,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                           const SizedBox(height: 24),
                           if (!_showCodeInput) ...[
                             GestureDetector(
@@ -344,39 +366,43 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
                           ],
                           if (_showConfirm) ...[
                             const SizedBox(height: 16),
-                            GestureDetector(
-                              onTap: _isLoading ? null : _confirm,
-                              child: Container(
-                                width: double.infinity,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFF8F4EFF),
-                                      Color(0xFFA237FF),
-                                    ],
+                            Builder(
+                              builder: (context) {
+                                return GestureDetector(
+                                  onTap: _isConfirmLoading ? null : _confirm,
+                                  child: Container(
+                                    width: double.infinity,
+                                    height: 50,
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFF8F4EFF),
+                                          Color(0xFFA237FF),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.circular(30),
+                                    ),
+                                    child: Center(
+                                      child: _isConfirmLoading
+                                          ? const SizedBox(
+                                              width: 22,
+                                              height: 22,
+                                              child: Image(
+                                                image: AssetImage('assets/images/loading_icon.png'),
+                                              ),
+                                            )
+                                          : const Text(
+                                              'Confirm',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                    ),
                                   ),
-                                  borderRadius: BorderRadius.circular(30),
-                                ),
-                                child: Center(
-                                  child: _isLoading
-                                      ? const SizedBox(
-                                          width: 22,
-                                          height: 22,
-                                          child: Image(
-                                            image: AssetImage('assets/images/loading_icon.png'),
-                                          ),
-                                        )
-                                      : const Text(
-                                          'Confirm',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                ),
-                              ),
+                                );
+                              },
                             ),
                           ],
                         ],
@@ -547,6 +573,7 @@ class _CodeInput extends StatelessWidget {
     required this.validator,
     required this.isLoading,
     required this.countdown,
+    required this.onResend,
     this.enabled = true,
   });
 
@@ -554,6 +581,7 @@ class _CodeInput extends StatelessWidget {
   final FormFieldValidator<String> validator;
   final bool isLoading;
   final int countdown;
+  final VoidCallback? onResend;
   final bool enabled;
 
   @override
@@ -611,7 +639,31 @@ class _CodeInput extends StatelessWidget {
                   ],
                 ),
               )
-            : null,
+            : Padding(
+                padding: const EdgeInsets.only(right: 20),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 1,
+                      height: 18,
+                      color: const Color(0xFF999999),
+                    ),
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: onResend == null ? null : () => onResend!(),
+                      child: Text(
+                        'Resend',
+                        style: TextStyle(
+                          color: Color(0xFF8F4EFF),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
         suffixIconConstraints: const BoxConstraints(minWidth: 80),
         filled: true,
         fillColor: const Color(0xFF3B3C45),

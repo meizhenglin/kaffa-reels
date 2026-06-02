@@ -124,11 +124,13 @@ class DioClient {
             _logger.e('【ERROR MESSAGE】${error.message}');
             _logger.e('');
 
-            if (statusCode != 200) {
-              handler.next(error);
-            } else {
-              handler.next(error);
+            // Token 过期：401 或后端返回的特定 code
+            if (statusCode == 401 || code == 401) {
+              _logger.w('【TOKEN EXPIRED】401 detected, triggering token expired flow');
+              await _handleTokenExpired();
             }
+
+            handler.next(error);
           },
         ),
       );

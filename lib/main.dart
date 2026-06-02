@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_aliplayer/flutter_aliplayer.dart';
+import 'package:go_router/go_router.dart';
 import 'package:arab_drama_app/l10n/app_localizations.dart';
 
 import 'app/providers/app_providers.dart';
@@ -57,6 +58,15 @@ class _ArabDramaAppState extends ConsumerState<ArabDramaApp> {
       ref.read(localeProvider.notifier).load();
       // 初始化 AuthService（加载缓存的 Token 和 UUID）
       await ref.read(authServiceProvider).init().timeout(const Duration(seconds: 5), onTimeout: () {});
+
+      // 注册 Token 过期回调：清除 Token + 跳转到登录页
+      ref.read(dioClientProvider).setOnTokenExpired(() {
+        ref.read(authServiceProvider).logout();
+        if (mounted) {
+          context.go('/auth/login');
+        }
+      });
+
       // 启动时匿名登录，后续所有需要 Token 的请求直接使用
       ref.read(guestLoginProvider.notifier).login();
     });

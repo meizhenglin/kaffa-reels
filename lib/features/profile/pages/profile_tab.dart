@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../app/providers/app_providers.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../auth/models/user_model.dart';
 import 'chat_page.dart';
 import 'settings_page.dart';
 
@@ -109,11 +107,12 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
     // 优先用 photoURL（后端/Firebase），fallback 到本地 avatar
     final avatarUrl = user?.photoURL ?? user?.avatar;
 
-    return GestureDetector(
-      onTap: () => context.push('/change-name'),
-      child: Row(
-        children: [
-          Container(
+    return Row(
+      children: [
+        // 头像区域：点击选择图片
+        GestureDetector(
+          onTap: () => _pickAvatar(context),
+          child: Container(
             width: 73,
             height: 73,
             decoration: BoxDecoration(
@@ -136,25 +135,26 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                   : _buildAvatarPlaceholder(),
             ),
           ),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Column(
+        ),
+        const SizedBox(width: 13),
+        Expanded(
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(
-                      user?.userNickname ?? 'Guest${user?.id.substring(0, 5) ?? ''}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
+                // 昵称区域：点击跳转改名页
+                GestureDetector(
+                  onTap: () => context.push('/change-name'),
+                  child: Text(
+                    user?.userNickname ?? 'Guest${user?.id.substring(0, 5) ?? ''}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
                     ),
-                  ],
+                  ),
                 ),
                 const SizedBox(height: 8),
-                if (auth.isAuthenticated)
+                if (user != null && !user.isTourist)
                   Container(
                     height: 18,
                     padding: const EdgeInsets.only(right: 5),
@@ -187,37 +187,53 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                     l10n?.loginSubtitle ?? 'Login to unlock more features',
                     style: const TextStyle(color: Color(0xFFFFFFFF), fontSize: 13),
                   ),
+                const SizedBox(height: 8),
+                if (user == null || user.isTourist)
+                  GestureDetector(
+                    onTap: () => context.push('/auth/login'),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFFFF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        l10n?.login_button ?? 'Log in',
+                        style: const TextStyle(
+                          color: Color(0xFF8F4EFF),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  )
+                  else
+                    const SizedBox(width: 20),
               ],
             ),
           ),
-          if (!auth.isAuthenticated)
-            GestureDetector(
-              onTap: () => context.push('/auth/login'),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFFFF),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  l10n?.login_button ?? 'Log in',
-                  style: const TextStyle(
-                    color: Color(0xFF8F4EFF),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            )
-          else
+          if (user != null && !user.isTourist)
             Image.asset(
               'assets/images/to.png',
               width: 20,
               height: 20,
             ),
         ],
-      ),
-    );
+      );
+  }
+
+  Future<void> _pickAvatar(BuildContext context) async {
+    final auth = ref.read(authProvider);
+    if (auth.user == null || auth.user!.isTourist) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in first'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    context.push('/auth/photo-setting');
   }
 
   Widget _buildAvatarPlaceholder() {
@@ -284,7 +300,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  auth.isAuthenticated
+                  user == null || !user.isTourist
                       ? 'Validity Period：${_formatDate(user?.membershipExpiryDate)}'
                       : (AppLocalizations.of(context)?.vipSubtitle ??
                           'Unlock all series with one tap'),
@@ -304,10 +320,10 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
                   // fit: BoxFit.cover,
                 ),
               ),
-              child: Text(
-                auth.isAuthenticated
-                    ? 'Renewal'
-                    : (AppLocalizations.of(context)?.subscribe ?? 'Subscribe'),
+                child: Text(
+                  user == null || !user.isTourist
+                      ? 'Renewal'
+                      : (AppLocalizations.of(context)?.subscribe ?? 'Subscribe'),
                 style: const TextStyle(
                   color: Color(0xFFFFEDC6),
                   fontSize: 13,

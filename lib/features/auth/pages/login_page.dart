@@ -6,37 +6,62 @@ import 'package:go_router/go_router.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
+import '../../../core/providers/auth_provider.dart' as core_auth show GuestLoginStatus, guestLoginProvider;
 
-class LoginPage extends ConsumerWidget {
+class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key, this.redirect});
 
   final String? redirect;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends ConsumerState<LoginPage> {
+  bool _redirectRegistered = false;
+
+  void _maybeRegisterRedirect() {
+    if (_redirectRegistered) return;
+    _redirectRegistered = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.listen<AuthState>(authProvider, (_, next) {
+        if (!mounted) return;
+        if (next.isAuthenticated && !next.isLoading) {
+          // 清除游客登录状态
+          ref.read(core_auth.guestLoginProvider.notifier).state = core_auth.GuestLoginStatus.initial;
+          final r = widget.redirect;
+          // 优先返回 redirect，没有则返回用户中心
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (!mounted) return;
+            context.go(r != null && r.isNotEmpty ? r : '/profile');
+          });
+        }
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _maybeRegisterRedirect();
     final l10n = AppLocalizations.of(context);
-    final auth = ref.watch(authProvider);
 
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Background image
           Image.asset(
             'assets/images/login_bg.png',
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) =>
                 Container(color: const Color(0xFF1A1A2A)),
           ),
-          // Content overlay
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 18),
-                  // Back button + Title row
                   Row(
                     children: [
                       GestureDetector(
@@ -76,7 +101,6 @@ class LoginPage extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 67),
-                  // Logo
                   Center(
                     child: Image.asset(
                       'assets/images/login_logo.png',
@@ -91,107 +115,97 @@ class LoginPage extends ConsumerWidget {
                           ),
                           borderRadius: BorderRadius.circular(18),
                         ),
-                        // child: const Icon(
-                        //   Icons.play_arrow_rounded,
-                        //   color: Colors.white,
-                        //   size: 36,
-                        // ),
                       ),
                     ),
                   ),
-                  // const SizedBox(height: 24),
-                  // Title
-                  // Center(
-                  //   child: Text(
-                  //     l10n?.login ?? 'Log in to Qahwa Tv',
-                  //     style: const TextStyle(
-                  //       color: Colors.white,
-                  //       fontSize: 24,
-                  //       fontWeight: FontWeight.bold,
-                  //     ),
-                  //   ),
-                  // ),
                   const SizedBox(height: 63),
-                  // Platform buttons
-                  _PlatformButton(
-                    label: 'Use E-Mail',
-                    icon: Icons.email_outlined,
-                    iconPath: 'assets/images/email_icon.png',
-                    isLoading: false,
-                    onTap: () =>
-                        context.pushNamed('loginEmail', extra: redirect),
-                  ),
-                  const SizedBox(height: 15),
-                  _PlatformButton(
-                    label: 'Continue with Google',
-                    icon: Icons.g_mobiledata,
-                    iconPath: 'assets/images/google_icon.png',
-                    isLoading: auth.isLoading,
-                    onTap: () async {
-                      ref.read(authProvider.notifier).clearError();
-                      final success = await ref
-                          .read(authProvider.notifier)
-                          .signInWithGoogle();
-                      if (success) {
-                        final r = redirect;
-                        if (r != null && r.isNotEmpty) {
-                          context.go(r);
-                        } else {
-                          context.go('/');
-                        }
-                      }
+                  // Buttons — isolated in Builder so auth state changes don't
+                  // rebuild the Sign up link below.
+                  Builder(
+                    builder: (context) {
+                      return Column(
+                        children: [
+                          _PlatformButton(
+                            label: 'Use E-Mail',
+                            icon: Icons.email_outlined,
+                            iconPath: 'assets/images/email_icon.png',
+                            isLoading: false,
+                            onTap: () => context.pushNamed(
+                              'loginEmail',
+                              extra: widget.redirect,
+                            ),
+                          ),
+                          const SizedBox(height: 15),
+                          Consumer(
+                            builder: (_, ref, __) {
+                              final isLoading =
+                                  ref.watch(authProvider).isLoading;
+                              return _PlatformButton(
+                                label: 'Continue with Google',
+                                icon: Icons.g_mobiledata,
+                                iconPath: 'assets/images/google_icon.png',
+                                isLoading: isLoading,
+                                onTap: () async {
+                                  ref.read(authProvider.notifier).clearError();
+                                  await ref
+                                      .read(authProvider.notifier)
+                                      .signInWithGoogle();
+                                },
+                              );
+                            },
+                          ),
+                          if (Platform.isIOS) ...[
+                            const SizedBox(height: 16),
+                            Consumer(
+                              builder: (_, ref, __) {
+                                final isLoading =
+                                    ref.watch(authProvider).isLoading;
+                                return _PlatformButton(
+                                  label: 'Continue with Apple',
+                                  icon: Icons.apple,
+                                  iconPath: 'assets/images/apple_icon.png',
+                                  isLoading: isLoading,
+                                  isApple: true,
+                                  onTap: () async {
+                                    ref
+                                        .read(authProvider.notifier)
+                                        .clearError();
+                                    await ref
+                                        .read(authProvider.notifier)
+                                        .signInWithApple();
+                                  },
+                                );
+                              },
+                            ),
+                          ],
+                        ],
+                      );
                     },
                   ),
-                  if (Platform.isIOS) ...[
-                    const SizedBox(height: 16),
-                    _PlatformButton(
-                      label: 'Continue with Apple',
-                      icon: Icons.apple,
-                      iconPath: 'assets/images/apple_icon.png',
-                      isLoading: auth.isLoading,
-                      isApple: true,
-                      onTap: () async {
-                        ref.read(authProvider.notifier).clearError();
-                        final success = await ref
-                            .read(authProvider.notifier)
-                            .signInWithApple();
-                        if (success) {
-                          final r = redirect;
-                          if (r != null && r.isNotEmpty) {
-                            context.go(r);
-                          } else {
-                            context.go('/');
-                          }
-                        }
-                      },
-                    ),
-                  ],
                   const Spacer(),
-                  // const SizedBox(height: 24),
-                  // Sign up link
                   GestureDetector(
                     onTap: () => context.push('/auth/register/email'),
                     child: Center(
-                    child: RichText(
-                      text: TextSpan(
-                        text: 'Do not have StoryDrama account? ',
-                        style: const TextStyle(
-                          color: Color(0xFF999999),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        children: [
-                          TextSpan(
-                            text: 'Sign up',
-                            style: const TextStyle(
-                              color: Color(0xFF8F4EFF),
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
+                      child: RichText(
+                        text: TextSpan(
+                          text: 'Do not have StoryDrama account? ',
+                          style: const TextStyle(
+                            color: Color(0xFF999999),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
                           ),
-                        ],
+                          children: const [
+                            TextSpan(
+                              text: 'Sign up',
+                              style: TextStyle(
+                                color: Color(0xFF8F4EFF),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
                     ),
                   ),
                   const SizedBox(height: 60),
