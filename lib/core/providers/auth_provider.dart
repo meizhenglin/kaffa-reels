@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_service.dart';
-
 export '../auth/auth_service.dart' show AuthService, RegisterResult, CheckCodeResult;
 
 /// AuthService 全局单例 Provider（必须先调用 init() 加载缓存 token）
@@ -25,9 +24,9 @@ class GuestLoginNotifier extends StateNotifier<GuestLoginStatus> {
   Future<void> login() async {
     if (state == GuestLoginStatus.loading) return;
 
-    // 强制发起请求，确保使用新的 /api/user/userAuthorization 接口
+    // 不强制登录：如果已有 Token 则跳过，保持用户的登录态
     state = GuestLoginStatus.loading;
-    final result = await _authService.login(forceLogin: true);
+    final result = await _authService.login(forceLogin: false);
     state = result != null ? GuestLoginStatus.success : GuestLoginStatus.failure;
   }
 }

@@ -47,7 +47,9 @@ class AuthRepository {
 
   Future<void> clearCache() async {
     await _storage.remove(AppConstants.userCacheKey);
+    await _storage.removeUserData();
     await _storage.clearAuthToken();
+    await _storage.removeToken();
   }
 
   Future<String?> refreshIdToken({bool forceRefresh = false}) async {
@@ -63,6 +65,18 @@ class AuthRepository {
   Future<UserModel> _userModelFromFirebaseUser(User user) async {
     await refreshIdToken();
     final cached = await getCachedUser();
+
+    // 补充获取后端用户中心数据（昵称、头像等）
+    try {
+      final centerResp = await apiServiceProvider.getUserCenter();
+      debugPrint('[AuthRepo] getUserCenter (firebase user) resp: ${centerResp.data}');
+      if (centerResp.isSuccess && centerResp.data != null) {
+        final centerData = centerResp.data as Map<String, dynamic>;
+        await _storage.saveUserData(centerData);
+        return UserModel.fromJson(centerData);
+      }
+    } catch (_) {}
+
     return UserModel.fromFirebaseUser(
       user,
       membershipType: cached?.membershipType ?? MembershipType.regular,
@@ -101,23 +115,36 @@ class AuthRepository {
       throw Exception(resp.error ?? 'Login failed');
     }
 
-    // 保存后端返回的 Token
     final data = resp.data as Map<String, dynamic>?;
+
+    // 保存后端返回的 Token
     final token = data?['token'] as String?;
     if (token != null) {
       await _storage.saveToken(token);
     }
 
-    // 构建本地用户模型
-    final user = UserModel(
-      id: data?['id']?.toString() ?? email,
-      email: email.trim(),
-      nickname: data?['nickname'] as String? ?? email.split('@').first,
-      avatar: data?['avatar'] as String?,
-      membershipType: MembershipType.regular,
-      membershipExpiryDate: null,
-      createdAt: DateTime.now(),
-    );
+    // 登录接口只返回 userId 和 token，昵称/头像需要从用户中心获取
+    final centerResp = await apiServiceProvider.getUserCenter();
+    debugPrint('[AuthRepo] getUserCenter resp: ${centerResp.data}');
+    final centerData = (centerResp.isSuccess && centerResp.data != null)
+        ? centerResp.data as Map<String, dynamic>
+        : null;
+
+    // 合并登录接口和用户中心的数据，用户中心的字段优先
+    final userData = {
+      ...?data,
+      if (centerData != null) ...centerData,
+    };
+
+    // 保存到 user_data（头像、昵称等展示数据）和 cached_user（完整 UserModel）
+    await _storage.saveUserData(userData);
+
+    final userId = userData['userId']?.toString() ?? userData['id']?.toString() ?? email;
+    final user = UserModel.fromJson({
+      ...userData,
+      'userId': userId,
+      'email': email.trim(),
+    });
     await cacheUser(user);
     return user;
   }
@@ -145,16 +172,15 @@ class AuthRepository {
       await _storage.saveToken(token);
     }
 
-    // 构建本地用户模型
-    final user = UserModel(
-      id: data?['id']?.toString() ?? email,
-      email: email.trim(),
-      nickname: username.trim(),
-      avatar: null,
-      membershipType: MembershipType.regular,
-      membershipExpiryDate: null,
-      createdAt: DateTime.now(),
-    );
+    // 用后端数据构建用户模型（优先用后端返回的字段）
+    final userId = data?['userId']?.toString() ?? data?['id']?.toString() ?? email;
+    final user = UserModel.fromJson({
+      ...?data,
+      'userId': userId,
+      'email': email.trim(),
+      'nickName': data?['nickName'] ?? username.trim(),
+    });
+    await _storage.saveUserData(user.toJson());
     await cacheUser(user);
     return user;
   }

@@ -452,6 +452,12 @@ abstract class AppLocalizations {
   /// **'Subscribe'**
   String get subscribe;
 
+  /// No description provided for @activate.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate'**
+  String get activate;
+
   /// No description provided for @monthly.
   ///
   /// In en, this message translates to:

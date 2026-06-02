@@ -264,9 +264,30 @@ class ApiService {
     );
   }
 
+  /// 用户设置（统一接口：修改昵称/头像/语言）
+  /// setId: 1=昵称  2=头像  3=语言
+  Future<ApiResponse> updateUserSettings({
+    required int setId,
+    String? setValue,
+    String? nickName,
+    String? avatarUrl,
+    String? language,
+  }) {
+    return request(
+      ApiEndpoints.userSettings,
+      data: {
+        'setId': setId,
+        if (setValue != null) 'setValue': setValue,
+        if (nickName != null) 'nickName': nickName,
+        if (avatarUrl != null) 'avatarUrl': avatarUrl,
+        if (language != null) 'language': language,
+      },
+    );
+  }
+
   /// 获取头像列表
   Future<ApiResponse> getAvatarList() {
-    return request(ApiEndpoints.avatarList);
+    return request('${ApiEndpoints.avatarList}?id=11', method: 'GET');
   }
 
   // ==================== TheaterModel 剧场 Tab ====================

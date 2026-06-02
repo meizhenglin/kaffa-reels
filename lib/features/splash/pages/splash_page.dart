@@ -55,21 +55,29 @@ class _SplashPageState extends ConsumerState<SplashPage> with SingleTickerProvid
   /// 注意：storage.init() / themeModeProvider.load() / localeProvider.load()
   /// 已在 main.dart 中完成，此处不再重复调用
   Future<void> _initializeAndNavigate() async {
+    debugPrint('[Splash] _initializeAndNavigate start');
     // 初始化游客身份（带超时保护，防止 Firebase 网络问题导致永久卡住）
-    await _withTimeout(
-      ref.read(authProvider.notifier).initAsGuest(),
-      const Duration(seconds: 10),
-    );
-    // 等待动画完成
-    await Future.delayed(const Duration(milliseconds: 2000));
+    try {
+      await ref.read(authProvider.notifier).initAsGuest().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () { debugPrint('[Splash] initAsGuest TIMEOUT!'); },
+      );
+      debugPrint('[Splash] initAsGuest done, state: ${ref.read(authProvider)}');
+    } catch (e) {
+      debugPrint('[Splash] initAsGuest ERROR: $e');
+    }
+    // 等待动画自然完成后跳转（动画时长 1.5 秒）
+    await Future.delayed(const Duration(milliseconds: 1500));
     if (mounted) context.go('/');
   }
 
   /// 超时包装器：防止异步操作永久阻塞
   Future<void> _withTimeout(Future<void> future, Duration timeout) async {
     try {
-      await future.timeout(timeout, onTimeout: () {});
-    } catch (_) {}
+      await future.timeout(timeout, onTimeout: () { debugPrint('[Splash] _withTimeout onTimeout!'); });
+    } catch (e) {
+      debugPrint('[Splash] _withTimeout catch: $e');
+    }
   }
 
   @override void dispose() { _controller.dispose(); super.dispose(); }

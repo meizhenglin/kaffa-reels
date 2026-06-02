@@ -147,14 +147,12 @@ final recommendProvider =
 /// - 根据 ID 获取短剧详情
 /// ============================================================================
 class RecommendNotifier extends StateNotifier<RecommendState> {
-  RecommendNotifier(this._repository) : super(const RecommendState()) {
-    loadInitial();
-  }
+  RecommendNotifier(this._repository) : super(const RecommendState());
 
   final RecommendRepository _repository;
 
   // ==================== 初始加载 ====================
-  /// 加载初始数据
+  /// 加载初始数据（需在 Tab 可见时手动调用）
   Future<void> loadInitial() async {
     state = state.copyWith(
       status: RecommendStatus.loading,

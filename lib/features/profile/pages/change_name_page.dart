@@ -5,7 +5,9 @@ import '../../../app/widgets/gradient_scaffold.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class ChangeNamePage extends ConsumerStatefulWidget {
-  const ChangeNamePage({super.key});
+  const ChangeNamePage({super.key, this.fromRegister = false});
+
+  final bool fromRegister;
 
   @override
   ConsumerState<ChangeNamePage> createState() => _ChangeNamePageState();
@@ -34,11 +36,25 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
     final newName = _newNameController.text.trim();
     if (newName.isEmpty) return;
     ref.read(authProvider.notifier).updateNickname(newName);
-    context.go('/auth/login');
+    if (widget.fromRegister) {
+      context.go('/auth/login');
+    } else {
+      context.pop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final auth = ref.watch(authProvider);
+
+    // 游客直接跳转登录
+    if (auth.user == null || auth.user!.isTourist) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/auth/login');
+      });
+      return const SizedBox.shrink();
+    }
+
     return GradientScaffold(
       body: SafeArea(
         child: Column(
@@ -49,7 +65,12 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
               child: Row(
                 children: [
                   GestureDetector(
-                    onTap: () => context.pop(),
+                    onTap: () async {
+                      final didPop = await Navigator.of(context).maybePop();
+                      if (!didPop && mounted) {
+                        context.go('/profile');
+                      }
+                    },
                     child: Image.asset(
                       'assets/images/back.png',
                       width: 24,

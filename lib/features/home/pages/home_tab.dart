@@ -23,6 +23,14 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
   String get tabId => 'home';
 
   @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      ref.read(recommendProvider.notifier).loadInitial();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final recommendState = ref.watch(recommendProvider);

@@ -186,6 +186,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get subscribe => 'Subscribe';
 
   @override
+  String get activate => 'Activate';
+
+  @override
   String get monthly => 'Monthly';
 
   @override

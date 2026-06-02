@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../core/utils/app_restart.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../app/providers/app_providers.dart';
+import '../../../core/providers/auth_provider.dart' show GuestLoginStatus, guestLoginProvider;
 import '../../auth/providers/auth_provider.dart';
 import 'language_page.dart';
 import 'message_settings_page.dart';
@@ -59,15 +62,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     await ref.read(authProvider.notifier).signOut();
 
+    // 重置游客登录状态为 initial，下次启动会重新登录
+    ref.read(guestLoginProvider.notifier).state = GuestLoginStatus.initial;
+
     if (mounted) {
-      setState(() => _isLoggingOut = false);
-      context.go('/auth/login');
+      context.pop();
+      AppRestart.restart();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    // 监听 authProvider，游客状态变化时自动刷新 UI
+    final auth = ref.watch(authProvider);
 
     return GradientScaffold(
       body: SafeArea(
@@ -222,9 +230,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
                     const SizedBox(height: 32),
 
-                    // Log out
+                    // Log out / Login Now
                     GestureDetector(
-                      onTap: _isLoggingOut ? null : _handleLogout,
+                        onTap: () {
+                        if (auth.user != null && auth.user!.isTourist) {
+                          context.push('/auth/login?redirect=/profile');
+                        } else {
+                          _handleLogout();
+                        }
+                      },
                       child: Container(
                         width: double.infinity,
                         height: 50,
@@ -232,10 +246,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           color: const Color(0xFF464950),
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Center(
+                        child: Center(
                           child: Text(
-                            'Log out',
-                            style: TextStyle(
+                            auth.user != null && auth.user!.isTourist
+                                ? 'Login Now'
+                                : 'Log out',
+                            style: const TextStyle(
                               color: Color(0xFFFFFFFF),
                               fontSize: 15,
                               fontWeight: FontWeight.w600,

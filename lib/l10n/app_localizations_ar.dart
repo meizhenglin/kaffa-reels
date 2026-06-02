@@ -186,6 +186,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get subscribe => 'اشترك';
 
   @override
+  String get activate => 'تفعيل';
+
+  @override
   String get monthly => 'Monthly';
 
   @override

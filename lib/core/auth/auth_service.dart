@@ -69,6 +69,11 @@ class AuthService {
 
   Future<void> init() async {
     _cachedToken = await _storage.getToken();
+    // Google/Apple 登录存的是 auth_token，也要读进来
+    final authToken = await _storage.getAuthTokenAsync();
+    if (_cachedToken == null || _cachedToken!.isEmpty) {
+      _cachedToken = authToken;
+    }
   }
 
   /// 获取或创建持久化的硬件设备 ID
@@ -171,6 +176,9 @@ class AuthService {
   Future<void> logout() async {
     _cachedToken = null;
     await _storage.removeToken();
+    await _storage.removeUserData();
+    // 清除 SharedPreferences 中的用户缓存，防止 initAsGuest 恢复旧账号
+    await _storage.remove(AppConstants.userCacheKey);
   }
 
   /// 校验邮箱验证码

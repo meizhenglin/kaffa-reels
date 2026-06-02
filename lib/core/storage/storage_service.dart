@@ -103,6 +103,7 @@ class StorageService {
   /// 清除认证令牌
   /// 【调用时机】用户登出时调用
   Future<void> clearAuthToken() async {
+    await _secureStorage.delete(key: 'user_token');
     await _secureStorage.delete(key: 'auth_token');
   }
 

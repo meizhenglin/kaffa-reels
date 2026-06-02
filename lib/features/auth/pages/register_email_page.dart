@@ -76,7 +76,7 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
       }
       if (!mounted) return;
       // 注册成功后进入设置头像和昵称的引导流程
-      context.go('/auth/photo-setting');
+      context.push('/auth/photo-setting', extra: true);
     } else {
       final errorMsg = ref.read(authProvider).errorMessage;
       debugPrint('[RegisterEmail] failed: $errorMsg');
@@ -194,6 +194,7 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         fit: StackFit.expand,
         children: [

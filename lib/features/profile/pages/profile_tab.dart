@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../auth/providers/auth_provider.dart';
+import '../../auth/providers/auth_provider.dart' show authProvider, AuthStatus, authServiceProvider;
 import 'chat_page.dart';
 import 'settings_page.dart';
 
@@ -14,23 +14,44 @@ class ProfileTab extends ConsumerStatefulWidget {
   ConsumerState<ProfileTab> createState() => _ProfileTabState();
 }
 
-class _ProfileTabState extends ConsumerState<ProfileTab> {
+class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    // 切换到 Profile Tab 时获取用户信息
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 每次依赖变化时（如从其他 tab 切换回来）重新加载用户信息
     Future.microtask(_loadUserInfo);
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // 从后台切回前台时也刷新
+      Future.microtask(_loadUserInfo);
+    }
+  }
+
   Future<void> _loadUserInfo() async {
+    final authState = ref.read(authProvider);
+    // 已登出时不再从 storage 恢复旧数据
+    if (authState.status == AuthStatus.unauthenticated) return;
+
     final authService = ref.read(authServiceProvider);
     await authService.fetchUserInfo();
     final userData = await authService.getUserData();
     if (userData != null && mounted) {
       ref.read(authProvider.notifier).updateUserFromData(userData);
-      // 注意：不要在这里同步后端返回的语言设置！
-      // 语言设置由用户在 LanguagePage 主动切换，重启 App 后从 Storage 读取即可。
-      // 如果在这里 setLocale，会覆盖用户手动选择的语言。
     }
   }
   Widget build(BuildContext context) {
@@ -104,12 +125,13 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
     final auth = ref.watch(authProvider);
     final user = auth.user;
 
-    // 优先用 photoURL（后端/Firebase），fallback 到本地 avatar
     final avatarUrl = user?.photoURL ?? user?.avatar;
+    final isLoggedIn = user != null && !user.isTourist;
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // 头像区域：点击选择图片
+        // 头像区域
         GestureDetector(
           onTap: () => _pickAvatar(context),
           child: Container(
@@ -117,109 +139,77 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
             height: 73,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(50),
-              border: Border.all(
-                color: const Color(0xFFFFFFFF),
-                width: 1,
-              ),
+              border: Border.all(color: const Color(0xFFFFFFFF), width: 1),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(50),
               child: avatarUrl != null && avatarUrl.isNotEmpty
-                  ? Image.network(
-                      avatarUrl,
-                      width: 73,
-                      height: 73,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _buildAvatarPlaceholder(),
-                    )
+                  ? Image.network(avatarUrl, width: 73, height: 73, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _buildAvatarPlaceholder())
                   : _buildAvatarPlaceholder(),
             ),
           ),
         ),
         const SizedBox(width: 13),
+        // 昵称 + ID / 登录提示
         Expanded(
           child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 昵称区域：点击跳转改名页
-                GestureDetector(
-                  onTap: () => context.push('/change-name'),
-                  child: Text(
-                    user?.userNickname ?? 'Guest${user?.id.substring(0, 5) ?? ''}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: () => _goToChangeName(context),
+                child: Text(
+                  user?.userNickname ?? 'Guest',
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 8),
-                if (user != null && !user.isTourist)
-                  Container(
-                    height: 18,
-                    padding: const EdgeInsets.only(right: 5),
-                    decoration: BoxDecoration(
-                      color: const Color(0x26FFFFFF),
-                      borderRadius: BorderRadius.circular(7),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Image.asset(
-                          'assets/images/id_bg.png',
-                          width: 20,
-                          height: 18,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          user?.id ?? '',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w400,
-                            fontSize: 13,
-                            color: Color(0xFFFFFFFF),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else
-                  Text(
-                    l10n?.loginSubtitle ?? 'Login to unlock more features',
-                    style: const TextStyle(color: Color(0xFFFFFFFF), fontSize: 13),
+              ),
+              const SizedBox(height: 8),
+              if (isLoggedIn)
+                Container(
+                  height: 18,
+                  padding: const EdgeInsets.only(right: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0x26FFFFFF),
+                    borderRadius: BorderRadius.circular(7),
                   ),
-                const SizedBox(height: 8),
-                if (user == null || user.isTourist)
-                  GestureDetector(
-                    onTap: () => context.push('/auth/login'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFFFF),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        l10n?.login_button ?? 'Log in',
-                        style: const TextStyle(
-                          color: Color(0xFF8F4EFF),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  )
-                  else
-                    const SizedBox(width: 20),
-              ],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset('assets/images/id_bg.png', width: 20, height: 18),
+                      const SizedBox(width: 4),
+                      Text(user?.id ?? '',
+                          style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 13, color: Color(0xFFFFFFFF))),
+                    ],
+                  ),
+                )
+              else
+                Text(
+                  l10n?.loginSubtitle ?? 'Login to unlock more features',
+                  style: const TextStyle(color: Color(0xFFFFFFFF), fontSize: 13),
+                ),
+            ],
+          ),
+        ),
+        // 最右侧：登录按钮 或 箭头
+        if (isLoggedIn)
+          Image.asset('assets/images/to.png', width: 20, height: 20)
+        else
+          GestureDetector(
+            onTap: () => context.push('/auth/login?redirect=/profile'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFFFF),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                l10n?.login_button ?? 'Log in',
+                style: const TextStyle(color: Color(0xFF8F4EFF), fontSize: 13, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
-          if (user != null && !user.isTourist)
-            Image.asset(
-              'assets/images/to.png',
-              width: 20,
-              height: 20,
-            ),
-        ],
-      );
+      ],
+    );
   }
 
   Future<void> _pickAvatar(BuildContext context) async {
@@ -234,6 +224,20 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
       return;
     }
     context.push('/auth/photo-setting');
+  }
+
+  Future<void> _goToChangeName(BuildContext context) async {
+    final auth = ref.read(authProvider);
+    if (auth.user == null || auth.user!.isTourist) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in first'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    context.push('/change-name');
   }
 
   Widget _buildAvatarPlaceholder() {
@@ -309,29 +313,64 @@ class _ProfileTabState extends ConsumerState<ProfileTab> {
               ],
             ),
           ),
-          GestureDetector(
-            onTap: () => context.go('/membership'),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(31),
-                image: const DecorationImage(
-                  image: AssetImage('assets/images/activate_bg.png'),
-                  // fit: BoxFit.cover,
+          if (user == null || user.isTourist)
+            GestureDetector(
+              onTap: () {
+                final messenger = ScaffoldMessenger.of(context);
+                messenger.hideCurrentSnackBar();
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      AppLocalizations.of(context)?.loginSubtitle ?? 'Login to unlock more features',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.black),
+                    ),
+                    backgroundColor: const Color(0xFFFFFFFF),
+                    duration: const Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(31),
+                  image: const DecorationImage(
+                    image: AssetImage('assets/images/activate_bg.png'),
+                  ),
+                ),
+                child: Text(
+                  AppLocalizations.of(context)?.activate ?? 'Activate',
+                  style: const TextStyle(
+                    color: Color(0xFFFFEDC6),
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-                child: Text(
-                  user == null || !user.isTourist
-                      ? 'Renewal'
-                      : (AppLocalizations.of(context)?.subscribe ?? 'Subscribe'),
-                style: const TextStyle(
-                  color: Color(0xFFFFEDC6),
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
+            )
+          else
+            GestureDetector(
+              onTap: () => context.go('/membership'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(31),
+                  image: const DecorationImage(
+                    image: AssetImage('assets/images/activate_bg.png'),
+                  ),
+                ),
+                child: const Text(
+                  'Renewal',
+                  style: TextStyle(
+                    color: Color(0xFFFFEDC6),
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

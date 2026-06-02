@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/providers/app_providers.dart';
+import '../../../app/router/router_config.dart' show shellNavigatorProfileKey;
 import '../../../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
 
@@ -51,34 +52,58 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
   }
 
   Future<void> _submit() async {
+    debugPrint('=== _submit called ===');
     if (!_formKey.currentState!.validate()) return;
 
     ref.read(authProvider.notifier).clearError();
+    final wasMounted = mounted;
+    final router = GoRouter.of(context);
+
     final success = await ref.read(authProvider.notifier).signInWithEmail(
           _emailController.text.trim(),
           _passwordController.text,
         );
 
-    if (success && mounted) {
-      // 保存或清除自动登录凭证
-      final storage = ref.read(storageServiceProvider);
-      if (_autoLogin) {
-        await storage.saveAutoLogin(true);
-        await storage.saveAutoLoginEmail(_emailController.text.trim());
-        await storage.saveAutoLoginPassword(_passwordController.text);
-        await storage.saveAutoLoginTimestamp();
-      } else {
-        await storage.saveAutoLogin(false);
-        await storage.clearAutoLoginCredentials();
-      }
-
-      final r = widget.redirect;
-      if (r != null && r.isNotEmpty) {
-        context.go(r);
-      } else {
-        context.go('/');
-      }
+    if (!success) {
+      debugPrint('[LoginEmail] signInWithEmail returned false');
+      return;
     }
+
+    debugPrint('[LoginEmail] signInWithEmail success, saving credentials...');
+
+    // 保存或清除自动登录凭证
+    final storage = ref.read(storageServiceProvider);
+    if (_autoLogin) {
+      await storage.saveAutoLogin(true);
+      await storage.saveAutoLoginEmail(_emailController.text.trim());
+      await storage.saveAutoLoginPassword(_passwordController.text);
+      await storage.saveAutoLoginTimestamp();
+    } else {
+      await storage.saveAutoLogin(false);
+      await storage.clearAutoLoginCredentials();
+    }
+
+    debugPrint('[LoginEmail] credentials saved, wasMounted=$wasMounted, navigating...');
+
+    // 再次检查 mounted，因为所有 await 都结束后状态可能已改变
+    if (!wasMounted) {
+      debugPrint('[LoginEmail] no longer mounted after awaits, skip navigation');
+      return;
+    }
+
+    // 登录成功，pop 掉 auth 页面，然后用 StatefulNavigationShellState.goBranch 切换 tab
+    // StatefulNavigationShell.maybeOf(context) 从任何 context 获取 shell 的 state，然后调用 goBranch
+    context.pop(); // pop LoginEmailPage → 回到 LoginPage
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final shellState = StatefulNavigationShell.maybeOf(context);
+      if (shellState != null) {
+        debugPrint('[LoginEmail] switching to profile branch via shellState.goBranch(4)');
+        shellState.goBranch(4); // 切换到 profile tab（索引 4）
+      } else {
+        debugPrint('[LoginEmail] shellState is null, fallback to router.go');
+        router.go('/profile');
+      }
+    });
   }
 
   @override
@@ -87,6 +112,7 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         fit: StackFit.expand,
         children: [

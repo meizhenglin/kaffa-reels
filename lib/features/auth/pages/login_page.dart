@@ -18,35 +18,17 @@ class LoginPage extends ConsumerStatefulWidget {
 }
 
 class _LoginPageState extends ConsumerState<LoginPage> {
-  bool _redirectRegistered = false;
-
-  void _maybeRegisterRedirect() {
-    if (_redirectRegistered) return;
-    _redirectRegistered = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      ref.listen<AuthState>(authProvider, (_, next) {
-        if (!mounted) return;
-        if (next.isAuthenticated && !next.isLoading) {
-          // 清除游客登录状态
-          ref.read(core_auth.guestLoginProvider.notifier).state = core_auth.GuestLoginStatus.initial;
-          final r = widget.redirect;
-          // 优先返回 redirect，没有则返回用户中心
-          Future.delayed(const Duration(milliseconds: 100), () {
-            if (!mounted) return;
-            context.go(r != null && r.isNotEmpty ? r : '/profile');
-          });
-        }
-      });
-    });
+  @override
+  void initState() {
+    super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
-    _maybeRegisterRedirect();
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -130,10 +112,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             icon: Icons.email_outlined,
                             iconPath: 'assets/images/email_icon.png',
                             isLoading: false,
-                            onTap: () => context.pushNamed(
-                              'loginEmail',
-                              extra: widget.redirect,
-                            ),
+                            onTap: () {
+                              final target = widget.redirect ?? '/profile';
+                              context.pushNamed<String>(
+                                'loginEmail',
+                                extra: target,
+                              );
+                            },
                           ),
                           const SizedBox(height: 15),
                           Consumer(
@@ -150,6 +135,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                   await ref
                                       .read(authProvider.notifier)
                                       .signInWithGoogle();
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    if (mounted) context.go('/profile');
+                                  });
                                 },
                               );
                             },
@@ -173,6 +161,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                     await ref
                                         .read(authProvider.notifier)
                                         .signInWithApple();
+                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                      if (mounted) context.go('/profile');
+                                    });
                                   },
                                 );
                               },

@@ -67,8 +67,10 @@ class _ArabDramaAppState extends ConsumerState<ArabDramaApp> {
         }
       });
 
-      // 启动时匿名登录，后续所有需要 Token 的请求直接使用
-      ref.read(guestLoginProvider.notifier).login();
+      // 启动时匿名登录（仅在没有 Token 时才登录，不覆盖已有登录态）
+      // 注意：AuthNotifier._init() 已在后台处理，这里不需要重复调用。
+      // guestLoginProvider 的状态由 AuthNotifier 内部管理。
+      // ref.read(guestLoginProvider.notifier).login();
     });
   }
 

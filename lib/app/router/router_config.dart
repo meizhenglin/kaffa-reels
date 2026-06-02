@@ -147,19 +147,24 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuthRoute = _authRoutes.any(location.startsWith);
       final isAuthenticating = auth.status == AuthStatus.authenticating;
 
+      print('[Router] redirect: location=$location, isAuthRoute=$isAuthRoute, isAuthenticated=$isAuthenticated, userId=${auth.user?.id}, isTourist=${auth.user?.isTourist}');
+
       // 正在验证中，不做重定向
-      if (isAuthenticating) return null;
+      if (isAuthenticating) { print('[Router] → authenticating, no redirect'); return null; }
 
       // 已登录用户（且不是游客）访问认证页面 → 跳转到首页或 redirect 参数指定的页面
       if (isAuthenticated && isAuthRoute && auth.user != null && !auth.user!.isTourist) {
         final redirect = state.uri.queryParameters['redirect'];
         if (redirect != null && redirect.isNotEmpty) {
+          print('[Router] → authenticated + authRoute, redirect to: $redirect');
           return redirect;
         }
+        print('[Router] → authenticated + authRoute, redirect to /');
         return '/';
       }
 
       // 其他情况不重定向
+      print('[Router] → no redirect needed');
       return null;
     },
 
@@ -286,6 +291,26 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       // ==================== 全屏页面路由 ====================
+
+      /// Photo Setting 页面（root 路由，pop 返回正确）
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/auth/photo-setting',
+        name: 'photo-setting',
+        builder: (context, state) => PhotoSettingPage(
+          fromRegister: state.extra as bool? ?? false,
+        ),
+      ),
+
+      /// 改名页面（root 路由，pop 返回正确）
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/change-name',
+        name: 'change-name',
+        builder: (context, state) => ChangeNamePage(
+          fromRegister: state.extra as bool? ?? false,
+        ),
+      ),
 
       /// 搜索页面
       /// 【路径】/search
@@ -485,16 +510,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const RegisterEmailPage(),
       ),
 
-      /// Photo Setting 页面
-      /// 【路径】/auth/photo-setting
-      /// 【功能】注册后设置头像
-      GoRoute(
-        parentNavigatorKey: rootNavigatorKey,
-        path: '/auth/photo-setting',
-        name: 'photo-setting',
-        builder: (context, state) => const PhotoSettingPage(),
-      ),
-
       /// 用户协议页面
       /// 【路径】/auth/user-agreement
       GoRoute(
@@ -532,14 +547,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const MembershipPage(),
       ),
 
-      /// 改名页面
-      GoRoute(
-        parentNavigatorKey: rootNavigatorKey,
-        path: '/change-name',
-        name: 'change-name',
-        builder: (context, state) => const ChangeNamePage(),
-      ),
-
       /// 观看历史页面
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
@@ -558,9 +565,6 @@ final routerProvider = Provider<GoRouter>((ref) {
     ),
   );
 });
-
-/// ============================================================================
-/// Deep Link 路由跳转扩展
 ///
 /// 【功能】提供便捷的方法跳转到指定 Tab
 ///

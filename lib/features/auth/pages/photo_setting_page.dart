@@ -7,7 +7,9 @@ import '../../../app/widgets/gradient_scaffold.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class PhotoSettingPage extends ConsumerStatefulWidget {
-  const PhotoSettingPage({super.key});
+  const PhotoSettingPage({super.key, this.fromRegister = false});
+
+  final bool fromRegister;
 
   @override
   ConsumerState<PhotoSettingPage> createState() => _PhotoSettingPageState();
@@ -30,7 +32,7 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
     if (resp.isSuccess && resp.data != null) {
       final list = resp.data as List;
       setState(() {
-        _avatars = list.map((e) => e.toString()).toList();
+        _avatars = list.map((e) => (e as Map<String, dynamic>)['iconUrl'] as String).toList();
         _isLoading = false;
       });
     } else {
@@ -39,21 +41,41 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
   }
 
   void _onSkip() {
-    context.go('/change-name');
+    if (widget.fromRegister) {
+      context.push('/change-name', extra: true);
+    } else {
+      context.go('/profile');
+    }
   }
 
-  void _onContinue() {
+  void _onContinue() async {
     if (_selectedAvatar != null) {
-      ref.read(authProvider.notifier).updateAvatar(_selectedAvatar!);
+      await ref.read(authProvider.notifier).updateAvatar(_selectedAvatar!);
+      final authService = ref.read(authServiceProvider);
+      await authService.fetchUserInfo();
+      final userData = await authService.getUserData();
+      if (userData != null && mounted) {
+        ref.read(authProvider.notifier).updateUserFromData(userData);
+      }
     }
-    context.go('/change-name');
+    if (widget.fromRegister) {
+      context.push('/change-name', extra: true);
+    } else {
+      context.go('/profile');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
-    final user = auth.user;
-    final currentAvatarUrl = user?.photoURL ?? user?.avatar;
+
+    // 游客直接跳转登录
+    if (auth.user == null || auth.user!.isTourist) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) context.go('/auth/login');
+      });
+      return const SizedBox.shrink();
+    }
 
     return GradientScaffold(
       body: SafeArea(
@@ -65,7 +87,16 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
               child: Row(
                 children: [
                   GestureDetector(
-                    onTap: () => context.go('/auth/login'),
+                    onTap: () async {
+                      if (widget.fromRegister) {
+                        final didPop = await Navigator.of(context).maybePop();
+                        if (!didPop && mounted) {
+                          context.go('/auth/login');
+                        }
+                      } else {
+                        context.go('/profile');
+                      }
+                    },
                     child: Image.asset(
                       'assets/images/back.png',
                       width: 24,
@@ -85,47 +116,6 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
                   ),
                   const SizedBox(width: 24),
                 ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            // 当前头像预览
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF3B3C45),
-                image: _selectedAvatar != null
-                    ? DecorationImage(
-                        image: NetworkImage(_selectedAvatar!),
-                        fit: BoxFit.cover,
-                      )
-                    : (currentAvatarUrl != null && currentAvatarUrl.isNotEmpty
-                        ? DecorationImage(
-                            image: NetworkImage(currentAvatarUrl),
-                            fit: BoxFit.cover,
-                          )
-                        : null),
-              ),
-              child: _selectedAvatar == null &&
-                      (currentAvatarUrl == null || currentAvatarUrl.isEmpty)
-                  ? const Center(
-                      child: Icon(
-                        Icons.person,
-                        size: 50,
-                        color: Colors.white54,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              _selectedAvatar != null
-                  ? 'Choose your avatar'
-                  : 'Please select an avatar',
-              style: const TextStyle(
-                color: Color(0xFFCCCCCC),
-                fontSize: 14,
               ),
             ),
             const SizedBox(height: 24),
@@ -184,36 +174,38 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
                           },
                         ),
             ),
-            // Skip 按钮
-            GestureDetector(
-              onTap: _onSkip,
-              child: Container(
-                width: double.infinity,
-                margin: const EdgeInsets.symmetric(horizontal: 32),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  border: Border.all(color: const Color(0xFF8F4EFF), width: 1),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: const Text(
-                  'Skip',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFF8F4EFF),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
+            // Skip 按钮（仅注册流程显示）
+            if (widget.fromRegister) ...[
+              GestureDetector(
+                onTap: _onSkip,
+                child: Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.transparent,
+                    border: Border.all(color: const Color(0xFF8F4EFF), width: 1),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: const Text(
+                    'Skip',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF8F4EFF),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
+            ],
             // Continue 按钮
             GestureDetector(
               onTap: _selectedAvatar != null ? _onContinue : null,
               child: Container(
                 width: double.infinity,
-                margin: const EdgeInsets.symmetric(horizontal: 32),
+                margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
                   gradient: _selectedAvatar != null

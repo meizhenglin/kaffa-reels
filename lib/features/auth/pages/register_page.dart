@@ -173,6 +173,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     final l10n = AppLocalizations.of(context);
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         fit: StackFit.expand,
         children: [
