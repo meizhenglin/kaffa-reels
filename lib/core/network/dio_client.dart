@@ -199,6 +199,11 @@ class DioClient {
   }
 
   HttpClientAdapter _buildHttpClientAdapter() {
+    if (kIsWeb) {
+      // Web 平台：使用默认适配器（Dio 自带的浏览器 Fetch API）
+      return HttpClientAdapter();
+    }
+    // Android/iOS/macOS：使用 IOHttpClientAdapter，支持自签名证书
     return IOHttpClientAdapter(
       createHttpClient: () {
         final client = HttpClient();

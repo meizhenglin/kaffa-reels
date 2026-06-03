@@ -14,12 +14,11 @@ class AppConfig {
 
   // ==================== API 配置 ====================
   /// API 基础地址
-  /// 【开发环境】越南开发环境: https://xemphimhay.vn
-  /// 【生产环境】正式服务器: https://shortplay.yuechang8.cn
-  static const String apiBaseUrl = 'http://192.168.1.52:8082/';
+  /// 测试环境 ngork
+  static const String apiBaseUrl = 'https://scolding-unbaked-refrain.ngrok-free.dev/';
 
   /// 图片 CDN 地址
-  static const String picRootPath = 'https://ott.goatstudio.tech';
+  static const String picRootPath = 'https://image.qahwatv.com/';
 
   // ==================== 平台标识 ====================
   /// platformId=3;platformAppId=3001  抖音
@@ -59,14 +58,10 @@ class AppConfig {
   static String get resourceVersion => androidResourceVersion;
 
   // ==================== 支付类型 ====================
-  /// 微信支付标识
-  static const int payTypeWechat = 2;
-  /// 抖音支付标识
-  static const int payTypeDouyin = 3;
   /// Android 支付标识
-  static const int payTypeAndroid = 5;
+  static const int payTypeAndroid = 1;
   /// iOS 支付标识
-  static const int payTypeiOS = 6;
+  static const int payTypeiOS = 2;
 
   // ==================== 当前环境 ====================
   /// 当前平台类型（Android / iOS）
