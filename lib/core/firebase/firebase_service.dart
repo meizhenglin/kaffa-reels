@@ -17,41 +17,9 @@ class FirebaseService {
   static Future<void> initialize() async {
     if (_initialized) return;
 
-    try {
-      if (Firebase.apps.isNotEmpty) {
-        _initialized = true;
-        _logger.i('Firebase already initialized');
-        return;
-      }
-
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-      _initialized = true;
-      _logger.i('Firebase initialized successfully');
-    } on FirebaseException catch (e, st) {
-      if (e.code == 'duplicate-app' && e.message?.contains('[DEFAULT]') == true) {
-        _initialized = true;
-        _logger.w('Firebase default app already exists, continuing.');
-        return;
-      }
-      _logger.e('Firebase initialization failed', error: e, stackTrace: st);
-      if (kDebugMode) {
-        _logger.w(
-          'Run `dart pub global activate flutterfire_cli` then '
-          '`flutterfire configure` to generate firebase_options.dart',
-        );
-      }
-      rethrow;
-    } catch (e, st) {
-      _logger.e('Firebase initialization failed', error: e, stackTrace: st);
-      if (kDebugMode) {
-        _logger.w(
-          'Run `dart pub global activate flutterfire_cli` then '
-          '`flutterfire configure` to generate firebase_options.dart',
-        );
-      }
-      rethrow;
-    }
+    // 项目使用设备匿名登录，不依赖 Firebase Auth，所有平台跳过初始化
+    _initialized = true;
+    _logger.i('Firebase skipped (project uses device anonymous login)');
   }
 }
+
