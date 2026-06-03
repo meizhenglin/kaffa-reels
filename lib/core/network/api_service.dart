@@ -319,7 +319,7 @@ class ApiService {
 
   /// 获取用户最近观看
   Future<ApiResponse> getLastUserViewHistoryOne() {
-    return request(ApiEndpoints.lastUserViewHistoryOne, method: 'GET');
+    return request(ApiEndpoints.lastUserViewHistoryOne, method: 'POST');
   }
 
   /// 根据视频 ID 获取用户观看的集数

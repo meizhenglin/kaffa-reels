@@ -8,6 +8,7 @@ import '../../explore/pages/explore_page.dart';
 import '../models/navigation_item.dart';
 import '../providers/tab_scroll_provider.dart';
 import '../widgets/bottom_nav_bar.dart';
+import '../widgets/history_resume_card.dart';
 
 /// 当前活跃 tab 索引 provider（供其他页面订阅）
 /// 用于在切换 tab 时通知页面暂停/恢复视频播放等
@@ -64,7 +65,12 @@ class _MainPageState extends ConsumerState<MainPage> {
     final currentIndex = widget.navigationShell.currentIndex;
 
     return GradientScaffold(
-      body: widget.navigationShell,
+      body: Stack(
+        children: [
+          widget.navigationShell,
+          if (currentIndex == 0) const HistoryResumeCard(),
+        ],
+      ),
       bottomNavigationBar: AppBottomNavBar(
         items: items,
         currentIndex: currentIndex,
