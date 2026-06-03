@@ -82,10 +82,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage> {
 
     if (widget.preload) {
       _preloadPageController = PreloadPageController();
-      _preloadPageController.addListener(_onPageChanged);
     } else {
       _pageController = PageController();
-      _pageController.addListener(_onPageChanged);
     }
 
     _loadData();
@@ -169,7 +167,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage> {
         if (url.isEmpty) continue;
 
         validVideos.add(VideoInfo(
-          id: validVideos.length + 1,
+          id: int.tryParse(epId) ?? 0,
           videoId: int.tryParse(widget.videoId!) ?? 0,
           videoUrl: url,
           coverUrl: playItem['videoPicture'] as String? ?? videoPicture,
@@ -241,13 +239,12 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage> {
     setState(() {
       _isLoading = false;
     });
+
+    // 进入播放器时上报第一集的观看记录
+    _reportViewHistory(_currentIndex);
   }
 
-  void _onPageChanged() {
-    final newPageIndex = widget.preload
-        ? _preloadPageController.page?.round() ?? 0
-        : _pageController.page?.round() ?? 0;
-
+  void _onPageChanged(int newPageIndex) {
     if (_currentIndex == newPageIndex) return;
 
     debugPrint("[$_tag]${'-' * 30}[index][$_currentIndex->$newPageIndex]");
@@ -255,6 +252,18 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage> {
     _currentIndex = newPageIndex;
     _aliPlayerPreload.moveTo(newPageIndex);
     _pauseAllExceptCurrent(newPageIndex);
+  }
+
+  void _reportViewHistory(int index) {
+    if (widget.videoId == null || widget.videoId!.isEmpty) return;
+    if (index < 0 || index >= videoInfoList.length) return;
+    final videoInfo = videoInfoList[index];
+    final episodesId = videoInfo.id.toString();
+    debugPrint("[$_tag] setUserViewAddHistory videoId=${widget.videoId} episodesId=$episodesId");
+    apiServiceProvider.setUserViewAddHistory(
+      videoId: widget.videoId!,
+      episodesId: episodesId,
+    );
   }
 
   void _pauseAllExceptCurrent(int currentIndex) {
@@ -312,12 +321,20 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage> {
             itemCount: videoInfoList.length,
             itemBuilder: _buildItem,
             preloadPagesCount: 1,
+            onPageChanged: (index) {
+              _onPageChanged(index);
+              _reportViewHistory(index);
+            },
           )
         : PageView.builder(
             controller: _pageController,
             scrollDirection: Axis.vertical,
             itemCount: videoInfoList.length,
             itemBuilder: _buildItem,
+            onPageChanged: (index) {
+              _onPageChanged(index);
+              _reportViewHistory(index);
+            },
           );
   }
 }
