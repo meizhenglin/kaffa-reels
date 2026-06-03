@@ -13,6 +13,23 @@ enum PlayerStatus {
   error,
 }
 
+/// Episode data model for the common player.
+class CommonEpisode {
+  const CommonEpisode({
+    required this.id,
+    required this.title,
+    required this.videoUrl,
+    this.coverUrl,
+    this.isUnlocked = true,
+  });
+
+  final String id;
+  final String title;
+  final String videoUrl;
+  final String? coverUrl;
+  final bool isUnlocked;
+}
+
 class PlayerState extends Equatable {
   const PlayerState({
     this.status = PlayerStatus.idle,

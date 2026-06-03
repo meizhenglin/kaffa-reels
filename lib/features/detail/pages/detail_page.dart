@@ -4,13 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:preload_page_view/preload_page_view.dart';
 
 import '../../../app/providers/app_providers.dart';
-import '../../../components/common_video_player.dart';
 import '../../../core/network/api_service.dart';
-import '../../recommend/models/video_info.dart';
-import '../../recommend/pages/ali_player_preload.dart';
-import '../../recommend/pages/short_video_item.dart';
+import '../../commonAliPlayer/short_video_item.dart';
+import '../../player/domain/player_state.dart';
 import '../../player/presentation/episode_sheet.dart';
 import '../../player/presentation/player_controller.dart';
+import '../../recommend/models/video_info.dart';
+import '../../recommend/pages/ali_player_preload.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../payment/providers/membership_provider.dart';
 import '../../payment/widgets/vip_paywall_overlay.dart';

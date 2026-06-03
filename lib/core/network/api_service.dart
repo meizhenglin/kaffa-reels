@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../config/app_config.dart';
+import '../constants/api_error_code.dart';
 import '../model/api_endpoints.dart';
 import '../storage/storage_service.dart';
 import 'dio_client.dart';
@@ -91,9 +92,9 @@ class ApiService {
         final code = body['code'] as int?;
         final msg = body['msg'] as String?;
 
-        if (code == 0 || code == 200) {
+        if (code == ApiErrorCode.success || code == ApiErrorCode.ok) {
           return ApiResponse.success(body['data']);
-        } else if (code == 23) {
+        } else if (code == ApiErrorCode.tokenExpired) {
           return ApiResponse.expired(msg ?? 'Token expired');
         } else {
           return ApiResponse.error(msg ?? 'Request failed', code: code);
@@ -107,7 +108,7 @@ class ApiService {
       if (e.response?.statusCode == 200) {
         final body = e.response?.data;
         final code = body?['code'] as int?;
-        if (code == 23) {
+        if (code == ApiErrorCode.tokenExpired) {
           return ApiResponse.expired(body?['msg'] ?? 'Token expired');
         }
       }

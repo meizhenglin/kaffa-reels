@@ -195,6 +195,53 @@ class StorageService {
     return _prefs?.getBool('is_dark_mode') ?? false;
   }
 
+  // ==================== 播放进度持久化 ====================
+  /// 保存视频播放进度
+  /// [videoId] 视频 ID
+  /// [positionMs] 当前播放位置（毫秒）
+  /// [durationMs] 视频总时长（毫秒）
+  Future<void> saveVideoProgress(String videoId, int positionMs, int durationMs) async {
+    final all = await getAllVideoProgress();
+    all[videoId] = {
+      'positionMs': positionMs,
+      'durationMs': durationMs,
+      'lastUpdated': DateTime.now().toIso8601String(),
+    };
+    await _prefs?.setString(_keyVideoProgress, jsonEncode(all));
+  }
+
+  /// 读取指定视频的播放进度
+  /// 返回 positionMs（毫秒），未找到返回 0
+  Future<int> getVideoProgress(String videoId) async {
+    final all = await getAllVideoProgress();
+    return all[videoId]?['positionMs'] as int? ?? 0;
+  }
+
+  /// 读取指定视频的完整进度信息
+  /// 返回 {positionMs, durationMs, lastUpdated}，未找到返回 null
+  Future<Map<String, dynamic>?> getVideoProgressInfo(String videoId) async {
+    final all = await getAllVideoProgress();
+    return all[videoId] as Map<String, dynamic>?;
+  }
+
+  /// 读取所有视频播放进度
+  Future<Map<String, dynamic>> getAllVideoProgress() async {
+    final jsonString = _prefs?.getString(_keyVideoProgress);
+    if (jsonString != null) {
+      return jsonDecode(jsonString) as Map<String, dynamic>;
+    }
+    return {};
+  }
+
+  /// 删除指定视频的播放进度
+  Future<void> removeVideoProgress(String videoId) async {
+    final all = await getAllVideoProgress();
+    all.remove(videoId);
+    await _prefs?.setString(_keyVideoProgress, jsonEncode(all));
+  }
+
+  static const String _keyVideoProgress = 'video_progress';
+
   // ==================== 观看历史记录 (SharedPreferences) ====================
   /// 添加内容到观看历史
   /// [item] 要添加的内容数据，必须包含 'id' 字段

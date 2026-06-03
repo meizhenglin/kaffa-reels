@@ -6,31 +6,13 @@ import 'package:flutter_aliplayer/flutter_aliplayer_factory.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/constants/api_error_code.dart';
 import '../features/payment/widgets/vip_paywall_overlay.dart';
 import '../features/player/domain/player_state.dart';
 import '../features/player/presentation/episode_sheet.dart';
 import '../features/player/presentation/player_controller.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/payment/providers/membership_provider.dart';
-
-enum VideoQuality { sd, hd, fhd }
-
-/// Episode data model for the common player.
-class CommonEpisode {
-  const CommonEpisode({
-    required this.id,
-    required this.title,
-    required this.videoUrl,
-    this.coverUrl,
-    this.isUnlocked = true,
-  });
-
-  final String id;
-  final String title;
-  final String videoUrl;
-  final String? coverUrl;
-  final bool isUnlocked;
-}
 
 /// Common video player component.
 ///
@@ -384,7 +366,7 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
         // 404 错误视为锁定状态
         final is404 = (msg ?? '').contains('404') ||
             (extra ?? '').contains('404') ||
-            code == 20050007;
+            code == ApiErrorCode.videoNotFound;
         if (is404) {
           setState(() => _isLocked = true);
         } else {

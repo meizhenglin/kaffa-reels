@@ -20,6 +20,7 @@ import '../../features/games/pages/games_tab.dart';
 import '../../features/home/pages/home_tab.dart';
 import '../../features/home/pages/main_page.dart';
 import '../../features/home/models/navigation_item.dart';
+import '../../features/player/domain/player_state.dart';
 import '../../features/player/presentation/player_page.dart';
 import '../../features/player/presentation/player_controller.dart';
 import '../../features/player/presentation/test_player_page.dart';

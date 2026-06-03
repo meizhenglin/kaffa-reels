@@ -16,10 +16,14 @@ class ShortVideoItem extends StatefulWidget {
   /// 是否自动播放
   final bool autoPlay;
 
+  /// 叠加层 builder，传入后替换默认右侧操作按钮
+  final Widget Function(BuildContext context, VideoInfo videoInfo)? overlayBuilder;
+
   const ShortVideoItem({
     super.key,
     required this.videoInfo,
     this.autoPlay = false,
+    this.overlayBuilder,
   });
 
   @override
@@ -27,10 +31,8 @@ class ShortVideoItem extends StatefulWidget {
 }
 
 class ShortVideoItemState extends State<ShortVideoItem> {
-  /// 日志标签
   static const String _tag = "ShortVideoItem";
 
-  /// 播放器组件控制器
   late AliPlayerWidgetController _controller;
 
   /// 当前是否处于 loading 状态（用于自定义 loading 遮罩）
@@ -39,28 +41,30 @@ class ShortVideoItemState extends State<ShortVideoItem> {
   /// loading 状态监听器引用，用于移除
   VoidCallback? _loadingListener;
 
+  /// 当前正在使用的视频 URL
+  String _currentUrl = '';
+
   @override
   void initState() {
     super.initState();
 
-    final url = widget.videoInfo.videoUrl;
-    debugPrint("[$_tag][initState] id=${widget.videoInfo.id} url='$url'");
+    _currentUrl = widget.videoInfo.videoUrl;
+    debugPrint(
+        "[$_tag][initState] id=${widget.videoInfo.id} autoPlay=${widget.autoPlay}");
 
     _controller = AliPlayerWidgetController(context);
 
-    if (url.isEmpty) {
+    if (_currentUrl.isEmpty) {
       debugPrint("[$_tag] url empty, skip configure");
       return;
     }
 
-    // 通过 onPlayerConfig 监听 loading 状态（AliPlayerWidgetData 唯一的配置回调）
     final data = AliPlayerWidgetData(
       sceneType: SceneType.listPlayer,
-      videoSource: VideoSourceFactory.createUrlSource(url),
+      videoSource: VideoSourceFactory.createUrlSource(_currentUrl),
       coverUrl: widget.videoInfo.coverUrl ?? '',
       autoPlay: widget.autoPlay,
       onPlayerConfig: (player) async {
-        // 监听 isLoadingStateNotifier，拿到 SDK 内部的 loading 状态变化
         _loadingListener = () {
           if (mounted) {
             setState(() {
@@ -73,7 +77,30 @@ class ShortVideoItemState extends State<ShortVideoItem> {
       },
     );
     _controller.configure(data);
-    debugPrint("[$_tag] configured with url=$url");
+    debugPrint("[$_tag] configured with url=$_currentUrl");
+  }
+
+  /// 切换到指定集：直接替换当前播放器内容并播放（不重建 widget）
+  void switchTo(VideoInfo newInfo) {
+    if (!mounted) return;
+    debugPrint(
+        "[$_tag][switchTo] ${widget.videoInfo.id} → ${newInfo.id} url=${newInfo.videoUrl}");
+
+    _controller.stop();
+    _controller.destroy();
+    _currentUrl = newInfo.videoUrl;
+
+    _controller = AliPlayerWidgetController(context);
+
+    if (newInfo.videoUrl.isEmpty) return;
+    final videoSource = VideoSourceFactory.createUrlSource(newInfo.videoUrl);
+    final data = AliPlayerWidgetData(
+      sceneType: SceneType.listPlayer,
+      videoSource: videoSource,
+      coverUrl: newInfo.coverUrl ?? '',
+      autoPlay: true,
+    );
+    _controller.configure(data);
   }
 
   @override
@@ -82,6 +109,7 @@ class ShortVideoItemState extends State<ShortVideoItem> {
     if (_loadingListener != null) {
       _controller.isLoadingStateNotifier.removeListener(_loadingListener!);
     }
+    _controller.stop();
     _controller.destroy();
     super.dispose();
   }
@@ -89,14 +117,12 @@ class ShortVideoItemState extends State<ShortVideoItem> {
   /// 暂停播放
   void pause() {
     debugPrint("[$_tag][paused]: ${widget.videoInfo.id}");
-
     _controller.pause();
   }
 
   /// 恢复播放
   void resume() {
     debugPrint("[$_tag][resumed]: ${widget.videoInfo.id}");
-
     _controller.play();
   }
 
@@ -109,12 +135,16 @@ class ShortVideoItemState extends State<ShortVideoItem> {
           _controller,
           slotBuilders: {
             SlotType.topBar: (context) => _buildTopBar(context),
-            SlotType.overlays: (context) => _buildRightSideActionsOverlay(context),
+            SlotType.overlays: widget.overlayBuilder != null
+                ? (context) => const SizedBox.shrink()
+                : (context) => _buildRightSideActionsOverlay(context),
           },
           hiddenSlotElements: {
             SlotType.topBar: {'back', 'snapshot', 'settings'},
           },
         ),
+        if (widget.overlayBuilder != null)
+          widget.overlayBuilder!(context, widget.videoInfo),
         if (_isLoading)
           Positioned.fill(
             child: Container(
@@ -189,7 +219,6 @@ class ShortVideoItemState extends State<ShortVideoItem> {
     );
   }
 
-  /// 构建单个操作按钮
   Widget _buildActionButton({
     required IconData icon,
     required String label,
@@ -204,7 +233,7 @@ class ShortVideoItemState extends State<ShortVideoItem> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.3),
+              color: Colors.black.withValues(alpha: 0.3),
               shape: BoxShape.circle,
             ),
             child: Icon(

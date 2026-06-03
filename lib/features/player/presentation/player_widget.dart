@@ -583,7 +583,7 @@ class _BufferedTrackShape extends SliderTrackShape {
 
   @override
   void paint(
-    Painting context,
+    PaintingContext context,
     Offset offset, {
     required RenderBox parentBox,
     required SliderThemeData sliderTheme,

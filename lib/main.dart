@@ -59,12 +59,16 @@ class _ArabDramaAppState extends ConsumerState<ArabDramaApp> {
       // 初始化 AuthService（加载缓存的 Token 和 UUID）
       await ref.read(authServiceProvider).init().timeout(const Duration(seconds: 5), onTimeout: () {});
 
-      // 注册 Token 过期回调：清除 Token + 跳转到登录页
-      ref.read(dioClientProvider).setOnTokenExpired(() {
-        ref.read(authServiceProvider).logout();
+      // 注册 Token 过期回调：先尝试刷新，刷新失败则登出
+      ref.read(dioClientProvider).setOnTokenExpired(() async {
+        final newToken = await ref.read(authServiceProvider).refreshToken();
+        if (newToken != null) return newToken;
+        // 刷新失败，强制登出
+        await ref.read(authServiceProvider).logout();
         if (mounted) {
           context.go('/auth/login');
         }
+        return null;
       });
 
       // 启动时匿名登录（仅在没有 Token 时才登录，不覆盖已有登录态）

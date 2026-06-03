@@ -181,6 +181,36 @@ class AuthService {
     await _storage.remove(AppConstants.userCacheKey);
   }
 
+  /// 刷新 Token
+  ///
+  /// 后端无独立 refresh 接口，复用 guestLogin 机制：
+  /// 已有 deviceId → 重新请求新 Token → 更新缓存
+  Future<String?> refreshToken() async {
+    debugPrint('[AuthService] refreshToken() called');
+    try {
+      final deviceId = await _getOrCreateDeviceId();
+      await _saveDeviceLanguage();
+
+      final response = await _apiService.guestLogin(deviceId: deviceId);
+
+      if (response.isSuccess && response.data != null) {
+        final data = response.data as Map<String, dynamic>;
+        final newToken = data['token'] as String?;
+        if (newToken != null && newToken.isNotEmpty) {
+          _cachedToken = newToken;
+          await _storage.saveToken(newToken);
+          debugPrint('[AuthService] refreshToken success');
+          return newToken;
+        }
+      }
+      debugPrint('[AuthService] refreshToken failed: ${response.error}');
+      return null;
+    } catch (e) {
+      debugPrint('[AuthService] refreshToken error: $e');
+      return null;
+    }
+  }
+
   /// 校验邮箱验证码
   Future<CheckCodeResult> checkEmailCode({
     required String email,
