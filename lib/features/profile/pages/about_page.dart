@@ -65,7 +65,7 @@ class AboutPage extends ConsumerWidget {
                     ),
                     const SizedBox(height: 20),
                     const Text(
-                      'Arabic Drama',
+                      'Qahwa TV',
                       style: TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.bold,
@@ -173,7 +173,7 @@ class AboutPage extends ConsumerWidget {
               ),
               const SizedBox(height: 32),
               Text(
-                '© 2026 Arabic Drama. All rights reserved.',
+                '© 2026 Qahwa TV. All rights reserved.',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.grey[500],

@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'Arabic Drama'**
+  /// **'Qahwa TV'**
   String get appTitle;
 
   /// No description provided for @bottomNav_home.
@@ -677,7 +677,7 @@ abstract class AppLocalizations {
   /// No description provided for @appDescription.
   ///
   /// In en, this message translates to:
-  /// **'Your premium destination for Arabic short dramas. Watch the best Arabic series and exclusive content anytime, anywhere.'**
+  /// **'Your premium destination for short dramas. Watch the best series and exclusive content anytime, anywhere.'**
   String get appDescription;
 
   /// No description provided for @privacyPolicy.

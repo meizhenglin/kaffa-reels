@@ -187,8 +187,8 @@ class SubscriptionProducts {
   SubscriptionProducts._();
 
   // NOTE: Replace these IDs with your actual product IDs from Play Console/App Store Connect
-  static const _googlePlayBase = 'com.arabdrama.vip.';
-  static const _appStoreBase = 'com.arabdrama.vip.';
+  static const _googlePlayBase = 'com.qahwatv.vip.';
+  static const _appStoreBase = 'com.qahwatv.vip.';
 
   static final List<SubscriptionProduct> products = [
     SubscriptionProduct(

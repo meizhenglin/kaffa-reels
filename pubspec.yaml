@@ -1,5 +1,5 @@
-name: arab_drama_app
-description: "Arabic Drama App - A short drama streaming application for Arabic region."
+name: qahwa_tv
+description: "QahwaTV App - A short drama streaming application for Arabic region."
 publish_to: 'none'
 
 version: 1.0.0+1

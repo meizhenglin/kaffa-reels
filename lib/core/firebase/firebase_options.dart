@@ -47,7 +47,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
     projectId: 'YOUR_PROJECT_ID',
     storageBucket: 'YOUR_PROJECT_ID.appspot.com',
-    iosBundleId: 'com.yourcompany.arabDramaApp',
+    iosBundleId: 'com.yourcompany.qahwaTV',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -56,6 +56,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
     projectId: 'YOUR_PROJECT_ID',
     storageBucket: 'YOUR_PROJECT_ID.appspot.com',
-    iosBundleId: 'com.yourcompany.arabDramaApp',
+    iosBundleId: 'com.yourcompany.qahwaTV',
   );
 }
