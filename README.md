@@ -75,3 +75,7 @@ C:\Users\yewu\.gradle\wrapper\dists\gradle-8.14-all\c2qonpi39x1mddn7hk5gh9iqj\
 ├── gradle-8.14-all.zip          ← 手动放入这个
 └── gradle-8.14/                  ← 自动解压后生成
 放入 zip 后，删除同目录下的 .lck 锁文件（如果有），然后重新运行 flutter run 即可。
+
+
+ngrok http 8082
+https://scolding-unbaked-refrain.ngrok-free.dev 
