@@ -67,7 +67,10 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
                   GestureDetector(
                     onTap: () async {
                       final didPop = await Navigator.of(context).maybePop();
-                      if (!didPop && mounted) {
+                      if (!context.mounted) {
+                        return;
+                      }
+                      if (!didPop) {
                         context.go('/profile');
                       }
                     },

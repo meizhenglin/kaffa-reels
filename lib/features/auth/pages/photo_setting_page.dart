@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../app/providers/app_providers.dart';
 import '../../../core/network/api_service.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -60,6 +59,10 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
       }
     } catch (_) {}
 
+    if (!mounted) {
+      return;
+    }
+
     if (widget.fromRegister) {
       context.push('/change-name', extra: true);
     } else {
@@ -92,7 +95,10 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
                     onTap: () async {
                       if (widget.fromRegister) {
                         final didPop = await Navigator.of(context).maybePop();
-                        if (!didPop && mounted) {
+                        if (!context.mounted) {
+                          return;
+                        }
+                        if (!didPop) {
                           context.go('/auth/login');
                         }
                       } else {
@@ -162,7 +168,7 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
                                   child: Image.network(
                                     url,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
+                                    errorBuilder: (_, _, _) => Container(
                                       color: const Color(0xFF3B3C45),
                                       child: const Icon(
                                         Icons.person,

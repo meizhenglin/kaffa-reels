@@ -4,10 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/preload_network_image.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../core/providers/auth_provider.dart' show authServiceProvider, apiServiceProviderRef;
-import '../../auth/providers/auth_provider.dart' show authProvider, AuthStatus, authServiceProvider;
+import '../../../core/providers/auth_provider.dart' show apiServiceProviderRef;
+import '../../auth/providers/auth_provider.dart'
+    show AuthState, AuthStatus, authProvider, authServiceProvider;
 import 'chat_page.dart';
-import 'settings_page.dart';
 
 class ProfileTab extends ConsumerStatefulWidget {
   const ProfileTab({super.key});
@@ -17,14 +17,40 @@ class ProfileTab extends ConsumerStatefulWidget {
 }
 
 class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObserver {
+  ProviderSubscription<AuthState>? _authStateSubscription;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // 监听认证状态从游客切到正式登录的瞬间，立即刷新 Profile 资料。
+    // 否则页面如果没有发生路由重建，只靠 didChangeDependencies 不一定能及时拉到邮箱用户信息。
+    _authStateSubscription = ref.listenManual<AuthState>(
+      authProvider,
+      (previous, next) {
+        final previousUser = previous?.user;
+        final nextUser = next.user;
+        final switchedFromGuestToLoggedIn =
+            previousUser != null &&
+            previousUser.isTourist &&
+            nextUser != null &&
+            !nextUser.isTourist;
+        final switchedFromNoUserToLoggedIn =
+            previousUser == null &&
+            nextUser != null &&
+            !nextUser.isTourist;
+
+        if (switchedFromGuestToLoggedIn || switchedFromNoUserToLoggedIn) {
+          Future.microtask(_loadUserInfo);
+        }
+      },
+    );
   }
 
   @override
   void dispose() {
+    _authStateSubscription?.close();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -46,26 +72,44 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
 
   Future<void> _loadUserInfo() async {
     final authState = ref.read(authProvider);
-    if (authState.status == AuthStatus.unauthenticated) return;
+    final currentUser = authState.user;
+    debugPrint(
+      '[ProfileTab._loadUserInfo] '
+      'status=${authState.status} '
+      'isTourist=${currentUser?.isTourist} '
+      'user=${currentUser?.toJson()}',
+    );
+    if (authState.status == AuthStatus.unauthenticated ||
+        currentUser == null ||
+        currentUser.isTourist) {
+      debugPrint('[ProfileTab._loadUserInfo] skip refresh for guest/unauthenticated');
+      return;
+    }
 
     try {
       final resp = await ref.read(apiServiceProviderRef).getUserCenter();
       if (resp.isSuccess && resp.data != null && mounted) {
         final userData = resp.data as Map<String, dynamic>;
+        debugPrint('[ProfileTab._loadUserInfo] getUserCenter success: $userData');
         ref.read(authProvider.notifier).updateUserFromData(userData);
         return;
       }
-    } catch (_) {}
+      debugPrint('[ProfileTab._loadUserInfo] getUserCenter failed: success=${resp.isSuccess} data=${resp.data}');
+    } catch (e) {
+      debugPrint('[ProfileTab._loadUserInfo] getUserCenter error: $e');
+    }
 
-    // 网络失败时降级读取 Storage 缓存
+    // 网络失败时降级读取 Storage 缓存（仅正式登录用户）
     if (mounted) {
       final authService = ref.read(authServiceProvider);
       final userData = await authService.getUserData();
+      debugPrint('[ProfileTab._loadUserInfo] fallback storage userData=$userData');
       if (userData != null && mounted) {
         ref.read(authProvider.notifier).updateUserFromData(userData);
       }
     }
   }
+  @override
   Widget build(BuildContext context) {
     return GradientScaffold(
       body: SafeArea(
@@ -94,12 +138,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                   ),
                   IconButton(
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SettingsPage(),
-                        ),
-                      );
+                      context.push('/profile/settings');
                     },
                     icon: Image.asset(
                       'assets/images/setting.png',
@@ -136,9 +175,16 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
     final l10n = AppLocalizations.of(context);
     final auth = ref.watch(authProvider);
     final user = auth.user;
+    debugPrint(
+      '[ProfileTab.buildUserSection] '
+      'status=${auth.status} '
+      'isTourist=${user?.isTourist} '
+      'user=${user?.toJson()}',
+    );
 
     final avatarUrl = user?.photoURL ?? user?.avatar;
     final isLoggedIn = user != null && !user.isTourist;
+    final shouldShowLoginButton = user == null || user.isTourist;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -194,21 +240,21 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                     children: [
                       Image.asset('assets/images/id_bg.png', width: 20, height: 18),
                       const SizedBox(width: 4),
-                      Text(user?.id ?? '',
+                      Text(user.id,
                           style: const TextStyle(fontWeight: FontWeight.w400, fontSize: 13, color: Color(0xFFFFFFFF))),
                     ],
                   ),
                 )
               else
                 Text(
-                  l10n?.loginSubtitle ?? 'Login to unlock more features',
+                  l10n.loginSubtitle,
                   style: const TextStyle(color: Color(0xFFFFFFFF), fontSize: 13),
                 ),
             ],
           ),
         ),
-        // 最右侧：登录按钮 或 箭头
-        if (isLoggedIn)
+        // 最右侧：游客显示登录按钮，邮箱账号显示右箭头
+        if (!shouldShowLoginButton)
           Image.asset('assets/images/to.png', width: 20, height: 20)
         else
           GestureDetector(
@@ -220,7 +266,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
-                l10n?.login_button ?? 'Log in',
+                l10n.login_button,
                 style: const TextStyle(color: Color(0xFF8F4EFF), fontSize: 13, fontWeight: FontWeight.w600),
               ),
             ),
@@ -312,7 +358,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  AppLocalizations.of(context)?.vipMember ?? 'VIP Member',
+                  AppLocalizations.of(context).vipMember,
                   style: const TextStyle(
                     color: Color(0xFF3A1D00),
                     fontSize: 15,
@@ -323,8 +369,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                 Text(
                   user == null || !user.isTourist
                       ? 'Validity Period：${_formatDate(user?.membershipExpiryDate)}'
-                      : (AppLocalizations.of(context)?.vipSubtitle ??
-                          'Unlock all series with one tap'),
+                      : AppLocalizations.of(context).vipSubtitle,
                   style: const TextStyle(color: Color(0xFF3A1D00), fontSize: 12),
                 ),
               ],
@@ -338,7 +383,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                 messenger.showSnackBar(
                   SnackBar(
                     content: Text(
-                      AppLocalizations.of(context)?.loginSubtitle ?? 'Login to unlock more features',
+                      AppLocalizations.of(context).loginSubtitle,
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.black),
                     ),
@@ -358,7 +403,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                   ),
                 ),
                 child: Text(
-                  AppLocalizations.of(context)?.activate ?? 'Activate',
+                  AppLocalizations.of(context).activate,
                   style: const TextStyle(
                     color: Color(0xFFFFEDC6),
                     fontSize: 13,

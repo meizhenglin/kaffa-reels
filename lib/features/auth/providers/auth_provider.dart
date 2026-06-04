@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../core/providers/auth_provider.dart' show GuestLoginStatus, guestLoginProvider, authServiceProvider, apiServiceProviderRef;
@@ -60,10 +59,20 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) => Aut
 
 /// 认证状态管理器
 class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._ref) : super(const AuthState()) { _startInit(); }
+  AuthNotifier(this._ref) : super(const AuthState()) { _configureGuestLoginCallback(); _startInit(); }
   final Ref _ref;
-  StreamSubscription<User?>? _authSubscription;
+  StreamSubscription<dynamic>? _authSubscription;
   AuthRepository get _repository => _ref.read(authRepositoryProvider);
+
+  void _configureGuestLoginCallback() {
+    _ref.read(dioClientProvider).setOnGuestLogin(() async {
+      debugPrint('[AuthNotifier] Dio requested guest login callback');
+      final result = await _ref.read(authServiceProvider).ensureGuestLogin();
+      final token = result?.token ?? await _ref.read(storageServiceProvider).getToken();
+      debugPrint('[AuthNotifier] guest login callback resolved tokenPresent=${token != null && token.isNotEmpty}');
+      return token;
+    });
+  }
 
   /// 启动初始化（不阻塞 Provider 创建）
   void _startInit() {
@@ -74,31 +83,91 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// 初始化：检查缓存用户 + 监听 Firebase 状态变化
   ///
-  /// 注意：邮箱登录不走 Firebase Auth，初始化阶段只有一件事：
-  /// 如果有 auto-login 凭证就自动登录；否则不改变状态，交给 splash_page 的 initAsGuest。
+  /// 统一认证入口：
+  /// 1. 若存在自动登录凭证，则优先恢复邮箱正式登录态；
+  /// 2. 若本地仍有后端 token，则优先按后端正式用户恢复；
+  /// 3. 若 Firebase 当前仍有第三方登录用户，再从 Firebase 恢复；
+  /// 4. 否则执行游客初始化。
+  ///
+  /// 注意：main.dart 不再提前做游客登录，避免启动阶段出现两套认证决策来源。
   Future<void> _init() async {
-    // 自动登录：检查是否有保存的凭证，有则自动登录
-    if (await _repository.hasAutoLoginCredentials()) {
+    final storage = _ref.read(storageServiceProvider);
+    final authService = _ref.read(authServiceProvider);
+    final hasAutoLogin = await _repository.hasAutoLoginCredentials();
+    final storedToken = await storage.getToken();
+    final storedUserData = await authService.getUserData();
+    final firebaseUser = _repository.currentFirebaseUser;
+
+    debugPrint(
+      '[AuthNotifier] _init start '
+      'hasAutoLogin=$hasAutoLogin '
+      'hasStoredToken=${storedToken != null && storedToken.isNotEmpty} '
+      'hasStoredUserData=${storedUserData != null} '
+      'firebaseCurrentUser=$firebaseUser',
+    );
+
+    if (hasAutoLogin) {
       debugPrint('[AuthNotifier] auto-login credentials found, performing auto-login...');
       state = state.copyWith(status: AuthStatus.authenticating, isLoading: true, clearError: true);
       try {
         final user = await _repository.performAutoLogin();
         state = state.copyWith(status: AuthStatus.authenticated, user: user, isLoading: false);
         debugPrint('[AuthNotifier] auto-login succeeded');
-        // auto-login 成功后才订阅 Firebase stream，用于监听 Google/Apple 的登出事件
         _subscribeFirebaseAuth();
         return;
       } catch (e) {
         debugPrint('[AuthNotifier] auto-login failed: $e, clearing credentials');
         await _repository.clearAutoLoginCredentials();
         state = state.copyWith(status: AuthStatus.unauthenticated, isLoading: false);
-        // 没有 Firebase 用户，stream 订阅无意义，跳过
-        return;
       }
     }
 
-    // 无 auto-login 凭证：不做任何状态操作，splash_page 的 initAsGuest 会接管
-    debugPrint('[AuthNotifier] no auto-login credentials, waiting for initAsGuest');
+    final restoredStoredUser = await _restoreStoredAuthenticatedUser(
+      storedToken: storedToken,
+      storedUserData: storedUserData,
+    );
+    if (restoredStoredUser) {
+      return;
+    }
+
+    if (firebaseUser != null) {
+      debugPrint('[AuthNotifier] falling back to Firebase authenticated user restore');
+      _subscribeFirebaseAuth();
+      await _onFirebaseAuthChanged(firebaseUser);
+      return;
+    }
+
+    await initAsGuest();
+  }
+
+  Future<bool> _restoreStoredAuthenticatedUser({
+    required String? storedToken,
+    required Map<String, dynamic>? storedUserData,
+  }) async {
+    final hasToken = storedToken != null && storedToken.isNotEmpty;
+    if (!hasToken) {
+      return false;
+    }
+
+    if (storedUserData == null) {
+      debugPrint('[AuthNotifier] stored token found but userData missing, cannot restore authenticated user');
+      return false;
+    }
+
+    final user = UserModel.fromJson(storedUserData);
+    if (user.isTourist) {
+      debugPrint('[AuthNotifier] stored token belongs to tourist identity, skip authenticated restore');
+      return false;
+    }
+
+    state = state.copyWith(
+      status: AuthStatus.authenticated,
+      user: user,
+      isLoading: false,
+      clearError: true,
+    );
+    debugPrint('[AuthNotifier] restored authenticated user from storage: ${user.userNickname}');
+    return true;
   }
 
   /// 订阅 Firebase Auth 状态变化（用于 Google/Apple 登录后的登出监听）
@@ -106,48 +175,53 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _authSubscription?.cancel();
     _authSubscription = _repository.authStateChanges.listen(
       _onFirebaseAuthChanged,
-      onError: (Object e) => state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString(), isLoading: false),
+      onError: (Object e) => state = state.copyWith(
+        status: AuthStatus.error,
+        errorMessage: e.toString(),
+        isLoading: false,
+      ),
     );
   }
 
   /// 初始化为游客（仅在未登录时调用，防止覆盖已有登录态）
+  ///
+  /// 这里既负责真正的 guest token 获取，也负责在游客接口失败时提供本地 guest UI fallback。
+  /// 游客/后端登录态统一只看 user_token；auth_token 仅表示 Firebase 身份，不代表后端接口已可用。
+  /// 这样可以避免 user_token 丢失但 auth_token 仍存在时，UI 与网络层判断不一致。
   Future<void> initAsGuest() async {
     debugPrint('[AuthNotifier] initAsGuest called, currentFirebaseUser: ${_repository.currentFirebaseUser}');
+
+    final restoredStoredUser = await _restoreStoredAuthenticatedUser(
+      storedToken: await _ref.read(storageServiceProvider).getToken(),
+      storedUserData: await _ref.read(authServiceProvider).getUserData(),
+    );
+    if (restoredStoredUser) {
+      debugPrint('[AuthNotifier] initAsGuest aborted because authenticated user was restored from storage');
+      return;
+    }
+
     final firebaseUser = _repository.currentFirebaseUser;
-    // Firebase 已登录（Google/Apple 用户），订阅状态变化并恢复用户
     if (firebaseUser != null) {
-      debugPrint('[AuthNotifier] Firebase user exists, restoring session');
+      debugPrint('[AuthNotifier] Firebase user exists, restoring third-party session');
       _subscribeFirebaseAuth();
       await _onFirebaseAuthChanged(firebaseUser);
       return;
     }
-    // 直接查 storage，不依赖 authService.init() 的 microtask 时序
-    final storedToken = await _ref.read(storageServiceProvider).getToken();
-    final storedAuthToken = await _ref.read(storageServiceProvider).getAuthTokenAsync();
-    final hasToken = (storedToken != null && storedToken.isNotEmpty) ||
-        (storedAuthToken != null && storedAuthToken.isNotEmpty);
-    if (hasToken) {
-      debugPrint('[AuthNotifier] token found in storage, skip initAsGuest, restoring user...');
-      // 有 token 但没有缓存用户（App 重启后第一次），从 storage 恢复用户数据
-      final userData = await _ref.read(authServiceProvider).getUserData();
-      if (userData != null) {
-        final user = UserModel.fromJson(userData);
-        state = state.copyWith(status: AuthStatus.authenticated, user: user);
-        debugPrint('[AuthNotifier] user restored from storage: ${user.userNickname}');
-      }
-      return;
-    }
-    debugPrint('[AuthNotifier] no token, creating guest user and fetching guest token...');
+
+    debugPrint('[AuthNotifier] no authenticated session, creating guest user and fetching guest token...');
     final authService = _ref.read(authServiceProvider);
-    final loginResult = await authService.login();
-    debugPrint('[AuthNotifier] guest login result: $loginResult');
+    final loginResult = await authService.ensureGuestLogin();
+    final currentToken = await _ref.read(storageServiceProvider).getToken();
+    debugPrint(
+      '[AuthNotifier] guest login result: $loginResult tokenPresent=${currentToken != null && currentToken.isNotEmpty}',
+    );
     final guestId = loginResult?.uuid ?? 'guest_${DateTime.now().millisecondsSinceEpoch}';
     final guestUser = UserModel.guest(guestId);
     state = state.copyWith(status: AuthStatus.authenticated, user: guestUser);
   }
 
   /// Firebase 认证状态变化回调
-  Future<void> _onFirebaseAuthChanged(User? user) async {
+  Future<void> _onFirebaseAuthChanged(dynamic user) async {
     debugPrint('[AuthNotifier] _onFirebaseAuthChanged user: $user, current status: ${state.status}');
     if (user == null) {
       // Firebase 用户登出时，清本地状态（邮箱登录退出由 signOut() 处理）
@@ -167,13 +241,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(status: AuthStatus.authenticating, isLoading: true, clearError: true);
     try {
       final user = await _repository.resolveCurrentUser();
-      if (user != null) state = state.copyWith(status: AuthStatus.authenticated, user: user, isLoading: false);
-      else {
+      if (user != null) {
+        state = state.copyWith(
+          status: AuthStatus.authenticated,
+          user: user,
+          isLoading: false,
+        );
+      } else {
         // 不再从缓存恢复用户——邮箱登录不走 Firebase Auth，
         // 退出后 token 已清，直接标记未登录，由 initAsGuest 创建游客
         state = state.copyWith(status: AuthStatus.unauthenticated, isLoading: false);
       }
-    } catch (e) { state = state.copyWith(status: AuthStatus.unauthenticated, isLoading: false, errorMessage: _mapError(e)); }
+    } catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        isLoading: false,
+        errorMessage: _mapError(e),
+      );
+    }
   }
 
   /// 邮箱登录
@@ -197,15 +282,59 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// 登出
+  ///
+  /// 清理正式登录态后，立即补做游客初始化，保证 Web 刷新前后与 App 重启后的体验一致。
   Future<void> signOut() async {
-    state = state.copyWith(isLoading: true);
+    state = state.copyWith(isLoading: true, clearError: true);
     try {
-      // 同步清掉 AuthService 内存中的 token，防止重启后被复用
+      final storage = _ref.read(storageServiceProvider);
+      debugPrint(
+        '[AuthNotifier.signOut] before logout '
+        'userToken=${await storage.getToken()} '
+        'authToken=${await storage.getAuthTokenAsync()} '
+        'userData=${await storage.getUserData()} '
+        'autoLogin=${await storage.getAutoLogin()} '
+        'autoLoginEmail=${await storage.getAutoLoginEmail()} '
+        'currentUser=${state.user?.toJson()}',
+      );
+
+      // 先清自动登录，避免冷启动时先被自动登录分支重新拉回正式账号。
+      await _repository.clearAutoLoginCredentials();
+
+      // AuthService 负责清理本地后端 token / 用户缓存；
+      // Repository 负责清理 Firebase / Google 登录态及其缓存。
       await _ref.read(authServiceProvider).logout();
       await _repository.signOut();
-      await _repository.clearAutoLoginCredentials();
-      state = state.copyWith(status: AuthStatus.unauthenticated, clearUser: true, isLoading: false, clearError: true);
-    } catch (e) { state = state.copyWith(isLoading: false, errorMessage: _mapError(e)); }
+
+      debugPrint(
+        '[AuthNotifier.signOut] after clear '
+        'userToken=${await storage.getToken()} '
+        'authToken=${await storage.getAuthTokenAsync()} '
+        'userData=${await storage.getUserData()} '
+        'autoLogin=${await storage.getAutoLogin()} '
+        'autoLoginEmail=${await storage.getAutoLoginEmail()} '
+        'firebaseCurrentUser=${_repository.currentFirebaseUser}',
+      );
+
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        isLoading: false,
+        clearUser: true,
+        clearError: true,
+      );
+      debugPrint('[AuthNotifier.signOut] local auth state cleared successfully');
+
+      await initAsGuest();
+      debugPrint('[AuthNotifier.signOut] guest session restored immediately after logout');
+    } catch (e) {
+      debugPrint('[AuthNotifier.signOut] error: $e');
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        isLoading: false,
+        clearUser: true,
+        errorMessage: _mapError(e),
+      );
+    }
   }
 
   /// 清除游客登录状态（注册完成后调用，防止游客身份残留）
@@ -224,9 +353,48 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// 从后端 /api/user/userPersonalCenter 返回的数据更新用户信息
-  void updateUserFromData(Map<String, dynamic> data) {
-    final user = UserModel.fromJson(data);
-    state = state.copyWith(status: AuthStatus.authenticated, user: user);
+  Future<void> updateUserFromData(Map<String, dynamic> data) async {
+    final currentUser = state.user;
+    final hasExplicitLoggedInIdentity =
+        data['userId'] != null ||
+        data['id'] != null ||
+        data['email'] != null ||
+        data['passportType'] != null;
+    final shouldDiscardGuestBase =
+        currentUser != null && currentUser.isTourist && hasExplicitLoggedInIdentity;
+
+    final mergedData = <String, dynamic>{
+      if (currentUser != null && !shouldDiscardGuestBase) ...currentUser.toJson(),
+      ...data,
+    };
+
+    final currentPassportType = shouldDiscardGuestBase ? null : currentUser?.passportType;
+    final nextPassportType = mergedData['passportType'];
+    final shouldPreserveLoggedInPassportType =
+        currentPassportType != null &&
+        currentPassportType != 0 &&
+        (nextPassportType == null || nextPassportType == 0 || nextPassportType == '0');
+
+    if (shouldPreserveLoggedInPassportType) {
+      mergedData['passportType'] = currentPassportType;
+    }
+
+    mergedData['userId'] =
+        data['userId']?.toString() ??
+        data['id']?.toString() ??
+        currentUser?.id ??
+        '';
+
+    final user = UserModel.fromJson(mergedData);
+    final shouldWriteUserCache = !user.isTourist;
+    if (shouldWriteUserCache) {
+      await _repository.saveUserData(user.toJson());
+    }
+    state = state.copyWith(
+      status: AuthStatus.authenticated,
+      user: user,
+      clearError: true,
+    );
   }
 
   /// 更新昵称（本地 + 后端）
@@ -287,21 +455,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// 错误码映射
   String _mapError(Object error) {
     if (error is AuthCancelledException) return 'Sign in cancelled';
-    if (error is FirebaseAuthException) {
-      switch (error.code) {
-        case 'invalid-email': return 'Invalid email address';
-        case 'user-disabled': return 'This account has been disabled';
-        case 'user-not-found': return 'No account found with this email';
-        case 'wrong-password': return 'Incorrect password';
-        case 'email-already-in-use': return 'Email is already registered';
-        case 'weak-password': return 'Password is too weak';
-        case 'operation-not-allowed': return 'This sign-in method is not enabled';
-        case 'invalid-credential': return 'Invalid credentials';
-        case 'network-request-failed': return 'Network error. Please check your connection';
-        default: return error.message ?? 'Authentication failed';
-      }
-    }
-    return error.toString();
+
+    final errorString = error.toString();
+    if (errorString.contains('invalid-email')) return 'Invalid email address';
+    if (errorString.contains('user-disabled')) return 'This account has been disabled';
+    if (errorString.contains('user-not-found')) return 'No account found with this email';
+    if (errorString.contains('wrong-password')) return 'Incorrect password';
+    if (errorString.contains('email-already-in-use')) return 'Email is already registered';
+    if (errorString.contains('weak-password')) return 'Password is too weak';
+    if (errorString.contains('operation-not-allowed')) return 'This sign-in method is not enabled';
+    if (errorString.contains('invalid-credential')) return 'Invalid credentials';
+    if (errorString.contains('network-request-failed')) return 'Network error. Please check your connection';
+
+    return errorString;
   }
 
   @override void dispose() { _authSubscription?.cancel(); super.dispose(); }

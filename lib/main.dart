@@ -21,25 +21,6 @@ Future<void> _withTimeout(Future<void> future, Duration timeout) async {
   } catch (_) {}
 }
 
-/// 启动时统一完成 Guest 登录，确保 UI 渲染时 token 已就绪
-Future<void> _ensureGuestLogin(ProviderContainer container) async {
-  final storage = container.read(storageServiceProvider);
-
-  // 检查 token 是否已存在
-  final cachedToken = await storage.getToken();
-  final authToken = await storage.getAuthTokenAsync();
-  if ((cachedToken != null && cachedToken.isNotEmpty) ||
-      (authToken != null && authToken.isNotEmpty)) {
-    debugPrint('[MAIN] token already exists, skip guest login');
-    return;
-  }
-
-  debugPrint('[MAIN] no token found, performing guest login...');
-  final authService = container.read(authServiceProvider);
-  final result = await authService.login();
-  debugPrint('[MAIN] guest login done: ${result?.token != null}');
-}
-
 Future<void> main() async {
   debugPrint('[MAIN] === main() started ===');
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,16 +39,9 @@ Future<void> main() async {
     const Duration(seconds: 15),
   );
 
-  // 在 ProviderScope 创建之前，先同步完成 Guest 登录
-  // 这样所有后续网络请求都有 token 可用，不会出现"空 token 先于登录"的问题
-  final _tempContainer = ProviderContainer(
-    overrides: [
-      storageServiceProvider.overrideWithValue(storage),
-    ],
-  );
-  await _ensureGuestLogin(_tempContainer);
-  _tempContainer.dispose();
-
+  // 这里只做基础设施初始化，不在 main() 提前执行游客登录。
+  // 当前用户身份（自动登录 / 正式登录恢复 / 游客初始化）统一由 AuthNotifier._init() 决定，
+  // 避免启动阶段出现两套认证入口，导致 token 与 UI 状态来源不一致。
   runApp(
     ProviderScope(
       overrides: [
@@ -90,15 +64,17 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
   void initState() {
     super.initState();
     // 主题/语言加载，以及注册 DioClient 的 Guest 登录回调
-    // 注意：Guest 登录本身已在 main() 中同步完成，这里只做收尾工作
+    // 注意：首次启动、重启恢复、自动登录失败后的游客初始化，都交给 AuthNotifier 统一处理。
+    // 这里仅注册网络层兜底：当请求发送时发现 token 为空，或后端返回 token 失效，再补做一次 guest 登录。
     Future.microtask(() {
       ref.read(themeModeProvider.notifier).load();
       ref.read(localeProvider.notifier).load();
 
-      // 注册 Guest 登录回调：用于 code=23 时自动 guest 登录重试
-      //（启动阶段 token 为空的场景已在 main() 中提前处理）
+      // 注册 Guest 登录回调：用于 token 为空或 code=23 时自动 guest 登录重试。
+      // 这层属于网络兜底，不负责决定 UI 应该显示游客还是正式用户。
+      // UI 认证状态统一由 authProvider 管理。
       ref.read(dioClientProvider).setOnGuestLogin(() async {
-        final result = await ref.read(authServiceProvider).login();
+        final result = await ref.read(authServiceProvider).ensureGuestLogin();
         return result?.token;
       });
     });

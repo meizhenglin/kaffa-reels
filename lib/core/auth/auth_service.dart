@@ -71,17 +71,17 @@ class AuthService {
   /// 读取本地保存的用户数据
   Future<Map<String, dynamic>?> getUserData() => _storage.getUserData();
 
-  /// 登录（匿名设备登录）
+  /// 确保当前存在可用的游客 token。
   ///
-  /// 直接查 Storage，只有 token 为空时才调用 userAuthorization 接口
-  Future<LoginResult?> login() async {
+  /// 这里只检查后端业务 token（user_token）。
+  /// auth_token 仅用于 Firebase / 第三方登录辅助，不参与游客身份判定。
+  /// 若本地已经有 user_token，则返回 null，表示无需再次发起游客登录。
+  Future<LoginResult?> ensureGuestLogin() async {
     try {
-      // 直接查 Storage，不依赖内存缓存
+      // 直接查 Storage，不依赖内存缓存；游客/后端鉴权统一只看 user_token。
       final cachedToken = await _storage.getToken();
-      final authToken = await _storage.getAuthTokenAsync();
-      if ((cachedToken != null && cachedToken.isNotEmpty) ||
-          (authToken != null && authToken.isNotEmpty)) {
-        debugPrint('[AuthService] token already exists in storage, skip guest login');
+      if (cachedToken != null && cachedToken.isNotEmpty) {
+        debugPrint('[AuthService] backend token already exists in storage, skip guest login');
         return null;
       }
 
@@ -105,7 +105,7 @@ class AuthService {
       debugPrint('[AuthService] guest login failed: ${response.error}');
       return null;
     } catch (e) {
-      debugPrint('[AuthService] login error: $e');
+      debugPrint('[AuthService] ensureGuestLogin error: $e');
       return null;
     }
   }

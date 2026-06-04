@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -8,17 +7,17 @@ import 'package:logger/logger.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/firebase/firebase_service.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/storage/storage_service.dart';
-import '../models/user_model.dart';
 import '../models/user_model.dart';
 
 class AuthRepository {
   AuthRepository(this._storage);
 
   final StorageService _storage;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  FirebaseAuth get _auth => FirebaseAuth.instance;
+  GoogleSignIn get _googleSignIn => GoogleSignIn();
   final Logger _logger = Logger();
 
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -66,8 +65,15 @@ class AuthRepository {
     await refreshIdToken();
     final cached = await getCachedUser();
 
-    return UserModel.fromFirebaseUser(
-      user,
+    return UserModel.fromFirebaseData(
+      {
+        'uid': user.uid,
+        'email': user.email,
+        'displayName': user.displayName,
+        'photoURL': user.photoURL,
+        'createdAt': user.metadata.creationTime,
+        'isEmailVerified': user.emailVerified,
+      },
       membershipType: cached?.membershipType ?? MembershipType.regular,
       membershipExpiryDate: cached?.membershipExpiryDate,
     );
@@ -170,6 +176,10 @@ class AuthRepository {
   }
 
   Future<UserModel> signInWithGoogle() async {
+    if (kIsWeb && !FirebaseService.isInitialized) {
+      throw StateError('Firebase Auth is unavailable because Firebase is not initialized.');
+    }
+
     final googleUser = await _googleSignIn.signIn();
     if (googleUser == null) {
       throw AuthCancelledException();
@@ -198,7 +208,9 @@ class AuthRepository {
   }
 
   Future<UserModel> signInWithApple() async {
-    if (!Platform.isIOS && !Platform.isMacOS) {
+    if (kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.iOS &&
+            defaultTargetPlatform != TargetPlatform.macOS)) {
       throw FirebaseAuthException(
         code: 'operation-not-allowed',
         message: 'Apple Sign In is only available on Apple platforms',
@@ -257,11 +269,27 @@ class AuthRepository {
   }
 
   Future<void> signOut() async {
-    await Future.wait([
-      _auth.signOut(),
-      _googleSignIn.signOut(),
-    ]);
+    Object? signOutError;
+
+    try {
+      await _auth.signOut();
+    } catch (e) {
+      signOutError ??= e;
+      _logger.w('[AuthRepo] Firebase signOut failed: $e');
+    }
+
+    try {
+      await _googleSignIn.signOut();
+    } catch (e) {
+      signOutError ??= e;
+      _logger.w('[AuthRepo] Google signOut failed: $e');
+    }
+
     await clearCache();
+
+    if (signOutError != null) {
+      _logger.w('[AuthRepo] signOut completed with non-fatal provider errors');
+    }
   }
 
   Future<UserModel> createGuestUser() async {

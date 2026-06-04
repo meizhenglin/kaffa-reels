@@ -157,7 +157,7 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                       child: Row(
                         textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
                         children: [
-                          const SizedBox(width: 15),
+                          const SizedBox(width: 4),
                           _buildThumbnail(state.info!.coverUrl),
                           const SizedBox(width: 11),
                           Expanded(
@@ -251,7 +251,7 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
 
   Widget _buildThumbnail(String? coverUrl) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(5),
       child: SizedBox(
         width: _thumbnailWidth,
         height: _thumbnailHeight,
@@ -295,8 +295,8 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
         Text(
           info.videoName,
           style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
+            color: Color(0xFFFFFFFF),
+            fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
           maxLines: 1,
@@ -304,10 +304,11 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
         ),
         const SizedBox(height: 4),
         Text(
-          'Continue Watching ${info.episodeLabel}',
+          'Continue Watching EP.${info.watchedEpNum}',
           style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 10,
+            color: Color(0xFFAEAEAE),
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,

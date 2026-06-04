@@ -1,12 +1,9 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
-import '../../../core/providers/auth_provider.dart' as core_auth show GuestLoginStatus, guestLoginProvider;
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key, this.redirect});
@@ -18,6 +15,18 @@ class LoginPage extends ConsumerStatefulWidget {
 }
 
 class _LoginPageState extends ConsumerState<LoginPage> {
+  void _navigateAfterLogin() {
+    if (!mounted) return;
+
+    final target = widget.redirect;
+    if (target != null && target.isNotEmpty) {
+      context.go(target);
+      return;
+    }
+
+    context.push('/auth/photo-setting');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -25,8 +34,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: Stack(
@@ -113,10 +120,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             iconPath: 'assets/images/email_icon.png',
                             isLoading: false,
                             onTap: () {
-                              final target = widget.redirect ?? '/profile';
                               context.pushNamed<String>(
                                 'loginEmail',
-                                extra: target,
+                                extra: widget.redirect,
                               );
                             },
                           ),
@@ -132,17 +138,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 isLoading: isLoading,
                                 onTap: () async {
                                   ref.read(authProvider.notifier).clearError();
-                                  await ref
+                                  final success = await ref
                                       .read(authProvider.notifier)
                                       .signInWithGoogle();
-                                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                                    if (mounted) context.go('/profile');
-                                  });
+                                  if (success) {
+                                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                                      _navigateAfterLogin();
+                                    });
+                                  }
                                 },
                               );
                             },
                           ),
-                          if (Platform.isIOS) ...[
+                          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) ...[
                             const SizedBox(height: 16),
                             Consumer(
                               builder: (_, ref, __) {
@@ -158,12 +166,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                     ref
                                         .read(authProvider.notifier)
                                         .clearError();
-                                    await ref
+                                    final success = await ref
                                         .read(authProvider.notifier)
                                         .signInWithApple();
-                                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                                      if (mounted) context.go('/profile');
-                                    });
+                                    if (success) {
+                                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                                        _navigateAfterLogin();
+                                      });
+                                    }
                                   },
                                 );
                               },

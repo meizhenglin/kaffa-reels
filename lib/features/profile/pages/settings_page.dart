@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../app/router/router_config.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../core/utils/app_restart.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../app/providers/app_providers.dart';
-import '../../../core/providers/auth_provider.dart' show GuestLoginStatus, guestLoginProvider;
 import '../../auth/providers/auth_provider.dart';
 import 'language_page.dart';
 import 'message_settings_page.dart';
@@ -21,7 +20,6 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
-  bool _isLoggingOut = false;
 
   Future<void> _handleLogout() async {
     final confirmed = await showDialog<bool>(
@@ -58,17 +56,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     if (confirmed != true || !mounted) return;
 
-    setState(() => _isLoggingOut = true);
-
     await ref.read(authProvider.notifier).signOut();
+    if (!mounted) return;
 
-    // 重置游客登录状态为 initial，下次启动会重新登录
-    ref.read(guestLoginProvider.notifier).state = GuestLoginStatus.initial;
-
-    if (mounted) {
-      context.pop();
-      AppRestart.restart();
+    final rootNavigator = rootNavigatorKey.currentState;
+    while (rootNavigator != null && rootNavigator.canPop()) {
+      rootNavigator.pop();
     }
+
+    context.go('/');
+    await AppRestart.restart();
   }
 
   @override
@@ -97,7 +94,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   Expanded(
                     child: Center(
                       child: Text(
-                        l10n?.settings ?? 'Settings',
+                        l10n.settings,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 18,

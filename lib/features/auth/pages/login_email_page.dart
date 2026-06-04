@@ -1,10 +1,12 @@
 import 'package:email_validator/email_validator.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/providers/app_providers.dart';
-import '../../../app/router/router_config.dart' show shellNavigatorProfileKey;
+import '../../../core/providers/auth_provider.dart' show apiServiceProviderRef;
+import '../../../core/utils/app_restart.dart';
 import '../../../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
 
@@ -71,6 +73,22 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
 
     debugPrint('[LoginEmail] signInWithEmail success, saving credentials...');
 
+    try {
+      final resp = await ref.read(apiServiceProviderRef).getUserCenter();
+      if (resp.isSuccess && resp.data != null) {
+        final userData = resp.data as Map<String, dynamic>;
+        ref.read(authProvider.notifier).updateUserFromData(userData);
+        debugPrint('[LoginEmail] getUserCenter success: $userData');
+      } else {
+        debugPrint(
+          '[LoginEmail] getUserCenter failed: '
+          'success=${resp.isSuccess} data=${resp.data} error=${resp.error}',
+        );
+      }
+    } catch (e) {
+      debugPrint('[LoginEmail] getUserCenter error: $e');
+    }
+
     // 保存或清除自动登录凭证
     final storage = ref.read(storageServiceProvider);
     if (_autoLogin) {
@@ -91,19 +109,19 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
       return;
     }
 
-    // 登录成功，pop 掉 auth 页面，然后用 StatefulNavigationShellState.goBranch 切换 tab
-    // StatefulNavigationShell.maybeOf(context) 从任何 context 获取 shell 的 state，然后调用 goBranch
-    context.pop(); // pop LoginEmailPage → 回到 LoginPage
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final shellState = StatefulNavigationShell.maybeOf(context);
-      if (shellState != null) {
-        debugPrint('[LoginEmail] switching to profile branch via shellState.goBranch(4)');
-        shellState.goBranch(4); // 切换到 profile tab（索引 4）
-      } else {
-        debugPrint('[LoginEmail] shellState is null, fallback to router.go');
-        router.go('/profile');
-      }
-    });
+    // 登录成功后按平台处理；如果外部显式传了 redirect，则优先按 redirect 跳转
+    final target = widget.redirect;
+    if (target != null && target.isNotEmpty) {
+      router.go(target);
+      return;
+    }
+
+    if (kIsWeb) {
+      router.go('/');
+      return;
+    }
+
+    await AppRestart.restart();
   }
 
   @override
@@ -198,10 +216,10 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                           controller: _emailController,
                           validator: (v) {
                             if (v == null || v.trim().isEmpty) {
-                              return l10n?.requiredField ?? 'Required';
+                              return l10n.requiredField;
                             }
                             if (!EmailValidator.validate(v.trim())) {
-                              return l10n?.invalidEmail ?? 'Invalid email';
+                              return l10n.invalidEmail;
                             }
                             return null;
                           },
@@ -214,7 +232,7 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                               setState(() => _obscurePassword = !_obscurePassword),
                           validator: (v) {
                             if (v == null || v.isEmpty) {
-                              return l10n?.requiredField ?? 'Required';
+                              return l10n.requiredField;
                             }
                             return null;
                           },

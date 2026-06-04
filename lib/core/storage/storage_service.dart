@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:convert';
 
 import '../../core/constants/app_constants.dart';
@@ -26,6 +27,9 @@ import '../../core/constants/app_constants.dart';
 /// - 修改存储格式：确保 jsonEncode/jsonDecode 的数据结构一致
 /// ============================================================================
 class StorageService {
+  static const String _userTokenKey = 'user_token';
+  static const String _userDataKey = 'user_data';
+  static const String _authTokenKey = 'auth_token';
   // 单例模式：确保全局只有一个 StorageService 实例
   static final StorageService _instance = StorageService._internal();
 
@@ -52,8 +56,7 @@ class StorageService {
       // 初始化成功提示：可在开发时取消注释查看
       // print('StorageService initialized successfully');
     } catch (e) {
-      // 初始化失败处理
-      print('StorageService init failed: $e');
+      debugPrint('StorageService init failed: $e');
     }
   }
 
@@ -87,24 +90,36 @@ class StorageService {
   // ==================== 认证令牌管理 (Secure Storage) ====================
   /// 【重要】这些方法使用加密存储，适合存储认证令牌等敏感信息
 
-  /// 保存认证令牌
+  /// 保存认证令牌（Firebase ID token / 第三方登录辅助凭证）
   /// [token] JWT 认证令牌
   /// 【调用时机】用户登录成功时调用
   Future<void> saveAuthToken(String token) async {
-    await _secureStorage.write(key: 'auth_token', value: token);
+    await _secureStorage.write(key: _authTokenKey, value: token);
+    if (kIsWeb) {
+      await _prefs?.setString(_authTokenKey, token);
+    }
   }
 
   /// 读取认证令牌（异步方式）
   /// 【说明】FlutterSecureStorage 不支持同步读取，必须使用异步方法
   Future<String?> getAuthTokenAsync() async {
-    return await _secureStorage.read(key: 'auth_token');
+    try {
+      final secureValue = await _secureStorage.read(key: _authTokenKey);
+      if (secureValue != null && secureValue.isNotEmpty) {
+        return secureValue;
+      }
+    } catch (_) {}
+    return _prefs?.getString(_authTokenKey);
   }
 
   /// 清除认证令牌
-  /// 【调用时机】用户登出时调用
+  /// 【说明】这里只清理 auth_token；user_token 由 removeToken() 或更高层登出流程单独清理。
+  /// 【调用时机】Firebase / 第三方登录态失效时调用
   Future<void> clearAuthToken() async {
-    await _secureStorage.delete(key: 'user_token');
-    await _secureStorage.delete(key: 'auth_token');
+    await _secureStorage.delete(key: _authTokenKey);
+    if (kIsWeb) {
+      await _prefs?.remove(_authTokenKey);
+    }
   }
 
   // ==================== 设备 UUID 管理 (Secure Storage) ====================
@@ -123,23 +138,35 @@ class StorageService {
   }
 
   // ==================== 用户令牌管理 (Secure Storage) ====================
-  /// 保存用户令牌（与上面的 AuthToken 类似，用于不同的认证场景）
+  /// 保存用户令牌（后端业务接口真正使用的 token）。
   Future<void> saveToken(String token) async {
-    await _secureStorage.write(key: 'user_token', value: token);
+    await _secureStorage.write(key: _userTokenKey, value: token);
+    if (kIsWeb) {
+      await _prefs?.setString(_userTokenKey, token);
+    }
+    debugPrint('[StorageService] saveToken web=$kIsWeb hasPrefs=${_prefs != null}');
   }
 
   /// 读取用户令牌
   Future<String?> getToken() async {
     try {
-      return await _secureStorage.read(key: 'user_token');
-    } catch (_) {
-      return null;
-    }
+      final secureValue = await _secureStorage.read(key: _userTokenKey);
+      if (secureValue != null && secureValue.isNotEmpty) {
+        debugPrint('[StorageService] getToken from secure storage web=$kIsWeb');
+        return secureValue;
+      }
+    } catch (_) {}
+    final prefsValue = _prefs?.getString(_userTokenKey);
+    debugPrint('[StorageService] getToken fallback prefsHit=${prefsValue != null && prefsValue.isNotEmpty} web=$kIsWeb');
+    return prefsValue;
   }
 
   /// 删除用户令牌
   Future<void> removeToken() async {
-    await _secureStorage.delete(key: 'user_token');
+    await _secureStorage.delete(key: _userTokenKey);
+    if (kIsWeb) {
+      await _prefs?.remove(_userTokenKey);
+    }
   }
 
   // ==================== 用户数据管理 (Secure Storage) ====================
@@ -148,13 +175,20 @@ class StorageService {
   /// 【调用时机】用户登录成功或更新个人信息时调用
   Future<void> saveUserData(Map<String, dynamic> userData) async {
     final jsonString = jsonEncode(userData);
-    await _secureStorage.write(key: 'user_data', value: jsonString);
+    await _secureStorage.write(key: _userDataKey, value: jsonString);
+    if (kIsWeb) {
+      await _prefs?.setString(_userDataKey, jsonString);
+    }
   }
 
   /// 读取用户个人数据
   /// 返回用户数据的 Map，如果不存在则返回 null
   Future<Map<String, dynamic>?> getUserData() async {
-    final jsonString = await _secureStorage.read(key: 'user_data');
+    String? jsonString;
+    try {
+      jsonString = await _secureStorage.read(key: _userDataKey);
+    } catch (_) {}
+    jsonString ??= _prefs?.getString(_userDataKey);
     if (jsonString != null) {
       return jsonDecode(jsonString) as Map<String, dynamic>;
     }
@@ -164,7 +198,10 @@ class StorageService {
   /// 删除用户个人数据
   /// 【调用时机】用户登出时调用
   Future<void> removeUserData() async {
-    await _secureStorage.delete(key: 'user_data');
+    await _secureStorage.delete(key: _userDataKey);
+    if (kIsWeb) {
+      await _prefs?.remove(_userDataKey);
+    }
   }
 
   // ==================== 语言偏好设置 (SharedPreferences) ====================

@@ -38,7 +38,7 @@ class GuestLoginNotifier extends StateNotifier<GuestLoginStatus> {
     if (state == GuestLoginStatus.loading) return;
 
     state = GuestLoginStatus.loading;
-    final result = await _authService.login();
+    final result = await _authService.ensureGuestLogin();
     state = result != null ? GuestLoginStatus.success : GuestLoginStatus.failure;
   }
 }

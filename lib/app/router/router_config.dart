@@ -26,6 +26,7 @@ import '../../features/player/presentation/player_controller.dart';
 import '../../features/player/presentation/test_player_page.dart';
 import '../../features/payment/pages/membership_page.dart';
 import '../../features/profile/pages/profile_tab.dart';
+import '../../features/profile/pages/settings_page.dart';
 import '../../features/profile/pages/change_name_page.dart';
 import '../../features/profile/pages/history_page.dart';
 import '../../features/recommend/models/drama_list_type.dart';
@@ -144,9 +145,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       final auth = ref.read(authProvider);
       final location = state.matchedLocation;
       final isAuthRoute = _authRoutes.any(location.startsWith);
+      final isFullyLoggedIn = auth.status == AuthStatus.authenticated &&
+          auth.user != null &&
+          !auth.user!.isTourist;
 
-      // 有 token（status=authenticated）访问登录/注册页 → 重定向到首页
-      if (isAuthRoute && auth.status == AuthStatus.authenticated) {
+      // 只有真正已登录的非游客用户，访问登录/注册页时才重定向到首页
+      if (isAuthRoute && isFullyLoggedIn) {
         return '/';
       }
 
@@ -269,6 +273,14 @@ final routerProvider = Provider<GoRouter>((ref) {
                 pageBuilder: (context, state) => const NoTransitionPage(
                   child: ProfileTab(),
                 ),
+                routes: [
+                  GoRoute(
+                    parentNavigatorKey: rootNavigatorKey,
+                    path: 'settings',
+                    name: 'profile-settings',
+                    builder: (context, state) => const SettingsPage(),
+                  ),
+                ],
               ),
             ],
           ),

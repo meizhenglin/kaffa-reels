@@ -1,5 +1,4 @@
 import 'package:equatable/equatable.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 enum MembershipType {
   regular,
@@ -57,18 +56,19 @@ class UserModel extends Equatable {
   bool get isVip => isPremium;
   DateTime? get vipExpireDate => membershipExpiryDate;
 
-  factory UserModel.fromFirebaseUser(
-    User user, {
+  factory UserModel.fromFirebaseData(Map<String, dynamic> data, {
     MembershipType membershipType = MembershipType.regular,
     DateTime? membershipExpiryDate,
   }) {
     return UserModel(
-      id: user.uid,
-      email: user.email,
-      displayName: user.displayName,
-      photoURL: user.photoURL,
-      createdAt: user.metadata.creationTime,
-      isEmailVerified: user.emailVerified,
+      id: data['uid']?.toString() ?? '',
+      email: data['email'] as String?,
+      displayName: data['displayName'] as String?,
+      photoURL: data['photoURL'] as String?,
+      createdAt: data['createdAt'] is DateTime
+          ? data['createdAt'] as DateTime
+          : null,
+      isEmailVerified: data['isEmailVerified'] as bool? ?? false,
       membershipType: membershipType,
       membershipExpiryDate: membershipExpiryDate,
       isGuest: false,
