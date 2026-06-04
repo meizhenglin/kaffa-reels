@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../components/preload_network_image.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../payment/providers/membership_provider.dart';
 import '../../recommend/models/drama.dart';
@@ -359,17 +360,12 @@ class _SearchResultItem extends StatelessWidget {
               // 封面
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: Image.network(
-                  drama.coverUrl,
+                child: PreloadNetworkImage(
+                  imageUrl: drama.coverUrl,
+                  preloadAsset: 'assets/images/small_preload_bg.png',
                   width: 74,
                   height: 105,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 74,
-                    height: 105,
-                    color: Colors.grey[800],
-                    child: const Icon(Icons.movie, color: Colors.white54),
-                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -478,17 +474,12 @@ class _RankingListItem extends StatelessWidget {
               // 封面
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: Image.network(
-                  drama.coverUrl,
+                child: PreloadNetworkImage(
+                  imageUrl: drama.coverUrl,
+                  preloadAsset: 'assets/images/small_preload_bg.png',
                   width: 74,
                   height: 105,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 74,
-                    height: 105,
-                    color: Colors.grey[800],
-                    child: const Icon(Icons.movie, color: Colors.white54),
-                  ),
                 ),
               ),
               const SizedBox(width: 10),

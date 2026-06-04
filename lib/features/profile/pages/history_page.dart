@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
-import '../../recommend/models/drama.dart';
 import '../../recommend/utils/drama_navigation.dart';
 import '../providers/history_provider.dart';
 
@@ -178,6 +177,16 @@ class _HistoryListItem extends StatelessWidget {
                   width: 120,
                   height: 80,
                   fit: BoxFit.cover,
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.asset('assets/images/small_preload_bg.png', fit: BoxFit.cover),
+                        AnimatedOpacity(opacity: 1.0, duration: const Duration(milliseconds: 300), child: child),
+                      ],
+                    );
+                  },
                   errorBuilder: (_, __, ___) => Container(
                     width: 120,
                     height: 80,

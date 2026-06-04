@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../components/preload_network_image.dart';
 import '../providers/last_watched_provider.dart';
 
 /// 首页底部 Tab 栏上方悬浮的"继续观看"卡片
@@ -192,10 +193,11 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
             child: ClipRRect(
               borderRadius: BorderRadius.circular(_borderRadius - 2),
               child: info != null && info.coverUrl.isNotEmpty
-                  ? Image.network(
-                      info.coverUrl,
+                  ? PreloadNetworkImage(
+                      imageUrl: info.coverUrl,
+                      preloadAsset: 'assets/images/small_preload_bg.png',
+                      borderRadius: BorderRadius.circular(_borderRadius - 2),
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _buildThumbnailPlaceholder(),
                     )
                   : _buildThumbnailPlaceholder(),
             ),
@@ -235,10 +237,10 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
       width: _thumbnailSize,
       height: _cardHeight,
       child: coverUrl != null && coverUrl.isNotEmpty
-          ? Image.network(
-              coverUrl,
+          ? PreloadNetworkImage(
+              imageUrl: coverUrl,
+              preloadAsset: 'assets/images/small_preload_bg.png',
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _buildThumbnailPlaceholder(),
             )
           : _buildThumbnailPlaceholder(),
     );

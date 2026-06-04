@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../components/preload_network_image.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../payment/providers/membership_provider.dart';
@@ -35,10 +36,6 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     final l10n = AppLocalizations.of(context);
     final recommendState = ref.watch(recommendProvider);
 
-    if (recommendState.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
     return RefreshIndicator(
       onRefresh: _onRefresh,
       child: CustomScrollView(
@@ -51,7 +48,9 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
             child: BannerCarousel(
               banners: recommendState.banners.isNotEmpty
                   ? recommendState.banners
-                  : _buildMockBanners(),
+                  : recommendState.isLoading
+                      ? [preloadBanner]
+                      : _buildMockBanners(),
               height: 540,
               onBannerTap: (banner) => _onBannerTap(banner),
               onSearchTap: () => context.push('/search'),
@@ -279,39 +278,32 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
           Expanded(
             child: GestureDetector(
               onTap: onTap,
-              child: coverUrl == null
-                  ? const Center(
-                      child: Icon(
-                        Icons.movie_outlined,
-                        size: 40,
-                        color: Colors.white54,
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: AspectRatio(
+                      aspectRatio: drama?.aspectRatio ?? 165 / 224,
+                      child: PreloadNetworkImage(
+                        imageUrl: coverUrl ?? '',
+                        preloadAsset: 'assets/images/small_preload_bg.png',
+                        fit: BoxFit.cover,
                       ),
-                    )
-                  : Stack(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(16),
-                            image: DecorationImage(
-                                    image: NetworkImage(coverUrl),
-                                    fit: BoxFit.cover,
-                                  ),
-                          ),
-                        ),
-                        // VIP 角标（仅 isVipOnly 显示）
-                        if (drama != null && drama.isVipOnly)
-                          Positioned(
-                            top: 0,
-                            left: 0,
-                            child: Image.asset(
-                              'assets/images/home_vip_icon.png',
-                              width: 42,
-                              height: 18,
-                            ),
-                          ),
-                      ],
                     ),
+                  ),
+                  // VIP 角标（仅 isVipOnly 显示）
+                  if (drama != null && drama.isVipOnly)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      child: Image.asset(
+                        'assets/images/home_vip_icon.png',
+                        width: 42,
+                        height: 18,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -357,34 +349,20 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
         mainAxisSize: MainAxisSize.min,
         children: [
           Expanded(
-            child: GestureDetector(
+            child:             GestureDetector(
               onTap: onTap,
               child: Stack(
                 children: [
-                  coverUrl != null
-                      ? Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(16),
-                            image: DecorationImage(
-                              image: NetworkImage(coverUrl),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        )
-                      : Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.star,
-                              size: 30,
-                              color: Colors.amber,
-                            ),
-                          ),
-                        ),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: PreloadNetworkImage(
+                      imageUrl: coverUrl ?? '',
+                      preloadAsset: 'assets/images/small_preload_bg.png',
+                      width: 106,
+                      height: 150,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                   // VIP 徽章（强制显示，左上角）
                   if (drama != null && drama.isVipOnly)
                     Positioned(
@@ -478,32 +456,16 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
               onTap: onTap,
               child: Stack(
                 children: [
-                  coverUrl != null
-                      ? Container(
-                          height: 150,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(16),
-                            image: DecorationImage(
-                              image: NetworkImage(coverUrl),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        )
-                      : Container(
-                          height: 150,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.movie_outlined,
-                              size: 40,
-                              color: Colors.white54,
-                            ),
-                          ),
-                        ),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: PreloadNetworkImage(
+                      imageUrl: coverUrl ?? '',
+                      preloadAsset: 'assets/images/small_preload_bg.png',
+                      width: 106,
+                      height: 150,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                   // 前5名角标
                   if (drama != null && index < 5)
                     Positioned(

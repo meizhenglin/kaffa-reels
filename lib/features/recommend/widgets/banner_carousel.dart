@@ -48,11 +48,12 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.banners.isEmpty) {
-      return SizedBox(height: widget.height);
-    }
-
     final topPadding = MediaQuery.of(context).padding.top;
+    final hasRealBanners =
+        widget.banners.isNotEmpty && widget.banners.first.id != '__preload__';
+    final isLoading = widget.banners.isNotEmpty &&
+        widget.banners.length == 1 &&
+        widget.banners.first.id == '__preload__';
 
     return SizedBox(
       height: widget.height,
@@ -65,13 +66,48 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
               return Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.network(
-                    banner.imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: Colors.grey.shade300,
-                      child: const Icon(Icons.image_not_supported),
-                    ),
+                  // 图片内容：loading 时静态预加载图，真实数据时带淡入动画
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: isLoading
+                        ? Image.asset(
+                            'assets/images/banner_preload_bg.png',
+                            key: const ValueKey('preload'),
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                          )
+                        :                           Image.network(
+                            key: ValueKey(banner.id),
+                            banner.imageUrl,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                            loadingBuilder: (_, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              // 真实图片加载中：叠在预加载图上面，淡入效果
+                              return Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  Image.asset(
+                                    'assets/images/banner_preload_bg.png',
+                                    fit: BoxFit.cover,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                  ),
+                                  AnimatedOpacity(
+                                    opacity: 1.0,
+                                    duration: const Duration(milliseconds: 300),
+                                    child: child,
+                                  ),
+                                ],
+                              );
+                            },
+                            errorBuilder: (_, __, ___) => Container(
+                              color: Colors.grey.shade300,
+                              child: const Icon(Icons.image_not_supported),
+                            ),
+                          ),
                   ),
                   DecoratedBox(
                     decoration: BoxDecoration(
@@ -211,18 +247,26 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
             ),
           ),
 
-          // 指示器
-          Positioned(left: 0, right: 0, bottom: 11, child: _buildIndicator()),
+          // 指示器（loading 时隐藏）
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 11,
+            child: isLoading
+                ? const SizedBox.shrink()
+                : _buildIndicator(hasRealBanners),
+          ),
         ],
       ),
     );
   }
 
   /// 构建指示器
-  Widget _buildIndicator() {
+  Widget _buildIndicator(bool hasRealBanners) {
+    final count = hasRealBanners ? widget.banners.length : 0;
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(widget.banners.length, (index) {
+      children: List.generate(count, (index) {
         final isActive = index == _currentIndex;
 
         return AnimatedContainer(

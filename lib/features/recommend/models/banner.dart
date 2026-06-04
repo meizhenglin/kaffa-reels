@@ -72,3 +72,10 @@ class BannerItem extends Equatable {
   @override
   List<Object?> get props => [id, imageUrl, dramaId];
 }
+
+/// 轮播图预加载占位图（请求未完成时展示）
+const BannerItem preloadBanner = BannerItem(
+  id: '__preload__',
+  imageUrl: 'assets/images/banner_preload_bg.png',
+  dramaId: '',
+);

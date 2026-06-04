@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../components/preload_network_image.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -167,27 +168,15 @@ class DramaListPage extends ConsumerWidget {
             ),
             child: Stack(
               children: [
-                Container(
-                  height: 150,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(16),
-                    image: coverUrl != null
-                        ? DecorationImage(
-                            image: NetworkImage(coverUrl),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: PreloadNetworkImage(
+                    imageUrl: coverUrl,
+                    preloadAsset: 'assets/images/small_preload_bg.png',
+                    width: 106,
+                    height: 150,
+                    fit: BoxFit.cover,
                   ),
-                  child: coverUrl == null
-                      ? const Center(
-                          child: Icon(
-                            Icons.movie_outlined,
-                            size: 40,
-                            color: Colors.white54,
-                          ),
-                        )
-                      : null,
                 ),
                 // 前5名角标
                 if (index < 5)

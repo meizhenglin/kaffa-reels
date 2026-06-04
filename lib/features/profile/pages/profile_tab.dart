@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../components/preload_network_image.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/network/api_service.dart';
 import '../../auth/providers/auth_provider.dart' show authProvider, AuthStatus, authServiceProvider;
@@ -155,8 +156,13 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
             child: ClipRRect(
               borderRadius: BorderRadius.circular(50),
               child: avatarUrl != null && avatarUrl.isNotEmpty
-                  ? Image.network(avatarUrl, width: 73, height: 73, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _buildAvatarPlaceholder())
+                  ? PreloadNetworkImage(
+                      imageUrl: avatarUrl,
+                      preloadAsset: 'assets/images/small_preload_bg.png',
+                      width: 73,
+                      height: 73,
+                      fit: BoxFit.cover,
+                    )
                   : _buildAvatarPlaceholder(),
             ),
           ),

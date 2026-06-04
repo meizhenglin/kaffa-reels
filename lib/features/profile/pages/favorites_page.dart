@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../components/preload_network_image.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/storage/storage_service.dart';
 
@@ -198,9 +199,13 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
                       height: 100,
                       width: double.infinity,
                       color: Colors.grey[800],
-                      child: thumbnail != null
-                          ? Image.network(thumbnail, fit: BoxFit.cover)
-                          : const Icon(Icons.play_circle_outline, size: 40, color: Colors.white54),
+                    child: thumbnail != null
+                        ? PreloadNetworkImage(
+                            imageUrl: thumbnail,
+                            preloadAsset: 'assets/images/small_preload_bg.png',
+                            fit: BoxFit.cover,
+                          )
+                        : const Icon(Icons.play_circle_outline, size: 40, color: Colors.white54),
                     ),
                   ),
                   Positioned(

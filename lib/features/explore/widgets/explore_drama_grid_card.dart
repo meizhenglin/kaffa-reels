@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../components/preload_network_image.dart';
 import '../../recommend/models/drama.dart';
 import '../../recommend/models/drama_badge.dart';
 import 'highlighted_text.dart';
@@ -70,13 +71,10 @@ class ExploreDramaGridCard extends StatelessWidget {
                 // 封面图片
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: Image.network(
-                    drama.coverUrl,
+                  child: PreloadNetworkImage(
+                    imageUrl: drama.coverUrl,
+                    preloadAsset: 'assets/images/small_preload_bg.png',
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => ColoredBox(
-                      color: Colors.grey.shade300,
-                      child: const Icon(Icons.broken_image_outlined, size: 24),
-                    ),
                   ),
                 ),
 

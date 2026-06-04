@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import '../../../components/preload_network_image.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../recommend/providers/recommend_provider.dart';
@@ -633,40 +634,29 @@ class _DramaCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Expanded(
-              child: Stack(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey[800],
+              child: LayoutBuilder(
+                builder: (context, constraints) => Stack(
+                  children: [
+                    PreloadNetworkImage(
+                      imageUrl: _coverUrl,
+                      preloadAsset: 'assets/images/small_preload_bg.png',
+                      width: constraints.maxWidth,
+                      height: constraints.maxHeight,
+                      fit: BoxFit.cover,
                       borderRadius: BorderRadius.circular(12),
-                      image: _coverUrl.isNotEmpty
-                          ? DecorationImage(
-                              image: NetworkImage(_coverUrl),
-                              fit: BoxFit.cover,
-                            )
-                          : null,
                     ),
-                    child: _coverUrl.isEmpty
-                        ? Center(
-                            child: Icon(
-                              Icons.movie_outlined,
-                              color: Colors.white.withAlpha(77),
-                              size: 28,
-                            ),
-                          )
-                        : null,
-                  ),
-                  if (drama.isVipOnly == true)
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      child: Image.asset(
-                        'assets/images/home_vip_icon.png',
-                        width: 36,
-                        height: 15,
+                    if (drama.isVipOnly == true)
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        child: Image.asset(
+                          'assets/images/home_vip_icon.png',
+                          width: 36,
+                          height: 15,
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 5),

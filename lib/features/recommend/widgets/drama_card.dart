@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../components/preload_network_image.dart';
 import '../models/drama.dart';
 import '../models/drama_badge.dart';
 
@@ -208,24 +209,12 @@ class _CoverImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.network(
-      url,
-      fit: BoxFit.cover,
+    return PreloadNetworkImage(
+      imageUrl: url,
+      preloadAsset: 'assets/images/small_preload_bg.png',
       width: double.infinity,
       height: double.infinity,
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return Container(
-          color: Colors.grey.shade300,
-          child: const Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        );
-      },
-      errorBuilder: (_, __, ___) => Container(
-        color: Colors.grey.shade300,
-        child: const Icon(Icons.broken_image_outlined, size: 32),
-      ),
+      fit: BoxFit.cover,
     );
   }
 }
