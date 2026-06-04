@@ -81,6 +81,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get continueAsGuest => 'Continue as Guest';
 
   @override
+  String get continueWatching => 'مواصلة المشاهدة';
+
+  @override
   String get trending => 'Trending';
 
   @override

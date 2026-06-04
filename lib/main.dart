@@ -12,7 +12,7 @@ import 'app/router/router_config.dart';
 import 'app/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
 import 'core/firebase/firebase_service.dart';
-import 'core/providers/auth_provider.dart';
+import 'features/auth/providers/auth_provider.dart';
 import 'core/storage/storage_service.dart';
 
 Future<void> _withTimeout(Future<void> future, Duration timeout) async {
@@ -63,20 +63,12 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
   @override
   void initState() {
     super.initState();
-    // 主题/语言加载，以及注册 DioClient 的 Guest 登录回调
-    // 注意：首次启动、重启恢复、自动登录失败后的游客初始化，都交给 AuthNotifier 统一处理。
-    // 这里仅注册网络层兜底：当请求发送时发现 token 为空，或后端返回 token 失效，再补做一次 guest 登录。
+    // 启动时主动拉起认证初始化，避免依赖页面首次读取 authProvider 才触发。
+    // 这样刷新 Web / 冷启动 App 后，会尽早执行正式登录恢复或游客初始化。
     Future.microtask(() {
+      ref.read(authProvider);
       ref.read(themeModeProvider.notifier).load();
       ref.read(localeProvider.notifier).load();
-
-      // 注册 Guest 登录回调：用于 token 为空或 code=23 时自动 guest 登录重试。
-      // 这层属于网络兜底，不负责决定 UI 应该显示游客还是正式用户。
-      // UI 认证状态统一由 authProvider 管理。
-      ref.read(dioClientProvider).setOnGuestLogin(() async {
-        final result = await ref.read(authServiceProvider).ensureGuestLogin();
-        return result?.token;
-      });
     });
   }
 

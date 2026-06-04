@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qahwa_tv/l10n/app_localizations.dart';
 
 import '../../../components/preload_network_image.dart';
 import '../providers/last_watched_provider.dart';
@@ -66,10 +67,15 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(lastWatchedProvider);
+    final info = state.info;
 
-    if (state.info == null) return const SizedBox.shrink();
+    if (info == null || !info.hasDisplayableContent) {
+      return const SizedBox.shrink();
+    }
 
     final isRtl = Directionality.of(context) == TextDirection.rtl;
+    final continueWatchingText =
+        AppLocalizations.of(context).continueWatching;
 
     // 卡片展开方向：LTR 右滑展开，RTL 左滑展开
     // 封面图始终出现在卡片原位（卡片的右边缘 / 左边缘）
@@ -122,7 +128,7 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                 opacity: coverOpacity,
                 child: SlideTransition(
                   position: coverSlideAnimation,
-                  child: _buildCoverCard(state.info, isRtl),
+                  child: _buildCoverCard(info, isRtl),
                 ),
               ),
             ),
@@ -158,10 +164,10 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                         textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
                         children: [
                           const SizedBox(width: 4),
-                          _buildThumbnail(state.info!.coverUrl),
+                          _buildThumbnail(info.coverUrl),
                           const SizedBox(width: 11),
                           Expanded(
-                            child: _buildContent(state.info),
+                            child: _buildContent(info, continueWatchingText),
                           ),
                           const SizedBox(width: 12),
                           Padding(
@@ -275,7 +281,7 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
     );
   }
 
-  Widget _buildContent(LastWatchedInfo? info) {
+  Widget _buildContent(LastWatchedInfo? info, String continueWatchingText) {
     if (info == null) {
       return const Center(
         child: SizedBox(
@@ -304,7 +310,7 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
         ),
         const SizedBox(height: 4),
         Text(
-          'Continue Watching EP.${info.watchedEpNum}',
+          '$continueWatchingText EP.${info.watchedEpNum}',
           style: const TextStyle(
             color: Color(0xFFAEAEAE),
             fontSize: 11,

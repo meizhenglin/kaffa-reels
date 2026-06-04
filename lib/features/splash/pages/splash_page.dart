@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../l10n/app_localizations.dart';
-import '../../../app/providers/app_providers.dart';
 import '../../auth/providers/auth_provider.dart';
 
 /// ============================================================================
@@ -32,6 +30,7 @@ class _SplashPageState extends ConsumerState<SplashPage> with SingleTickerProvid
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;   // 淡入动画
   late Animation<double> _scaleAnimation;  // 缩放动画
+  bool _navigated = false;
 
   @override
   void initState() {
@@ -48,26 +47,42 @@ class _SplashPageState extends ConsumerState<SplashPage> with SingleTickerProvid
       CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.6, curve: Curves.easeOut)));
 
     _controller.forward();
+
+    ref.listenManual<AuthState>(authProvider, (previous, next) {
+      if (_isAuthReady(next)) {
+        _navigateToHomeWhenReady();
+      }
+    });
+
     _initializeAndNavigate();
   }
 
   /// 初始化并导航
   /// 注意：storage.init() / themeModeProvider.load() / localeProvider.load()
-  /// 已在 main.dart 中完成，此处不再重复调用
+  /// 已在 main.dart 中完成，此处只负责等待认证初始化完成后再进入首页。
   Future<void> _initializeAndNavigate() async {
     debugPrint('[Splash] _initializeAndNavigate start');
-    // Guest 登录已在 main() 中同步完成，token 已就绪，此处无需再处理
-    // 动画完成后直接跳转
-    await _controller.forward();
-    if (mounted) context.go('/');
+
+    final auth = ref.read(authProvider);
+    if (_isAuthReady(auth)) {
+      await _navigateToHomeWhenReady();
+      return;
+    }
+
+    debugPrint('[Splash] waiting for auth initialization to finish before navigating');
   }
 
-  /// 超时包装器：防止异步操作永久阻塞
-  Future<void> _withTimeout(Future<void> future, Duration timeout) async {
-    try {
-      await future.timeout(timeout, onTimeout: () { debugPrint('[Splash] _withTimeout onTimeout!'); });
-    } catch (e) {
-      debugPrint('[Splash] _withTimeout catch: $e');
+  bool _isAuthReady(AuthState auth) {
+    return auth.status != AuthStatus.authenticating && auth.user != null;
+  }
+
+  Future<void> _navigateToHomeWhenReady() async {
+    if (_navigated) return;
+    _navigated = true;
+    await _controller.forward().orCancel;
+    if (mounted) {
+      debugPrint('[Splash] auth ready, navigating to home');
+      context.go('/');
     }
   }
 

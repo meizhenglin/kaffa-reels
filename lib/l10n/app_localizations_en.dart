@@ -81,6 +81,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get continueAsGuest => 'Continue as Guest';
 
   @override
+  String get continueWatching => 'Continue Watching';
+
+  @override
   String get trending => 'Trending';
 
   @override

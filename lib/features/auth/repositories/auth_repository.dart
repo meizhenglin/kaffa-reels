@@ -20,9 +20,26 @@ class AuthRepository {
   GoogleSignIn get _googleSignIn => GoogleSignIn();
   final Logger _logger = Logger();
 
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  bool get _isFirebaseAuthAvailable => !kIsWeb || FirebaseService.isInitialized;
 
-  User? get currentFirebaseUser => _auth.currentUser;
+  Stream<User?> get authStateChanges {
+    if (!_isFirebaseAuthAvailable) {
+      return const Stream<User?>.empty();
+    }
+    return _auth.authStateChanges();
+  }
+
+  User? get currentFirebaseUser {
+    if (!_isFirebaseAuthAvailable) {
+      return null;
+    }
+    try {
+      return _auth.currentUser;
+    } catch (e) {
+      _logger.w('[AuthRepo] currentFirebaseUser unavailable: $e');
+      return null;
+    }
+  }
 
   Future<UserModel?> getCachedUser() async {
     final json = _storage.getString(AppConstants.userCacheKey);

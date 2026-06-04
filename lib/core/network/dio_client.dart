@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import '../config/app_config.dart';
 import '../constants/api_error_code.dart';
 import '../constants/app_constants.dart';
+import '../model/api_endpoints.dart';
 import '../storage/storage_service.dart';
 
 /// ============================================================================
@@ -53,14 +54,17 @@ class DioClient {
             // 每次请求动态构建 X-Client header（语言取自 Storage）
             options.headers['X-Client'] = _buildXClientHeader();
 
-            final token = await _storage.getToken();
-            if (token != null && token.isNotEmpty) {
-              options.headers['token'] = token;
-            } else {
-              // token 为空：先完成 guest 登录，再继续发请求
-              final newToken = await _ensureGuestLogin();
-              if (newToken != null) {
-                options.headers['token'] = newToken;
+            final isGuestAuthRequest = options.path == ApiEndpoints.guestLogin;
+            if (!isGuestAuthRequest) {
+              final token = await _storage.getToken();
+              if (token != null && token.isNotEmpty) {
+                options.headers['token'] = token;
+              } else {
+                // token 为空：先完成 guest 登录，再继续发请求
+                final newToken = await _ensureGuestLogin();
+                if (newToken != null) {
+                  options.headers['token'] = newToken;
+                }
               }
             }
             final clientParams = _storage.getString(AppConstants.clientParamsKey) ?? '';
@@ -205,10 +209,7 @@ class DioClient {
       String? newToken;
 
       if (_onGuestLogin != null) {
-        final result = _onGuestLogin!();
-        if (result != null) {
-          newToken = await result;
-        }
+        newToken = await _onGuestLogin!();
       }
 
       if (newToken != null) {

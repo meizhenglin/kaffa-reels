@@ -5,6 +5,7 @@ import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/preload_network_image.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/auth_provider.dart' show apiServiceProviderRef;
+import '../../home/pages/main_page.dart' show currentTabIndexProvider;
 import '../../auth/providers/auth_provider.dart'
     show AuthState, AuthStatus, authProvider, authServiceProvider;
 import 'chat_page.dart';
@@ -23,6 +24,12 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    ref.listenManual<int>(currentTabIndexProvider, (previous, next) {
+      if (next == 4) {
+        Future.microtask(_loadUserInfo);
+      }
+    });
 
     // 监听认证状态从游客切到正式登录的瞬间，立即刷新 Profile 资料。
     // 否则页面如果没有发生路由重建，只靠 didChangeDependencies 不一定能及时拉到邮箱用户信息。
@@ -79,10 +86,8 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
       'isTourist=${currentUser?.isTourist} '
       'user=${currentUser?.toJson()}',
     );
-    if (authState.status == AuthStatus.unauthenticated ||
-        currentUser == null ||
-        currentUser.isTourist) {
-      debugPrint('[ProfileTab._loadUserInfo] skip refresh for guest/unauthenticated');
+    if (authState.status == AuthStatus.unauthenticated || currentUser == null) {
+      debugPrint('[ProfileTab._loadUserInfo] skip refresh for missing user/unauthenticated');
       return;
     }
 

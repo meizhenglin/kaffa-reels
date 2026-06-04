@@ -22,6 +22,11 @@ class LastWatchedInfo {
 
   String get episodeLabel => 'EP.$watchedEpNum / $totalEpisodes';
 
+  bool get hasDisplayableContent =>
+      videoId.isNotEmpty &&
+      videoName.trim().isNotEmpty &&
+      episodesId > 0;
+
   factory LastWatchedInfo.fromJson(Map<String, dynamic> json) {
     return LastWatchedInfo(
       videoId: (json['videoId'] ?? '').toString(),
@@ -81,7 +86,11 @@ class LastWatchedNotifier extends StateNotifier<LastWatchedState> {
       if (resp.isSuccess && resp.data != null) {
         final info = LastWatchedInfo.fromJson(
             resp.data as Map<String, dynamic>);
-        state = LastWatchedState(info: info, isLoading: false);
+        if (info.hasDisplayableContent) {
+          state = LastWatchedState(info: info, isLoading: false);
+        } else {
+          state = const LastWatchedState(isLoading: false);
+        }
       } else {
         state = const LastWatchedState(isLoading: false);
       }

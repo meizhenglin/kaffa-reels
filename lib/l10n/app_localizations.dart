@@ -242,6 +242,12 @@ abstract class AppLocalizations {
   /// **'Continue as Guest'**
   String get continueAsGuest;
 
+  /// No description provided for @continueWatching.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue Watching'**
+  String get continueWatching;
+
   /// No description provided for @trending.
   ///
   /// In en, this message translates to:
