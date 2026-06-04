@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/preload_network_image.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../core/network/api_service.dart';
+import '../../../core/providers/auth_provider.dart' show authServiceProvider, apiServiceProviderRef;
 import '../../auth/providers/auth_provider.dart' show authProvider, AuthStatus, authServiceProvider;
 import 'chat_page.dart';
 import 'settings_page.dart';
@@ -49,7 +49,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
     if (authState.status == AuthStatus.unauthenticated) return;
 
     try {
-      final resp = await apiServiceProvider.getUserCenter();
+      final resp = await ref.read(apiServiceProviderRef).getUserCenter();
       if (resp.isSuccess && resp.data != null && mounted) {
         final userData = resp.data as Map<String, dynamic>;
         ref.read(authProvider.notifier).updateUserFromData(userData);

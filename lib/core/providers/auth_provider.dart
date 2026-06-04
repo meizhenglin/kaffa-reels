@@ -1,11 +1,24 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/providers/app_providers.dart';
 import '../auth/auth_service.dart';
+import '../network/api_service.dart';
 export '../auth/auth_service.dart' show AuthService, RegisterResult, CheckCodeResult;
 
 /// AuthService 全局单例 Provider（必须先调用 init() 加载缓存 token）
+final apiServiceProviderRef = Provider<ApiService>((ref) {
+  return ApiService(
+    dioClient: ref.read(dioClientProvider),
+    storage: ref.read(storageServiceProvider),
+  );
+});
+
+/// AuthService 全局单例 Provider（必须先调用 init() 加载缓存 token）
 final authServiceProvider = Provider<AuthService>((ref) {
-  return AuthService();
+  return AuthService(
+    apiService: ref.read(apiServiceProviderRef),
+    storage: ref.read(storageServiceProvider),
+  );
 });
 
 /// 匿名游客登录状态

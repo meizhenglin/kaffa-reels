@@ -297,8 +297,8 @@ class ApiService {
     String? nickName,
     String? avatarUrl,
     String? language,
-  }) {
-    return request(
+  }) async {
+    final response = await request(
       ApiEndpoints.userSettings,
       data: {
         'setId': setId,
@@ -308,6 +308,22 @@ class ApiService {
         if (language != null) 'language': language,
       },
     );
+
+    if (response.isSuccess && setId == 3) {
+      final data = response.data;
+      final returnedLanguage = data is Map<String, dynamic>
+          ? data['language'] as String?
+          : data is Map
+              ? data['language']?.toString()
+              : null;
+      if (returnedLanguage != null && returnedLanguage.trim().isNotEmpty) {
+        final normalizedLanguage = _normalizeLang(returnedLanguage);
+        await _storage.setString(AppConstants.deviceLangKey, normalizedLanguage);
+        await _storage.setString(AppConstants.localeKey, normalizedLanguage.startsWith('ar') ? 'ar' : 'en');
+      }
+    }
+
+    return response;
   }
 
   /// 获取头像列表

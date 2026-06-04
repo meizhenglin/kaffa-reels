@@ -264,7 +264,9 @@ class DioClient {
     final xClient = AppConfig.currentXClient;
     final version = AppConfig.appVersion;
     final osName = AppConfig.platformType;
-    return '$xClient;version=$version;osName=$osName;x-lang=$lang';
+    final header = '$xClient;version=$version;osName=$osName;x-lang=$lang';
+    debugPrint('[DioClient] X-Client built from deviceLang=$savedLang => $header');
+    return header;
   }
 
   String _normalizeLang(String? value) {

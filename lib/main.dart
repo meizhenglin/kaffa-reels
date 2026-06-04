@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:qahwa_tv/l10n/app_localizations.dart';
 
 import '_aliplayer_log_stub.dart'
@@ -14,6 +13,7 @@ import 'app/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
 import 'core/firebase/firebase_service.dart';
 import 'core/providers/auth_provider.dart';
+import 'core/storage/storage_service.dart';
 
 Future<void> _withTimeout(Future<void> future, Duration timeout) async {
   try {
@@ -45,6 +45,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   debugPrint('[MAIN] WidgetsFlutterBinding ready');
 
+  final storage = StorageService();
+  await storage.init();
+  debugPrint('[MAIN] StorageService initialized');
+
   // 关闭阿里云播放器日志（仅非 Web 平台）
   await aliplayer_impl.AliPlayerLog.init();
 
@@ -56,12 +60,19 @@ Future<void> main() async {
 
   // 在 ProviderScope 创建之前，先同步完成 Guest 登录
   // 这样所有后续网络请求都有 token 可用，不会出现"空 token 先于登录"的问题
-  final _tempContainer = ProviderContainer();
+  final _tempContainer = ProviderContainer(
+    overrides: [
+      storageServiceProvider.overrideWithValue(storage),
+    ],
+  );
   await _ensureGuestLogin(_tempContainer);
   _tempContainer.dispose();
 
   runApp(
     ProviderScope(
+      overrides: [
+        storageServiceProvider.overrideWithValue(storage),
+      ],
       child: const QahwaTVApp(),
     ),
   );

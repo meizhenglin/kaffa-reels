@@ -3,7 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers/app_providers.dart';
-import '../../../core/providers/auth_provider.dart' show GuestLoginStatus, guestLoginProvider, authServiceProvider;
+import '../../../core/providers/auth_provider.dart' show GuestLoginStatus, guestLoginProvider, authServiceProvider, apiServiceProviderRef;
+import '../../../core/constants/app_constants.dart';
 import '../../../core/network/api_service.dart';
 import '../models/user_model.dart';
 import '../repositories/auth_repository.dart';
@@ -239,8 +240,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// 设置语言（本地 + 后端）
   Future<void> setLanguage(String languageCode) async {
-    _repository.saveLanguage(languageCode);
-    await apiServiceProvider.updateUserSettings(setId: 3, language: languageCode);
+    final response = await _ref.read(apiServiceProviderRef).updateUserSettings(
+      setId: 3,
+      language: languageCode,
+    );
+
+    if (!response.isSuccess) {
+      throw Exception(response.error ?? 'Failed to update language');
+    }
+
+    final normalizedLanguage = languageCode.toLowerCase().startsWith('ar')
+        ? 'ar-SA'
+        : 'en-US';
+    final normalizedLanguageCode = normalizedLanguage.startsWith('ar')
+        ? 'ar'
+        : 'en';
+    final storage = _ref.read(storageServiceProvider);
+    await storage.setString(AppConstants.deviceLangKey, normalizedLanguage);
+    await storage.setString(AppConstants.localeKey, normalizedLanguageCode);
+    await _repository.saveLanguage(normalizedLanguageCode);
+    debugPrint(
+      '[AuthNotifier] setLanguage persisted deviceLang=${storage.getString(AppConstants.deviceLangKey)} '
+      'appLocale=${storage.getString(AppConstants.localeKey)} '
+      'languageCode=${await storage.getLanguage()}',
+    );
   }
 
   /// 执行认证操作（统一处理）

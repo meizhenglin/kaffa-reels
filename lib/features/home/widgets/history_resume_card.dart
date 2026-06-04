@@ -29,7 +29,8 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
 
   static const _cardHeight = 52.0;
   static const _borderRadius = 8.0;
-  static const _thumbnailSize = 52.0;
+  static const _thumbnailWidth = 32.0;
+  static const _thumbnailHeight = 45.0;
   static const _coverWidth = 65.0;
   static const _coverHeight = 92.0;
 
@@ -156,9 +157,25 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                       child: Row(
                         textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
                         children: [
+                          const SizedBox(width: 15),
                           _buildThumbnail(state.info!.coverUrl),
+                          const SizedBox(width: 11),
                           Expanded(
                             child: _buildContent(state.info),
+                          ),
+                          const SizedBox(width: 12),
+                          Padding(
+                            padding: const EdgeInsetsDirectional.only(end: 15),
+                            child: Image.asset(
+                              'assets/images/card_play_icon.png',
+                              width: 25,
+                              height: 25,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.play_circle_fill,
+                                color: Colors.white,
+                                size: 25,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -233,16 +250,19 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
   }
 
   Widget _buildThumbnail(String? coverUrl) {
-    return SizedBox(
-      width: _thumbnailSize,
-      height: _cardHeight,
-      child: coverUrl != null && coverUrl.isNotEmpty
-          ? PreloadNetworkImage(
-              imageUrl: coverUrl,
-              preloadAsset: 'assets/images/small_preload_bg.png',
-              fit: BoxFit.cover,
-            )
-          : _buildThumbnailPlaceholder(),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: SizedBox(
+        width: _thumbnailWidth,
+        height: _thumbnailHeight,
+        child: coverUrl != null && coverUrl.isNotEmpty
+            ? PreloadNetworkImage(
+                imageUrl: coverUrl,
+                preloadAsset: 'assets/images/small_preload_bg.png',
+                fit: BoxFit.cover,
+              )
+            : _buildThumbnailPlaceholder(),
+      ),
     );
   }
 
@@ -268,51 +288,31 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            info.videoName,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          info.videoName,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
           ),
-          const SizedBox(height: 2),
-          Text(
-            info.episodeLabel,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 10,
-            ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Continue Watching ${info.episodeLabel}',
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 10,
           ),
-          const SizedBox(height: 2),
-          const Row(
-            children: [
-              Icon(
-                Icons.play_circle_outline,
-                color: Color(0xFF8F4EFF),
-                size: 11,
-              ),
-              SizedBox(width: 3),
-              Text(
-                'Resume',
-                style: TextStyle(
-                  color: Color(0xFF8F4EFF),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 }

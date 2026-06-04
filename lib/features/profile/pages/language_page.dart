@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../core/utils/app_restart.dart';
@@ -14,11 +18,41 @@ class LanguagePage extends ConsumerStatefulWidget {
 
 class _LanguagePageState extends ConsumerState<LanguagePage> {
   late Locale _selectedLocale;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
     _selectedLocale = ref.read(localeProvider);
+  }
+
+  Future<void> _saveLanguage() async {
+    if (_isSaving) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final languageCode = _selectedLocale.languageCode.toLowerCase() == 'ar'
+          ? 'ar-SA'
+          : 'en-US';
+      await ref.read(authProvider.notifier).setLanguage(languageCode);
+      await ref.read(localeProvider.notifier).setLocale(_selectedLocale);
+
+      if (!mounted) return;
+      unawaited(AppRestart.restart());
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
@@ -81,27 +115,38 @@ class _LanguagePageState extends ConsumerState<LanguagePage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
               child: GestureDetector(
-                onTap: () async {
-                  await ref.read(localeProvider.notifier).setLocale(_selectedLocale);
-                  AppRestart.restart();
-                },
-                child: Container(
-                  width: double.infinity,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'Confirm',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                onTap: _isSaving ? null : _saveLanguage,
+                child: Opacity(
+                  opacity: _isSaving ? 0.7 : 1,
+                  child: Container(
+                    width: double.infinity,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
                       ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Text(
+                              'Confirm',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
                 ),

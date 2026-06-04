@@ -225,9 +225,24 @@ class AuthService {
 
   /// 获取设备语言并保存到 Storage，用于 X-Client header
   Future<void> _saveDeviceLanguage() async {
+    final savedLang = _storage.getString(AppConstants.deviceLangKey)?.trim();
+    final savedLocale = _storage.getString(AppConstants.localeKey)?.trim();
+
+    if (savedLang == 'ar-SA' || savedLang == 'en-US') {
+      debugPrint('[AuthService] preserve saved device language: $savedLang');
+      return;
+    }
+
+    if (savedLocale == 'ar' || savedLocale == 'en') {
+      final lang = savedLocale == 'ar' ? 'ar-SA' : 'en-US';
+      await _storage.setString(AppConstants.deviceLangKey, lang);
+      debugPrint('[AuthService] device language restored from app locale: $lang');
+      return;
+    }
+
     final locale = PlatformDispatcher.instance.locale;
     final lang = locale.languageCode.toLowerCase() == 'ar' ? 'ar-SA' : 'en-US';
     await _storage.setString(AppConstants.deviceLangKey, lang);
-    debugPrint('[AuthService] device language saved: $lang');
+    debugPrint('[AuthService] device language initialized from system locale: $lang');
   }
 }
