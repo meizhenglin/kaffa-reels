@@ -51,13 +51,15 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
   void _onContinue() async {
     if (_selectedAvatar != null) {
       await ref.read(authProvider.notifier).updateAvatar(_selectedAvatar!);
-      final authService = ref.read(authServiceProvider);
-      await authService.fetchUserInfo();
-      final userData = await authService.getUserData();
-      if (userData != null && mounted) {
-        ref.read(authProvider.notifier).updateUserFromData(userData);
-      }
     }
+
+    try {
+      final resp = await apiServiceProvider.getUserCenter();
+      if (resp.isSuccess && resp.data != null && mounted) {
+        ref.read(authProvider.notifier).updateUserFromData(resp.data as Map<String, dynamic>);
+      }
+    } catch (_) {}
+
     if (widget.fromRegister) {
       context.push('/change-name', extra: true);
     } else {

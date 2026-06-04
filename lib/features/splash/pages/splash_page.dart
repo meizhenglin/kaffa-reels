@@ -56,18 +56,9 @@ class _SplashPageState extends ConsumerState<SplashPage> with SingleTickerProvid
   /// 已在 main.dart 中完成，此处不再重复调用
   Future<void> _initializeAndNavigate() async {
     debugPrint('[Splash] _initializeAndNavigate start');
-    // 初始化游客身份（带超时保护，防止 Firebase 网络问题导致永久卡住）
-    try {
-      await ref.read(authProvider.notifier).initAsGuest().timeout(
-        const Duration(seconds: 10),
-        onTimeout: () { debugPrint('[Splash] initAsGuest TIMEOUT!'); },
-      );
-      debugPrint('[Splash] initAsGuest done, state: ${ref.read(authProvider)}');
-    } catch (e) {
-      debugPrint('[Splash] initAsGuest ERROR: $e');
-    }
-    // 等待动画自然完成后跳转（动画时长 1.5 秒）
-    await Future.delayed(const Duration(milliseconds: 1500));
+    // Guest 登录已在 main() 中同步完成，token 已就绪，此处无需再处理
+    // 动画完成后直接跳转
+    await _controller.forward();
     if (mounted) context.go('/');
   }
 

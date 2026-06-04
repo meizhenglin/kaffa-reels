@@ -24,9 +24,8 @@ class GuestLoginNotifier extends StateNotifier<GuestLoginStatus> {
   Future<void> login() async {
     if (state == GuestLoginStatus.loading) return;
 
-    // 不强制登录：如果已有 Token 则跳过，保持用户的登录态
     state = GuestLoginStatus.loading;
-    final result = await _authService.login(forceLogin: false);
+    final result = await _authService.login();
     state = result != null ? GuestLoginStatus.success : GuestLoginStatus.failure;
   }
 }

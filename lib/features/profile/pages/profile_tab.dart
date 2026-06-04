@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../core/network/api_service.dart';
 import '../../auth/providers/auth_provider.dart' show authProvider, AuthStatus, authServiceProvider;
 import 'chat_page.dart';
 import 'settings_page.dart';
@@ -44,14 +45,24 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
 
   Future<void> _loadUserInfo() async {
     final authState = ref.read(authProvider);
-    // 已登出时不再从 storage 恢复旧数据
     if (authState.status == AuthStatus.unauthenticated) return;
 
-    final authService = ref.read(authServiceProvider);
-    await authService.fetchUserInfo();
-    final userData = await authService.getUserData();
-    if (userData != null && mounted) {
-      ref.read(authProvider.notifier).updateUserFromData(userData);
+    try {
+      final resp = await apiServiceProvider.getUserCenter();
+      if (resp.isSuccess && resp.data != null && mounted) {
+        final userData = resp.data as Map<String, dynamic>;
+        ref.read(authProvider.notifier).updateUserFromData(userData);
+        return;
+      }
+    } catch (_) {}
+
+    // 网络失败时降级读取 Storage 缓存
+    if (mounted) {
+      final authService = ref.read(authServiceProvider);
+      final userData = await authService.getUserData();
+      if (userData != null && mounted) {
+        ref.read(authProvider.notifier).updateUserFromData(userData);
+      }
     }
   }
   Widget build(BuildContext context) {

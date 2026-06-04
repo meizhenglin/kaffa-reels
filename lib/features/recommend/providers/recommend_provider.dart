@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers/app_providers.dart';
 import '../../../core/network/api_service.dart';
-import '../../../core/providers/auth_provider.dart';
 import '../data/recommend_repository.dart';
 import '../models/banner.dart';
 import '../models/drama.dart';
@@ -145,7 +144,7 @@ class RecommendState {
 final recommendRepositoryProvider = Provider<RecommendRepository>((ref) {
   return RecommendRepository(
     dioClient: ref.read(dioClientProvider),
-    authService: ref.read(authServiceProvider),
+    storageService: ref.read(storageServiceProvider),
   );
 });
 

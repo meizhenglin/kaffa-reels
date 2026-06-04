@@ -79,7 +79,7 @@ class _MainPageState extends ConsumerState<MainPage> {
         fit: StackFit.expand,
         children: [
           widget.navigationShell,
-          if (currentIndex == 0) const HistoryResumeCard(),
+          if (currentIndex == 0) HistoryResumeCard(),
         ],
       ),
       bottomNavigationBar: AppBottomNavBar(

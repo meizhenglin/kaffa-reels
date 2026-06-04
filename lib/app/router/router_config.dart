@@ -137,35 +137,19 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: refreshNotifier,
 
     /// 路由守卫：每次路由变化时都会执行
-    /// 【功能】
-    /// - 已登录用户访问登录/注册页 → 重定向到首页
-    /// - 未登录用户访问需要认证的页面 → 重定向到登录页
+    ///
+    /// 【原则】Storage 有 token → status=authenticated → 视为已登录
+    /// 只要 status=authenticated，访问 /auth/* 页面就重定向到首页
     redirect: (context, state) {
-      // 获取当前认证状态
       final auth = ref.read(authProvider);
       final location = state.matchedLocation;
-      final isAuthenticated = auth.isAuthenticated;
       final isAuthRoute = _authRoutes.any(location.startsWith);
-      final isAuthenticating = auth.status == AuthStatus.authenticating;
 
-      print('[Router] redirect: location=$location, isAuthRoute=$isAuthRoute, isAuthenticated=$isAuthenticated, userId=${auth.user?.id}, isTourist=${auth.user?.isTourist}');
-
-      // 正在验证中，不做重定向
-      if (isAuthenticating) { print('[Router] → authenticating, no redirect'); return null; }
-
-      // 已登录用户（且不是游客）访问认证页面 → 跳转到首页或 redirect 参数指定的页面
-      if (isAuthenticated && isAuthRoute && auth.user != null && !auth.user!.isTourist) {
-        final redirect = state.uri.queryParameters['redirect'];
-        if (redirect != null && redirect.isNotEmpty) {
-          print('[Router] → authenticated + authRoute, redirect to: $redirect');
-          return redirect;
-        }
-        print('[Router] → authenticated + authRoute, redirect to /');
+      // 有 token（status=authenticated）访问登录/注册页 → 重定向到首页
+      if (isAuthRoute && auth.status == AuthStatus.authenticated) {
         return '/';
       }
 
-      // 其他情况不重定向
-      print('[Router] → no redirect needed');
       return null;
     },
 

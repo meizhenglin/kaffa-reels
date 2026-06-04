@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../app/providers/app_providers.dart';
+import '../../../core/network/api_service.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterEmailPage extends ConsumerStatefulWidget {
@@ -67,15 +68,13 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
 
       if (success) {
       debugPrint('[RegisterEmail] success, fetching user info...');
-      // 立即拉取后端真实用户信息（包含正确 nickname 和 id）
-      final authService = ref.read(authServiceProvider);
-      await authService.fetchUserInfo();
-      final userData = await authService.getUserData();
-      if (userData != null) {
-        ref.read(authProvider.notifier).updateUserFromData(userData);
-      }
+      try {
+        final resp = await apiServiceProvider.getUserCenter();
+        if (resp.isSuccess && resp.data != null) {
+          ref.read(authProvider.notifier).updateUserFromData(resp.data as Map<String, dynamic>);
+        }
+      } catch (_) {}
       if (!mounted) return;
-      // 注册成功后进入设置头像和昵称的引导流程
       context.push('/auth/photo-setting', extra: true);
     } else {
       final errorMsg = ref.read(authProvider).errorMessage;

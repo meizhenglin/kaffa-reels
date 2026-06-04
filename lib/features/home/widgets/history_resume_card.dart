@@ -108,14 +108,10 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
       right: 12,
       bottom: 20,
       child: SizedBox(
-        // 封面图92px在下，卡片52px在上，封面图底部与卡片底部对齐，共用 bottom:20
-        height: 20 + _coverHeight, // 112
+        height: 20 + _coverHeight,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // 封面图：92px 固定高，底部距 Stack 底部 20px（=距底部tab 20px）
-            // LTR 缩略图在卡片左侧 → 封面图定位到卡片左侧缩略图位置
-            // RTL 缩略图在卡片右侧 → 封面图定位到卡片右侧缩略图位置
             Positioned(
               left: isRtl ? 0 : null,
               right: isRtl ? null : 0,
@@ -128,8 +124,6 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                 ),
               ),
             ),
-            // 卡片：52px 高，底部距 Stack 底部 20px（=距底部tab 20px）
-            // LTR 右滑+淡出，RTL 左滑+淡出
             Positioned(
               bottom: 20,
               left: 0,
@@ -206,7 +200,6 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                   : _buildThumbnailPlaceholder(),
             ),
           ),
-          // 关闭按钮：LTR 在左侧，RTL 在右侧
           Positioned(
             top: -4,
             left: isRtl ? null : -4,
@@ -216,25 +209,15 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
               onTap: () {
                 ref.read(lastWatchedProvider.notifier).clear();
               },
-              child: Container(
-                // width: 28,
-                // height: 28,
-                // decoration: BoxDecoration(
-                //   color: Colors.black54,
-                //   borderRadius: BorderRadius.circular(14),
-                // ),
-                child: Image.asset(
+              child: Image.asset(
                 'assets/images/cover_close_icon.png',
                 width: 16,
                 height: 16,
-                // color: Colors.white,
                 errorBuilder: (_, __, ___) =>
                     const Icon(Icons.close, size: 16, color: Colors.white),
               ),
-              ),
             ),
           ),
-          // 播放按钮：居中显示
           Center(
             child: Image.asset(
               'assets/images/cover_play_icon.png',
@@ -278,14 +261,13 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
           height: 16,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            // color: Colors.white54,
           ),
         ),
       );
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
@@ -294,7 +276,7 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
             info.videoName,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
             maxLines: 1,
@@ -305,23 +287,23 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
             info.episodeLabel,
             style: const TextStyle(
               color: Colors.white70,
-              fontSize: 11,
+              fontSize: 10,
             ),
           ),
           const SizedBox(height: 2),
-          Row(
+          const Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.play_circle_outline,
                 color: Color(0xFF8F4EFF),
-                size: 12,
+                size: 11,
               ),
-              const SizedBox(width: 3),
-              const Text(
+              SizedBox(width: 3),
+              Text(
                 'Resume',
                 style: TextStyle(
                   color: Color(0xFF8F4EFF),
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: FontWeight.w500,
                 ),
               ),
