@@ -85,6 +85,8 @@ class RecommendRepository {
         final list = bannerResp.data as List;
         banners = list
             .map((json) => BannerItem.fromJson(json as Map<String, dynamic>))
+            .toList()
+            .reversed
             .toList();
       }
 

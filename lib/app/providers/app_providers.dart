@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_constants.dart';
@@ -74,6 +75,14 @@ final localeProvider =
     StateNotifierProvider<LocaleNotifier, Locale>((ref) {
   return LocaleNotifier(ref);
 });
+
+String formatDeviceLang(Locale locale) {
+  final languageCode = locale.languageCode.toLowerCase();
+  if (languageCode == 'ar') {
+    return 'ar-SA';
+  }
+  return 'en-US';
+}
 
 /// ============================================================================
 /// 主题模式状态管理器
@@ -152,15 +161,12 @@ class LocaleNotifier extends StateNotifier<Locale> {
     final storage = _ref.read(storageServiceProvider);
     await storage.setString('app_locale', locale.languageCode);
     // 3. 同步更新 deviceLangKey，下次请求的 X-Client header 立即生效
-    await storage.setString(AppConstants.deviceLangKey, locale.languageCode);
+    await storage.setString(
+      AppConstants.deviceLangKey,
+      formatDeviceLang(locale),
+    );
     // 4. 标记需要重启 App，让 main() 重新初始化所有 Provider 和接口
     await storage.setString(AppConstants.restartAppKey, 'true');
-  }
-
-  /// 将 Flutter Locale 格式化为 X-Client header 所需格式
-  String _formatLangCode(Locale locale) {
-    // 格式如 "en" / "ar"
-    return locale.languageCode;
   }
 
   /// 从本地存储加载语言设置

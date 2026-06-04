@@ -1,10 +1,14 @@
+import 'dart:ui' show Locale, PlatformDispatcher;
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../config/app_config.dart';
 import '../constants/api_error_code.dart';
+import '../constants/app_constants.dart';
 import '../model/api_endpoints.dart';
 import '../storage/storage_service.dart';
+import '../../app/providers/app_providers.dart';
 import 'dio_client.dart';
 
 /// ============================================================================
@@ -33,10 +37,30 @@ class ApiService {
   Dio get _dio => _dioClient.dio;
 
   String _buildXClientHeader() {
+    final savedLang = _storage.getString(AppConstants.deviceLangKey);
+    final locale = PlatformDispatcher.instance.locale;
+    final lang = _normalizeLang(savedLang, fallbackLocale: locale);
     final xClient = AppConfig.currentXClient;
     final version = AppConfig.appVersion;
     final osName = AppConfig.platformType;
-    return '$xClient;version=$version;osName=$osName;x-lang=en-US';
+    return '$xClient;version=$version;osName=$osName;x-lang=$lang';
+  }
+
+  String _normalizeLang(String? value, {Locale? fallbackLocale}) {
+    final normalized = value?.trim();
+    if (normalized == 'ar-SA') {
+      return 'ar-SA';
+    }
+    if (normalized == 'en-US') {
+      return 'en-US';
+    }
+    if (normalized == 'ar') {
+      return 'ar-SA';
+    }
+    if (normalized == 'en') {
+      return 'en-US';
+    }
+    return formatDeviceLang(fallbackLocale ?? const Locale('en'));
   }
 
   // ==================== 统一请求方法 ====================

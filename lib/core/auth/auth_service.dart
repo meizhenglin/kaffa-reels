@@ -1,6 +1,7 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/widgets.dart' show PlatformDispatcher;
 import 'package:uuid/uuid.dart';
 
 import '../network/api_service.dart';
@@ -225,10 +226,7 @@ class AuthService {
   /// 获取设备语言并保存到 Storage，用于 X-Client header
   Future<void> _saveDeviceLanguage() async {
     final locale = PlatformDispatcher.instance.locale;
-    String lang = '${locale.languageCode}-${locale.countryCode ?? ''}';
-    if (lang == '-' || lang.isEmpty) {
-      lang = 'en-US';
-    }
+    final lang = locale.languageCode.toLowerCase() == 'ar' ? 'ar-SA' : 'en-US';
     await _storage.setString(AppConstants.deviceLangKey, lang);
     debugPrint('[AuthService] device language saved: $lang');
   }

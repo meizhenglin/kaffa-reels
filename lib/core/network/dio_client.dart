@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show Locale, PlatformDispatcher;
 
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
@@ -259,23 +260,44 @@ class DioClient {
 
   String _buildXClientHeader() {
     final savedLang = _storage.getString(AppConstants.deviceLangKey);
-    final lang = (savedLang != null && savedLang.isNotEmpty)
-        ? savedLang
-        : _defaultLang;
+    final lang = _normalizeLang(savedLang);
     final xClient = AppConfig.currentXClient;
     final version = AppConfig.appVersion;
     final osName = AppConfig.platformType;
     return '$xClient;version=$version;osName=$osName;x-lang=$lang';
   }
 
+  String _normalizeLang(String? value) {
+    final normalized = value?.trim();
+    if (normalized == 'ar-SA') {
+      return 'ar-SA';
+    }
+    if (normalized == 'en-US') {
+      return 'en-US';
+    }
+    if (normalized == 'ar') {
+      return 'ar-SA';
+    }
+    if (normalized == 'en') {
+      return 'en-US';
+    }
+    return _defaultLang;
+  }
+
   static String get _defaultLang {
     try {
-      final locale = PlatformDispatcher.instance.locale;
-      final lang = '${locale.languageCode}-${locale.countryCode ?? ''}';
-      return lang.isNotEmpty ? lang : 'en-US';
+      return _normalizeLocale(PlatformDispatcher.instance.locale);
     } catch (_) {
       return 'en-US';
     }
+  }
+
+  static String _normalizeLocale(Locale locale) {
+    final languageCode = locale.languageCode.toLowerCase();
+    if (languageCode == 'ar') {
+      return 'ar-SA';
+    }
+    return 'en-US';
   }
 
   void setAuthToken(String? token) {

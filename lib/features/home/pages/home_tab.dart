@@ -61,35 +61,39 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
               context,
               title: l10n.topRecommend,
               onViewAll: () => context.push('/recommend/hot'),
+              topPadding: 30,
             ),
           ),
           SliverToBoxAdapter(
-            child: SizedBox(
-              height: 220,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 15),
-                itemCount: recommendState.topRecommend.isNotEmpty
-                    ? recommendState.topRecommend.length.clamp(0, 5)
-                    : 5,
-                itemBuilder: (context, index) {
-                  final drama = recommendState.topRecommend.isNotEmpty
-                      ? recommendState.topRecommend[index]
-                      : null;
-                  return _buildHorizontalCard(
-                    context,
-                    index,
-                    drama,
-                    onTap: drama != null
-                        ? () => openDramaPlayerWithVipCheck(
-                              context: context,
-                              drama: drama,
-                              authState: ref.watch(authProvider),
-                              memberState: ref.watch(memberStateProvider),
-                            )
-                        : null,
-                  );
-                },
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 30),
+              child: SizedBox(
+                height: 220,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 15),
+                  itemCount: recommendState.topRecommend.isNotEmpty
+                      ? recommendState.topRecommend.length.clamp(0, 5)
+                      : 5,
+                  itemBuilder: (context, index) {
+                    final drama = recommendState.topRecommend.isNotEmpty
+                        ? recommendState.topRecommend[index]
+                        : null;
+                    return _buildHorizontalCard(
+                      context,
+                      index,
+                      drama,
+                      onTap: drama != null
+                          ? () => openDramaPlayerWithVipCheck(
+                                context: context,
+                                drama: drama,
+                                authState: ref.watch(authProvider),
+                                memberState: ref.watch(memberStateProvider),
+                              )
+                          : null,
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -98,10 +102,11 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
               context,
               title: l10n.newForThisMonth,
               onViewAll: () => context.push('/recommend/all'),
+              topPadding: 0,
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 15),
+            padding: const EdgeInsets.fromLTRB(15, 0, 15, 30),
             sliver: SliverGrid(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
@@ -139,10 +144,11 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
               context,
               title: l10n.vipZone,
               onViewAll: () => context.go('/membership'),
+              topPadding: 0,
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(15, 0, 15, 15),
+            padding: const EdgeInsets.fromLTRB(30, 0, 15, 0),
             sliver: SliverGrid(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
@@ -226,17 +232,19 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     BuildContext context, {
     required String title,
     required VoidCallback onViewAll,
+    double topPadding = 0,
+    double bottomPadding = 12,
   }) {
-    final l10n = AppLocalizations.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 24, 14, 12),
+      padding: EdgeInsets.fromLTRB(16, topPadding, 14, bottomPadding),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             title,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
               color: Colors.white,
             ),
           ),
