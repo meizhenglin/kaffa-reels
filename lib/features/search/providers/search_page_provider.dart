@@ -2,8 +2,24 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/model/api_endpoints.dart';
 import '../../../core/network/api_service.dart';
 import '../../recommend/models/drama.dart';
+
+/// 推荐搜索词列表（剧名）
+final recommendedSearchListProvider =
+    FutureProvider<List<String>>((ref) async {
+  final resp = await apiServiceProvider.request(
+    ApiEndpoints.recommondSearchList,
+    method: 'POST',
+  );
+  if (!resp.isSuccess || resp.data == null) return [];
+  final list = resp.data as List;
+  return list
+      .map((item) => (item as Map)['rankingLabelName']?.toString() ?? '')
+      .where((s) => s.isNotEmpty)
+      .toList();
+});
 
 class SearchPageState {
   const SearchPageState({
@@ -95,10 +111,11 @@ class SearchPageNotifier extends StateNotifier<SearchPageState> {
   Future<void> _performSearch(String query, {required int page, required bool append}) async {
     state = state.copyWith(isLoadingResults: true, clearError: true);
     try {
-      final resp = await apiServiceProvider.getSearchList(keyword: query);
+      final resp = await apiServiceProvider.getSearchList(searchName: query);
       final List<Drama> results = [];
       if (resp.isSuccess && resp.data != null) {
-        final list = resp.data as List;
+        final map = resp.data as Map<String, dynamic>;
+        final list = map['searchResponse'] as List? ?? [];
         for (final json in list) {
           results.add(Drama.fromJson(json as Map<String, dynamic>));
         }

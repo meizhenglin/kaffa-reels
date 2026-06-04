@@ -347,10 +347,10 @@ class ApiService {
   }
 
   /// 搜索结果
-  Future<ApiResponse> getSearchList({required String keyword}) {
+  Future<ApiResponse> getSearchList({required String searchName}) {
     return request(
       ApiEndpoints.searchVideo,
-      data: {'keyword': keyword},
+      data: {'searchName': searchName},
     );
   }
 
@@ -648,13 +648,13 @@ class ApiService {
 
   /// 搜索视频
   Future<ApiResponse> searchVideo({
-    required String keyword,
+    required String searchName,
     int page = 1,
     int pageSize = 20,
   }) {
     return request(
       ApiEndpoints.searchVideo,
-      data: {'keyword': keyword, 'page': page, 'pageSize': pageSize},
+      data: {'searchName': searchName, 'page': page, 'pageSize': pageSize},
     );
   }
 }

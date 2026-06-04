@@ -154,10 +154,11 @@ class SearchNotifier extends StateNotifier<SearchState> {
   }) async {
     state = state.copyWith(isLoadingResults: true, clearError: true);
     try {
-      final resp = await apiServiceProvider.getSearchList(keyword: query);
+      final resp = await apiServiceProvider.getSearchList(searchName: query);
       final List<Drama> results = [];
       if (resp.isSuccess && resp.data != null) {
-        final list = resp.data as List;
+        final map = resp.data as Map<String, dynamic>;
+        final list = map['searchResponse'] as List? ?? [];
         for (final json in list) {
           results.add(Drama.fromJson(json as Map<String, dynamic>));
         }

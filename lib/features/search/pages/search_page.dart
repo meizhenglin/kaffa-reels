@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'dart:async' show Timer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
-import '../../../core/network/api_service.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../payment/providers/membership_provider.dart';
 import '../../recommend/models/drama.dart';
 import '../../recommend/utils/drama_navigation.dart';
-import '../../recommend/widgets/drama_card.dart';
 import '../providers/search_page_provider.dart';
 
 /// ============================================================================
@@ -29,9 +27,14 @@ class SearchPage extends ConsumerStatefulWidget {
   ConsumerState<SearchPage> createState() => _SearchPageState();
 }
 
-class _SearchPageState extends ConsumerState<SearchPage> {
+class _SearchPageState extends ConsumerState<SearchPage>
+    with SingleTickerProviderStateMixin {
   late final FocusNode _searchFocusNode;
   late final TextEditingController _searchController;
+  late final AnimationController _hintAnimController;
+  Timer? _hintTimer;
+
+  int _displayedWordIndex = 0;
 
   /// 排行数据（默认显示）
   List<Drama> get _rankingDramas {
@@ -40,22 +43,26 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     return ref.watch(rankingDramasProvider).value ?? [];
   }
 
+  List<String> get _words =>
+      ref.watch(recommendedSearchListProvider).value ?? [];
+
   @override
   void initState() {
     super.initState();
     _searchFocusNode = FocusNode();
     _searchController = TextEditingController(text: widget.initialQuery ?? '');
-    
-    // 添加焦点变化监听（调试用）
-    _searchFocusNode.addListener(() {
-      debugPrint('🔍 Focus changed: hasFocus = ${_searchFocusNode.hasFocus}');
-    });
-    
+    _hintAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _searchFocusNode.addListener(_onFocusChanged);
     Future.microtask(() {
       if (mounted) {
         ref.read(searchPageProvider.notifier).clearSearch();
         if (widget.initialQuery != null && widget.initialQuery!.isNotEmpty) {
           ref.read(searchPageProvider.notifier).submitSearch(widget.initialQuery!);
+        } else {
+          _startHintScroll();
         }
       }
     });
@@ -63,16 +70,12 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
   @override
   void dispose() {
+    _hintTimer?.cancel();
+    _hintAnimController.dispose();
     _searchFocusNode.unfocus();
     _searchFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
-  }
-
-  void _onSubmitted(String query) {
-    // 不强制取消焦点，让系统自然处理键盘
-    if (query.trim().isEmpty) return;
-    ref.read(searchPageProvider.notifier).submitSearch(query);
   }
 
   void _onDramaTap(Drama drama) {
@@ -96,7 +99,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           child: Column(
             children: [
               _buildSearchBar(),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
               if (!hasSearch) ...[
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
@@ -126,18 +129,45 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     );
   }
 
+  void _onFocusChanged() {
+    if (_searchFocusNode.hasFocus) {
+      _hintTimer?.cancel();
+      setState(() {});
+    } else if (_searchController.text.isEmpty) {
+      _startHintScroll();
+      setState(() {});
+    }
+  }
+
+  void _startHintScroll() {
+    _hintTimer?.cancel();
+    _hintAnimController.forward(from: 0);
+    _hintTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted) return;
+      setState(() {
+        _displayedWordIndex = (_displayedWordIndex + 1) % _words.length;
+      });
+      _hintAnimController.forward(from: 0);
+    });
+  }
+
+  void _onSubmitted(String query) {
+    // 不强制取消焦点，让系统自然处理键盘
+    if (query.trim().isEmpty) return;
+    ref.read(searchPageProvider.notifier).submitSearch(query);
+  }
+
   Widget _buildSearchBar() {
-    // 使用 RepaintBoundary 隔离搜索栏，避免键盘动画导致整个页面重绘
+    final words = _words;
+    final isFocused = _searchFocusNode.hasFocus;
+    final showHint = words.isNotEmpty && !isFocused;
     return RepaintBoundary(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 15, 16, 12),
         child: Row(
           children: [
             GestureDetector(
-              onTap: () {
-                // 直接返回，不强制隐藏键盘
-                context.pop();
-              },
+              onTap: () => context.pop(),
               child: const Image(
                 image: AssetImage('assets/images/back_icon.png'),
                 width: 20,
@@ -148,59 +178,99 @@ class _SearchPageState extends ConsumerState<SearchPage> {
             SizedBox(
               width: 320,
               height: 34,
-              child: TextField(
-                controller: _searchController,
-                focusNode: _searchFocusNode,
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  hintText: 'Search dramas...',
-                  prefixIcon: const Padding(
-                    padding: EdgeInsets.only(left: 14, right: 6),
-                    child: Image(
-                      image: AssetImage('assets/images/searchPage_icon.png'),
-                      width: 14,
-                      height: 14,
-                    ),
-                  ),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? GestureDetector(
-                          onTap: () {
-                            _searchController.clear();
-                            ref.read(searchPageProvider.notifier).clearSearch();
-                            // 清空时触发重建（频率很低，可以接受）
-                            setState(() {});
-                          },
-                          child: const Icon(Icons.clear, color: Color(0xFF999999), size: 18),
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: const Color(0x1AFFFFFF),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(50),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(50),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(50),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                  hintStyle: const TextStyle(color: Color(0x80FFFFFF), fontSize: 14),
-                ),
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                onChanged: (v) {
-                  // 只更新 Provider 状态，不触发 setState
-                  ref.read(searchPageProvider.notifier).setQuery(v);
-                },
-                onSubmitted: _onSubmitted,
-              ),
+              child: showHint
+                  ? Stack(
+                      children: [
+                        _buildTextField(),
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: 46),
+                                child: ClipRect(
+                                  child: SlideTransition(
+                                    position: Tween<Offset>(
+                                      begin: const Offset(0, 0.5),
+                                      end: Offset.zero,
+                                    ).animate(CurvedAnimation(
+                                      parent: _hintAnimController,
+                                      curve: Curves.easeOut,
+                                    )),
+                                    child: FadeTransition(
+                                      opacity: _hintAnimController,
+                                      child: Text(
+                                        words[_displayedWordIndex % words.length],
+                                        style: const TextStyle(
+                                          color: Color(0x80FFFFFF),
+                                          fontSize: 14,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : _buildTextField(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTextField() {
+    return TextField(
+      controller: _searchController,
+      focusNode: _searchFocusNode,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        prefixIcon: const Padding(
+          padding: EdgeInsets.only(left: 14, right: 6),
+          child: Image(
+            image: AssetImage('assets/images/searchPage_icon.png'),
+            width: 14,
+            height: 14,
+          ),
+        ),
+        suffixIcon: _searchController.text.isNotEmpty
+            ? GestureDetector(
+                onTap: () {
+                  _searchController.clear();
+                  ref.read(searchPageProvider.notifier).clearSearch();
+                  setState(() {});
+                },
+                child: const Icon(Icons.clear, color: Color(0xFF999999), size: 18),
+              )
+            : null,
+        filled: true,
+        fillColor: const Color(0x1AFFFFFF),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(50),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        hintStyle: const TextStyle(color: Color(0x80FFFFFF), fontSize: 14),
+      ),
+      style: const TextStyle(color: Colors.white, fontSize: 14),
+      onChanged: (v) {
+        ref.read(searchPageProvider.notifier).setQuery(v);
+        setState(() {});
+      },
+      onSubmitted: _onSubmitted,
     );
   }
 

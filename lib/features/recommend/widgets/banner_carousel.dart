@@ -201,12 +201,9 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
                   ),
                   const SizedBox(width: 8),
                   _ActionButton(
-                    // icon: Icons.workspace_premium_rounded,
-
-                    onTap: () {},
+                    onTap: () => context.push('/membership'),
                     isVip: true,
-                    // child:Image(image:  AssetImage('assets/images/search.png'),width: 24,height: 24,),
-                    child:Image.asset('assets/images/vip_icon.png',width: 32,height: 32,)
+                    child: Image.asset('assets/images/vip_icon.png', width: 32, height: 32),
 
                   ),
                 ],
