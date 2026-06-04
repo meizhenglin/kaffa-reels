@@ -45,6 +45,9 @@ class RecommendState {
     this.hotPicks = const [],
     this.charts = const [],
     this.newEpisodes = const [],
+    this.topRecommend = const [],
+    this.newForThisMonth = const [],
+    this.vipZone = const [],
     this.isRefreshing = false,
     this.isLoadingMore = false,
     this.hasMore = true,
@@ -67,6 +70,15 @@ class RecommendState {
 
   /// 最新剧集列表（瀑布流）
   final List<Drama> newEpisodes;
+
+  /// Top Recommend（videoHotListType=2）
+  final List<Drama> topRecommend;
+
+  /// New For This Month（videoHotListType=5）
+  final List<Drama> newForThisMonth;
+
+  /// VIP Zone（videoHotListType=6）
+  final List<Drama> vipZone;
 
   // ==================== 加载状态标志 ====================
   /// 是否正在下拉刷新
@@ -101,6 +113,9 @@ class RecommendState {
     List<Drama>? hotPicks,
     List<Drama>? charts,
     List<Drama>? newEpisodes,
+    List<Drama>? topRecommend,
+    List<Drama>? newForThisMonth,
+    List<Drama>? vipZone,
     bool? isRefreshing,
     bool? isLoadingMore,
     bool? hasMore,
@@ -114,6 +129,9 @@ class RecommendState {
       hotPicks: hotPicks ?? this.hotPicks,
       charts: charts ?? this.charts,
       newEpisodes: newEpisodes ?? this.newEpisodes,
+      topRecommend: topRecommend ?? this.topRecommend,
+      newForThisMonth: newForThisMonth ?? this.newForThisMonth,
+      vipZone: vipZone ?? this.vipZone,
       isRefreshing: isRefreshing ?? this.isRefreshing,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       hasMore: hasMore ?? this.hasMore,
@@ -160,12 +178,20 @@ class RecommendNotifier extends StateNotifier<RecommendState> {
     );
     try {
       final feed = await _repository.fetchFeed(page: 1);
+      final results = await Future.wait([
+        _repository.fetchVideoHotPicks(videoHotListType: 2), // Top Recommend
+        _repository.fetchVideoHotPicks(videoHotListType: 5), // New For This Month
+        _repository.fetchVideoHotPicks(videoHotListType: 6), // VIP Zone
+      ]);
       state = state.copyWith(
         status: RecommendStatus.success,
         banners: feed.banners,
         hotPicks: feed.hotPicks,
         charts: feed.charts,
         newEpisodes: feed.newEpisodes,
+        topRecommend: results[0],
+        newForThisMonth: results[1],
+        vipZone: results[2],
         hasMore: feed.hasMore,
         page: 1,
       );
@@ -184,12 +210,20 @@ class RecommendNotifier extends StateNotifier<RecommendState> {
     state = state.copyWith(isRefreshing: true, clearError: true);
     try {
       final feed = await _repository.fetchFeed(page: 1);
+      final results = await Future.wait([
+        _repository.fetchVideoHotPicks(videoHotListType: 2), // Top Recommend
+        _repository.fetchVideoHotPicks(videoHotListType: 5), // New For This Month
+        _repository.fetchVideoHotPicks(videoHotListType: 6), // VIP Zone
+      ]);
       state = state.copyWith(
         status: RecommendStatus.success,
         banners: feed.banners,
         hotPicks: feed.hotPicks,
         charts: feed.charts,
         newEpisodes: feed.newEpisodes,
+        topRecommend: results[0],
+        newForThisMonth: results[1],
+        vipZone: results[2],
         hasMore: feed.hasMore,
         page: 1,
         isRefreshing: false,

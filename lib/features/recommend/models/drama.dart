@@ -50,23 +50,24 @@ class Drama extends Equatable {
   String get formattedViews => views.toString();
 
   /// 从 JSON 创建 Drama 对象
+  /// API 返回字段映射：
+  ///   videoId       → id
+  ///   videoName     → title
+  ///   videoPicture  → coverUrl
+  ///   videoIntroduce → description
+  ///   videoEpisodes → episodeCount
   factory Drama.fromJson(Map<String, dynamic> json) {
     return Drama(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      coverUrl: json['coverUrl'] as String,
-      views: json['views'] as int,
-      rating: (json['rating'] as num).toDouble(),
-      description: json['description'] as String,
-      episodeCount: json['episodeCount'] as int,
+      id: '${json['videoId'] ?? 0}',
+      title: json['videoName'] as String? ?? '',
+      coverUrl: json['videoPicture'] as String? ?? '',
+      views: json['views'] as int? ?? 0,
+      rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
+      description: json['videoIntroduce'] as String? ?? '',
+      episodeCount: json['videoEpisodes'] as int? ?? 0,
       isVipOnly: json['isVipOnly'] as bool? ?? false,
       videoUrl: json['videoUrl'] as String?,
-      badge: json['badge'] != null
-          ? DramaBadge.values.firstWhere(
-              (e) => e.name == json['badge'],
-              orElse: () => DramaBadge.hot,
-            )
-          : null,
+      badge: null,
       aspectRatio: (json['aspectRatio'] as num?)?.toDouble() ?? 0.72,
     );
   }

@@ -70,14 +70,26 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 15),
-                itemCount: recommendState.hotPicks.isNotEmpty
-                    ? recommendState.hotPicks.length.clamp(0, 5)
+                itemCount: recommendState.topRecommend.isNotEmpty
+                    ? recommendState.topRecommend.length.clamp(0, 5)
                     : 5,
                 itemBuilder: (context, index) {
-                  final drama = recommendState.hotPicks.isNotEmpty
-                      ? recommendState.hotPicks[index]
+                  final drama = recommendState.topRecommend.isNotEmpty
+                      ? recommendState.topRecommend[index]
                       : null;
-                  return _buildHorizontalCard(context, index, drama);
+                  return _buildHorizontalCard(
+                    context,
+                    index,
+                    drama,
+                    onTap: drama != null
+                        ? () => openDramaPlayerWithVipCheck(
+                              context: context,
+                              drama: drama,
+                              authState: ref.watch(authProvider),
+                              memberState: ref.watch(memberStateProvider),
+                            )
+                        : null,
+                  );
                 },
               ),
             ),
@@ -99,13 +111,27 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
                 childAspectRatio: 165 / 224,
               ),
               delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildDramaCard(
+                  (context, index) => _buildDramaCard(
                   context,
                   recommendState,
                   index,
                   isNewThisMonth: true,
+                  onTap: recommendState.newForThisMonth.isNotEmpty &&
+                          index < recommendState.newForThisMonth.length
+                      ? () {
+                          final drama = recommendState.newForThisMonth[index];
+                          openDramaPlayerWithVipCheck(
+                            context: context,
+                            drama: drama,
+                            authState: ref.watch(authProvider),
+                            memberState: ref.watch(memberStateProvider),
+                          );
+                        }
+                      : null,
                 ),
-                childCount: 4,
+                childCount: recommendState.newForThisMonth.isNotEmpty
+                    ? recommendState.newForThisMonth.length.clamp(0, 4)
+                    : 4,
               ),
             ),
           ),
@@ -126,9 +152,28 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
                 childAspectRatio: 106 / 150,
               ),
               delegate: SliverChildBuilderDelegate(
-                (context, index) =>
-                    _buildVipCard(context, recommendState, index),
-                childCount: 6,
+                (context, index) {
+                  final drama = recommendState.vipZone.isNotEmpty &&
+                          index < recommendState.vipZone.length
+                      ? recommendState.vipZone[index]
+                      : null;
+                  return _buildVipCard(
+                    context,
+                    recommendState,
+                    index,
+                    onTap: drama != null
+                        ? () => openDramaPlayerWithVipCheck(
+                              context: context,
+                              drama: drama,
+                              authState: ref.watch(authProvider),
+                              memberState: ref.watch(memberStateProvider),
+                            )
+                        : null,
+                  );
+                },
+                childCount: recommendState.vipZone.isNotEmpty
+                    ? recommendState.vipZone.length.clamp(0, 6)
+                    : 6,
               ),
             ),
           ),
@@ -215,9 +260,10 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     RecommendState state,
     int index, {
     bool isNewThisMonth = false,
+    VoidCallback? onTap,
   }) {
     final source = isNewThisMonth
-        ? state.newEpisodes
+        ? state.newForThisMonth
         : state.newEpisodes;
     final drama = source.isNotEmpty && index < source.length
         ? source[index]
@@ -232,14 +278,7 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
         children: [
           Expanded(
             child: GestureDetector(
-              onTap: drama != null
-                  ? () => openDramaPlayerWithVipCheck(
-                        context: context,
-                        drama: drama,
-                        authState: ref.watch(authProvider),
-                        memberState: ref.watch(memberStateProvider),
-                      )
-                  : null,
+              onTap: onTap,
               child: coverUrl == null
                   ? const Center(
                       child: Icon(
@@ -299,10 +338,15 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     );
   }
 
-  Widget _buildVipCard(BuildContext context, RecommendState state, int index) {
-    // VIP 使用热门数据
-    final drama = state.hotPicks.isNotEmpty && index < state.hotPicks.length
-        ? state.hotPicks[index]
+  Widget _buildVipCard(
+    BuildContext context,
+    RecommendState state,
+    int index, {
+    VoidCallback? onTap,
+  }) {
+    // VIP Zone 使用 vipZone 数据
+    final drama = state.vipZone.isNotEmpty && index < state.vipZone.length
+        ? state.vipZone[index]
         : null;
     final coverUrl = drama?.coverUrl;
 
@@ -314,14 +358,7 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
         children: [
           Expanded(
             child: GestureDetector(
-              onTap: drama != null
-                  ? () => openDramaPlayerWithVipCheck(
-                        context: context,
-                        drama: drama,
-                        authState: ref.watch(authProvider),
-                        memberState: ref.watch(memberStateProvider),
-                      )
-                  : null,
+              onTap: onTap,
               child: Stack(
                 children: [
                   coverUrl != null
@@ -421,7 +458,12 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     );
   }
 
-  Widget _buildHorizontalCard(BuildContext context, int index, Drama? drama) {
+  Widget _buildHorizontalCard(
+    BuildContext context,
+    int index,
+    Drama? drama, {
+    VoidCallback? onTap,
+  }) {
     final coverUrl = drama?.coverUrl;
 
     return Padding(
@@ -433,14 +475,7 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
           mainAxisSize: MainAxisSize.min,
           children: [
             GestureDetector(
-              onTap: drama != null
-                  ? () => openDramaPlayerWithVipCheck(
-                        context: context,
-                        drama: drama,
-                        authState: ref.watch(authProvider),
-                        memberState: ref.watch(memberStateProvider),
-                      )
-                  : null,
+              onTap: onTap,
               child: Stack(
                 children: [
                   coverUrl != null

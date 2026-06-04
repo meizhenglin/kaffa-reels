@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/auth/auth_service.dart';
+import '../../../core/model/api_endpoints.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/network/dio_client.dart';
 import '../models/banner.dart';
@@ -153,6 +154,37 @@ class RecommendRepository {
     return list
         .map((json) => BannerItem.fromJson(json as Map<String, dynamic>))
         .toList();
+  }
+
+  // ==================== 热门精选 API ====================
+
+  /// 获取热门精选列表
+  /// 对应 /api/videoHotPicks/list
+  /// [videoHotListType] 2=Top Recommend  5=New For This Month  6=VIP Zone
+  Future<List<Drama>> fetchVideoHotPicks({required int videoHotListType}) async {
+    final token = await _authService.ensureToken();
+    if (token == null) return [];
+
+    try {
+      _dioClient.setAuthToken(token);
+      final response = await _dioClient.dio.post(
+        ApiEndpoints.videoHotPicks,
+        data: {'videoHotListType': videoHotListType},
+      );
+      final data = response.data as Map<String, dynamic>;
+      debugPrint('[VideoHotPicks] type=$videoHotListType code=${data['code']} data=${data['data']}');
+
+      if (data['code'] == 0 || data['code'] == 200) {
+        // API 返回结构：{ code, msg, data: { records: [...] } }
+        final records = data['data']?['records'] as List? ?? [];
+        return records
+            .map((json) => Drama.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
+    } on DioException {
+      // ignore
+    }
+    return [];
   }
 
   // ==================== 单集播放地址 ====================
