@@ -26,7 +26,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   void initState() {
     super.initState();
     Future.microtask(() {
-      ref.read(recommendProvider.notifier).loadInitial();
+      ref.read(membershipDramaProvider.notifier).load();
     });
   }
 
@@ -104,7 +104,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final recommendState = ref.watch(recommendProvider);
+    final recommendState = ref.watch(membershipDramaProvider);
     final memberState = ref.watch(memberStateProvider);
 
     if (memberState.isVip && !memberState.isExpired) {
@@ -206,7 +206,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   }
 
   /// 3. 剧卡片横向滚动区：高 137
-  Widget _buildDramaSection(RecommendState recommendState) {
+  Widget _buildDramaSection(MembershipDramaState recommendState) {
     final dramas = recommendState.vipZone.isNotEmpty
         ? recommendState.vipZone
         : (recommendState.topRecommend.isNotEmpty

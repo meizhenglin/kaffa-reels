@@ -168,8 +168,63 @@ class RecommendNotifier extends StateNotifier<RecommendState> {
 
   final RecommendRepository _repository;
 
-  // ==================== 初始加载 ====================
-  /// 加载初始数据（需在 Tab 可见时手动调用）
+  Future<({List<Drama> topRecommend, List<Drama> newForThisMonth, List<Drama> vipZone})>
+  _fetchHomeHotSections() async {
+    final results = await Future.wait([
+      _repository.fetchVideoHotPicks(videoHotListType: 2),
+      _repository.fetchVideoHotPicks(videoHotListType: 5),
+      _repository.fetchVideoHotPicks(videoHotListType: 6),
+    ]);
+
+    return (
+      topRecommend: results[0],
+      newForThisMonth: results[1],
+      vipZone: results[2],
+    );
+  }
+
+  /// 加载首页展示数据（不包含 Recommend Tab 的 recommendIndex）
+  Future<void> loadHomeSections({bool refresh = false}) async {
+    if (refresh && state.isRefreshing) return;
+
+    state = state.copyWith(
+      status: RecommendStatus.loading,
+      isRefreshing: refresh,
+      clearError: true,
+    );
+
+    try {
+      final bannerResp = await apiServiceProvider.getTheaterBanner();
+      List<BannerItem> banners = [];
+      if (bannerResp.isSuccess && bannerResp.data != null) {
+        final list = bannerResp.data as List;
+        banners = list
+            .map((json) => BannerItem.fromJson(json as Map<String, dynamic>))
+            .toList()
+            .reversed
+            .toList();
+      }
+
+      final sections = await _fetchHomeHotSections();
+
+      state = state.copyWith(
+        status: RecommendStatus.success,
+        banners: banners,
+        topRecommend: sections.topRecommend,
+        newForThisMonth: sections.newForThisMonth,
+        vipZone: sections.vipZone,
+        isRefreshing: false,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        status: RecommendStatus.error,
+        isRefreshing: false,
+        errorMessage: e.toString(),
+      );
+    }
+  }
+
+  /// 加载推荐页数据（包含 recommendIndex + 首页列表）
   Future<void> loadInitial() async {
     state = state.copyWith(
       status: RecommendStatus.loading,
@@ -177,20 +232,16 @@ class RecommendNotifier extends StateNotifier<RecommendState> {
     );
     try {
       final feed = await _repository.fetchFeed(page: 1);
-      final results = await Future.wait([
-        _repository.fetchVideoHotPicks(videoHotListType: 2), // Top Recommend
-        _repository.fetchVideoHotPicks(videoHotListType: 5), // New For This Month
-        _repository.fetchVideoHotPicks(videoHotListType: 6), // VIP Zone
-      ]);
+      final sections = await _fetchHomeHotSections();
       state = state.copyWith(
         status: RecommendStatus.success,
         banners: feed.banners,
         hotPicks: feed.hotPicks,
         charts: feed.charts,
         newEpisodes: feed.newEpisodes,
-        topRecommend: results[0],
-        newForThisMonth: results[1],
-        vipZone: results[2],
+        topRecommend: sections.topRecommend,
+        newForThisMonth: sections.newForThisMonth,
+        vipZone: sections.vipZone,
         hasMore: feed.hasMore,
         page: 1,
       );
@@ -205,34 +256,7 @@ class RecommendNotifier extends StateNotifier<RecommendState> {
   // ==================== 下拉刷新 ====================
   /// 刷新数据
   Future<void> refresh() async {
-    if (state.isRefreshing) return;
-    state = state.copyWith(isRefreshing: true, clearError: true);
-    try {
-      final feed = await _repository.fetchFeed(page: 1);
-      final results = await Future.wait([
-        _repository.fetchVideoHotPicks(videoHotListType: 2), // Top Recommend
-        _repository.fetchVideoHotPicks(videoHotListType: 5), // New For This Month
-        _repository.fetchVideoHotPicks(videoHotListType: 6), // VIP Zone
-      ]);
-      state = state.copyWith(
-        status: RecommendStatus.success,
-        banners: feed.banners,
-        hotPicks: feed.hotPicks,
-        charts: feed.charts,
-        newEpisodes: feed.newEpisodes,
-        topRecommend: results[0],
-        newForThisMonth: results[1],
-        vipZone: results[2],
-        hasMore: feed.hasMore,
-        page: 1,
-        isRefreshing: false,
-      );
-    } catch (e) {
-      state = state.copyWith(
-        isRefreshing: false,
-        errorMessage: e.toString(),
-      );
-    }
+    await loadHomeSections(refresh: true);
   }
 
   // ==================== 分页加载 ====================
@@ -358,6 +382,88 @@ class VideoFeedNotifier extends StateNotifier<VideoFeedState> {
     }
   }
 }
+
+class MembershipDramaState {
+  const MembershipDramaState({
+    this.status = RecommendStatus.initial,
+    this.topRecommend = const [],
+    this.vipZone = const [],
+    this.errorMessage,
+  });
+
+  final RecommendStatus status;
+  final List<Drama> topRecommend;
+  final List<Drama> vipZone;
+  final String? errorMessage;
+
+  bool get isLoading => status == RecommendStatus.loading;
+  bool get hasError => status == RecommendStatus.error;
+
+  MembershipDramaState copyWith({
+    RecommendStatus? status,
+    List<Drama>? topRecommend,
+    List<Drama>? vipZone,
+    String? errorMessage,
+    bool clearError = false,
+  }) {
+    return MembershipDramaState(
+      status: status ?? this.status,
+      topRecommend: topRecommend ?? this.topRecommend,
+      vipZone: vipZone ?? this.vipZone,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+    );
+  }
+}
+
+class MembershipDramaNotifier extends StateNotifier<MembershipDramaState> {
+  MembershipDramaNotifier(this._repository)
+      : super(const MembershipDramaState());
+
+  final RecommendRepository _repository;
+
+  Future<({List<Drama> topRecommend, List<Drama> vipZone})>
+  _fetchMembershipSections() async {
+    final results = await Future.wait([
+      _repository.fetchVideoHotPicks(videoHotListType: 2),
+      _repository.fetchVideoHotPicks(videoHotListType: 6),
+    ]);
+
+    return (
+      topRecommend: results[0],
+      vipZone: results[1],
+    );
+  }
+
+  Future<void> load() async {
+    if (state.isLoading) return;
+
+    state = state.copyWith(
+      status: RecommendStatus.loading,
+      clearError: true,
+    );
+
+    try {
+      final sections = await _fetchMembershipSections();
+
+      state = state.copyWith(
+        status: RecommendStatus.success,
+        topRecommend: sections.topRecommend,
+        vipZone: sections.vipZone,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        status: RecommendStatus.error,
+        errorMessage: e.toString(),
+      );
+    }
+  }
+}
+
+final membershipDramaProvider =
+    StateNotifierProvider<MembershipDramaNotifier, MembershipDramaState>((ref) {
+  final repository = ref.read(recommendRepositoryProvider);
+  return MembershipDramaNotifier(repository);
+});
 
 /// 沉浸式视频流 Provider
 final videoFeedProvider =

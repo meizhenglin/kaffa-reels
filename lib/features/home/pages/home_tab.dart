@@ -27,7 +27,7 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
   void initState() {
     super.initState();
     Future.microtask(() {
-      ref.read(recommendProvider.notifier).loadInitial();
+      ref.read(recommendProvider.notifier).loadHomeSections();
     });
   }
 
@@ -62,16 +62,17 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
               title: l10n.topRecommend,
               onViewAll: () => context.push('/recommend/hot'),
               topPadding: 30,
+              // bottomPadding: 0,
             ),
           ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 30),
               child: SizedBox(
-                height: 220,
+                height: 175,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 15),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
                   itemCount: recommendState.topRecommend.isNotEmpty
                       ? recommendState.topRecommend.length.clamp(0, 5)
                       : 5,
@@ -105,38 +106,10 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
               topPadding: 0,
             ),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(15, 0, 15, 30),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 15,
-                crossAxisSpacing: 15,
-                childAspectRatio: 165 / 224,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                  (context, index) => _buildDramaCard(
-                  context,
-                  recommendState,
-                  index,
-                  isNewThisMonth: true,
-                  onTap: recommendState.newForThisMonth.isNotEmpty &&
-                          index < recommendState.newForThisMonth.length
-                      ? () {
-                          final drama = recommendState.newForThisMonth[index];
-                          openDramaPlayerWithVipCheck(
-                            context: context,
-                            drama: drama,
-                            authState: ref.watch(authProvider),
-                            memberState: ref.watch(memberStateProvider),
-                          );
-                        }
-                      : null,
-                ),
-                childCount: recommendState.newForThisMonth.isNotEmpty
-                    ? recommendState.newForThisMonth.length.clamp(0, 4)
-                    : 4,
-              ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+              child: _buildNewForThisMonthSection(context, recommendState),
             ),
           ),
           SliverToBoxAdapter(
@@ -144,11 +117,11 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
               context,
               title: l10n.vipZone,
               onViewAll: () => context.go('/membership'),
-              topPadding: 0,
+              topPadding: 30,
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(30, 0, 15, 0),
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
             sliver: SliverGrid(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
@@ -188,7 +161,7 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
   }
 
   Future<void> _onRefresh() async {
-    await ref.read(recommendProvider.notifier).refresh();
+    await ref.read(recommendProvider.notifier).loadHomeSections(refresh: true);
   }
 
   List<BannerItem> _buildMockBanners() {
@@ -232,11 +205,11 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     BuildContext context, {
     required String title,
     required VoidCallback onViewAll,
-    double topPadding = 0,
-    double bottomPadding = 12,
+    double topPadding = 15,
+    double bottomPadding = 15,
   }) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, topPadding, 14, bottomPadding),
+      padding: EdgeInsets.fromLTRB(14, topPadding, 14, bottomPadding),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -262,19 +235,65 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     );
   }
 
-  Widget _buildDramaCard(
+  Widget _buildNewForThisMonthSection(
     BuildContext context,
     RecommendState state,
+  ) {
+    const visibleCount = 4;
+    final items = state.newForThisMonth.isNotEmpty
+        ? state.newForThisMonth.take(visibleCount).toList()
+        : List<Drama?>.filled(visibleCount, null);
+
+    return Column(
+      children: List.generate(2, (rowIndex) {
+        final leftIndex = rowIndex * 2;
+        final rightIndex = leftIndex + 1;
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: rowIndex == 0 ? 15 : 0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildDramaCardFromDrama(
+                context,
+                items[leftIndex],
+                leftIndex,
+                onTap: items[leftIndex] != null
+                    ? () => openDramaPlayerWithVipCheck(
+                          context: context,
+                          drama: items[leftIndex]!,
+                          authState: ref.watch(authProvider),
+                          memberState: ref.watch(memberStateProvider),
+                        )
+                    : null,
+              ),
+              _buildDramaCardFromDrama(
+                context,
+                items[rightIndex],
+                rightIndex,
+                onTap: items[rightIndex] != null
+                    ? () => openDramaPlayerWithVipCheck(
+                          context: context,
+                          drama: items[rightIndex]!,
+                          authState: ref.watch(authProvider),
+                          memberState: ref.watch(memberStateProvider),
+                        )
+                    : null,
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildDramaCardFromDrama(
+    BuildContext context,
+    Drama? drama,
     int index, {
-    bool isNewThisMonth = false,
     VoidCallback? onTap,
   }) {
-    final source = isNewThisMonth
-        ? state.newForThisMonth
-        : state.newEpisodes;
-    final drama = source.isNotEmpty && index < source.length
-        ? source[index]
-        : null;
     final coverUrl = drama?.coverUrl;
 
     return SizedBox(
@@ -283,35 +302,31 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: onTap,
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: AspectRatio(
-                      aspectRatio: drama?.aspectRatio ?? 165 / 224,
-                      child: PreloadNetworkImage(
-                        imageUrl: coverUrl ?? '',
-                        preloadAsset: 'assets/images/small_preload_bg.png',
-                        fit: BoxFit.cover,
-                      ),
+          GestureDetector(
+            onTap: onTap,
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: PreloadNetworkImage(
+                    imageUrl: coverUrl ?? '',
+                    preloadAsset: 'assets/images/small_preload_bg.png',
+                    width: 165,
+                    height: 224,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                if (drama != null && drama.isVipOnly)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    child: Image.asset(
+                      'assets/images/home_vip_icon.png',
+                      width: 42,
+                      height: 18,
                     ),
                   ),
-                  // VIP 角标（仅 isVipOnly 显示）
-                  if (drama != null && drama.isVipOnly)
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      child: Image.asset(
-                        'assets/images/home_vip_icon.png',
-                        width: 42,
-                        height: 18,
-                      ),
-                    ),
-                ],
-              ),
+              ],
             ),
           ),
           const SizedBox(height: 8),
@@ -323,16 +338,6 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          // if (drama != null)
-          //   Text(
-          //     '${drama.formattedViews} views • ${drama.episodeCount} episodes',
-          //     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          //       color: Colors.white60,
-          //       fontSize: 10,
-          //     ),
-          //     maxLines: 1,
-          //     overflow: TextOverflow.ellipsis,
-          //   ),
         ],
       ),
     );
@@ -396,50 +401,6 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
             overflow: TextOverflow.ellipsis,
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBadgeOverlay(Drama? drama) {
-    if (drama?.badge == null) return const SizedBox.shrink();
-
-    Color badgeColor;
-    String badgeText;
-
-    switch (drama!.badge!.name) {
-      case 'hot':
-        badgeColor = Colors.red;
-        badgeText = 'HOT';
-        break;
-      case 'update':
-        badgeColor = Colors.green;
-        badgeText = 'NEW';
-        break;
-      case 'exclusive':
-        badgeColor = Colors.purple;
-        badgeText = 'VIP';
-        break;
-      default:
-        return const SizedBox.shrink();
-    }
-
-    return Positioned(
-      top: 8,
-      left: 8,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: badgeColor,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(
-          badgeText,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
       ),
     );
   }
