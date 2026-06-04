@@ -9,7 +9,7 @@ class AppLocalizationsAr extends AppLocalizations {
   AppLocalizationsAr([String locale = 'ar']) : super(locale);
 
   @override
-  String get appTitle => 'المسلسلات العربية';
+  String get appTitle => 'قهوة تي في';
 
   @override
   String get bottomNav_home => 'الرئيسية';
@@ -302,7 +302,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get appDescription =>
-      'Your premium destination for Arabic short dramas. Watch the best Arabic series and exclusive content anytime, anywhere.';
+      'Your premium destination for short dramas. Watch the best series and exclusive content anytime, anywhere.';
 
   @override
   String get privacyPolicy => 'Privacy Policy';

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_aliplayer/flutter_aliplayer.dart';
 import 'package:go_router/go_router.dart';
-import 'package:arab_drama_app/l10n/app_localizations.dart';
+import 'package:qahwa_tv/l10n/app_localizations.dart';
+
+import '_aliplayer_log_stub.dart'
+    if (dart.library.io) '_aliplayer_log_native.dart'
+    as aliplayer_impl;
 
 import 'app/providers/app_providers.dart';
 import 'app/router/router_config.dart';
@@ -11,7 +14,6 @@ import 'app/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
 import 'core/firebase/firebase_service.dart';
 import 'core/providers/auth_provider.dart';
-import 'core/storage/storage_service.dart';
 
 Future<void> _withTimeout(Future<void> future, Duration timeout) async {
   try {
@@ -25,9 +27,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   debugPrint('[MAIN] WidgetsFlutterBinding ready');
 
-  // 关闭阿里云播放器日志（只保留 API 请求日志）
-  FlutterAliplayer.enableConsoleLog(false);
-  FlutterAliplayer.setLogLevel(LogLevel.AF_LOG_LEVEL_NONE);
+  // 关闭阿里云播放器日志（仅非 Web 平台）
+  await aliplayer_impl.AliPlayerLog.init();
 
   // Firebase 初始化
   await _withTimeout(
@@ -37,19 +38,19 @@ void main() async {
 
   runApp(
     ProviderScope(
-      child: const ArabDramaApp(),
+      child: const QahwaTVApp(),
     ),
   );
 }
 
-class ArabDramaApp extends ConsumerStatefulWidget {
-  const ArabDramaApp({super.key});
+class QahwaTVApp extends ConsumerStatefulWidget {
+  const QahwaTVApp({super.key});
 
   @override
-  ConsumerState<ArabDramaApp> createState() => _ArabDramaAppState();
+  ConsumerState<QahwaTVApp> createState() => _QahwaTVAppState();
 }
 
-class _ArabDramaAppState extends ConsumerState<ArabDramaApp> {
+class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
   @override
   void initState() {
     super.initState();

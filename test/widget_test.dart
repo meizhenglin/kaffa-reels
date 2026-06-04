@@ -4,9 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:arab_drama_app/main.dart';
-import 'package:arab_drama_app/core/storage/storage_service.dart';
-import 'package:arab_drama_app/app/providers/app_providers.dart';
+import 'package:qahwa_tv/main.dart';
+import 'package:qahwa_tv/core/storage/storage_service.dart';
+import 'package:qahwa_tv/app/providers/app_providers.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -52,7 +52,7 @@ void main() {
         overrides: [
           storageServiceProvider.overrideWithValue(storage),
         ],
-        child: const ArabDramaApp(),
+        child: const QahwaTVApp(),
       ),
     );
     await tester.pumpAndSettle();

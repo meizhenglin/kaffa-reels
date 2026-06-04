@@ -16,7 +16,7 @@ class AppConstants {
 
   // ==================== 应用基础信息 ====================
   /// 应用名称，显示在启动页和关于页面
-  static const String appName = 'Arabic Drama';
+  static const String appName = 'Qahwa TV';
 
   // ==================== API 配置 ====================
   /// API 服务器基础地址，所有 API 请求都会基于此地址

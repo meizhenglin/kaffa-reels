@@ -9,7 +9,7 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Arabic Drama';
+  String get appTitle => 'Qahwa TV';
 
   @override
   String get bottomNav_home => 'Home';
@@ -302,7 +302,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get appDescription =>
-      'Your premium destination for Arabic short dramas. Watch the best Arabic series and exclusive content anytime, anywhere.';
+      'Your premium destination for short dramas. Watch the best series and exclusive content anytime, anywhere.';
 
   @override
   String get privacyPolicy => 'Privacy Policy';

@@ -1,6 +1,6 @@
 {
   "@@locale": "en",
-  "appTitle": "Arabic Drama",
+  "appTitle": "Qahwa TV",
 
   "bottomNav_home": "Home",
   "bottomNav_recommend": "Recommend",
@@ -98,7 +98,7 @@
   "removedFromFavorites": "Removed from favorites",
   "noFavorites": "No favorites yet",
   "addFavoritesHint": "Tap the heart icon on dramas to add them here",
-  "appDescription": "Your premium destination for Arabic short dramas. Watch the best Arabic series and exclusive content anytime, anywhere.",
+  "appDescription": "Your premium destination for short dramas. Watch the best series and exclusive content anytime, anywhere.",
   "privacyPolicy": "Privacy Policy",
   "termsOfService": "Terms of Service",
   "contactUs": "Contact Us",
