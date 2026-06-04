@@ -5,9 +5,16 @@ import 'package:go_router/go_router.dart';
 import '../providers/last_watched_provider.dart';
 
 /// 首页底部 Tab 栏上方悬浮的"继续观看"卡片
-/// - 固定在距离底部导航栏上方 20pt
-/// - 可向左/右动画收缩，收缩后仅显示剧集封面图
-/// - 点击进入播放器从上次观看位置继续播放
+///
+/// LTR（中文/英文）：
+///   右滑卡片 → 卡片右滑+淡出，封面图从右侧淡入
+///   左滑封面图 → 封面图左滑+淡出，卡片从右滑入
+///   关闭按钮在封面图左侧
+///
+/// RTL（阿拉伯文）：
+///   左滑卡片 → 卡片左滑+淡出，封面图从左侧淡入
+///   右滑封面图 → 封面图右滑+淡出，卡片从左滑入
+///   关闭按钮在封面图右侧
 class HistoryResumeCard extends ConsumerStatefulWidget {
   const HistoryResumeCard({super.key});
 
@@ -18,10 +25,6 @@ class HistoryResumeCard extends ConsumerStatefulWidget {
 class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _widthAnimation;
-  late Animation<double> _iconRotationAnimation;
-
-  bool _isCollapsed = false;
 
   static const _cardHeight = 52.0;
   static const _borderRadius = 8.0;
@@ -36,22 +39,6 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
       duration: const Duration(milliseconds: 320),
       vsync: this,
     );
-    _widthAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    );
-    _iconRotationAnimation = Tween<double>(
-      begin: 0,
-      end: 0.5,
-    ).animate(_widthAnimation);
-
-    _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        setState(() => _isCollapsed = true);
-      } else if (status == AnimationStatus.dismissed) {
-        setState(() => _isCollapsed = false);
-      }
-    });
 
     Future.microtask(() {
       ref.read(lastWatchedProvider.notifier).load();
@@ -62,14 +49,6 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
   void dispose() {
     _controller.dispose();
     super.dispose();
-  }
-
-  void _toggleCollapse() {
-    if (_controller.isCompleted) {
-      _controller.reverse();
-    } else {
-      _controller.forward();
-    }
   }
 
   void _onTap() {
@@ -87,6 +66,42 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
     final state = ref.watch(lastWatchedProvider);
 
     if (state.info == null) return const SizedBox.shrink();
+
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+
+    // 卡片展开方向：LTR 右滑展开，RTL 左滑展开
+    // 封面图始终出现在卡片原位（卡片的右边缘 / 左边缘）
+    final slideDir = isRtl ? -1.0 : 1.0;
+    final slideAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: Offset(slideDir * 1.5, 0.0),
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+
+    final cardOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(_controller);
+    final coverOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
+    // 封面图滑入方向和卡片滑出方向相反，但都从屏幕外开始
+    final coverSlideAnimation = Tween<Offset>(
+      begin: Offset(slideDir * 2.0, 0.0), // 从屏幕外滑入
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+
+    // 滑动手势方向判断
+    void handleDragEnd(DragEndDetails details) {
+      final velocity = details.primaryVelocity ?? 0;
+      if (isRtl) {
+        if (velocity < -150) {
+          _controller.forward();
+        } else if (velocity > 150) {
+          _controller.reverse();
+        }
+      } else {
+        if (velocity > 150) {
+          _controller.forward();
+        } else if (velocity < -150) {
+          _controller.reverse();
+        }
+      }
+    }
 
     return Positioned(
       left: 12,
@@ -316,5 +331,4 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
       ),
     );
   }
-
 }
