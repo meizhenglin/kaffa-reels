@@ -146,11 +146,7 @@ class RecommendRepository {
   /// 对应 /api/videoHotPicks/list
   /// [videoHotListType] 2=Top Recommend  5=New For This Month  6=VIP Zone
   Future<List<Drama>> fetchVideoHotPicks({required int videoHotListType}) async {
-    final token = await _authService.ensureToken();
-    if (token == null) return [];
-
     try {
-      _dioClient.setAuthToken(token);
       final response = await _dioClient.dio.post(
         ApiEndpoints.videoHotPicks,
         data: {'videoHotListType': videoHotListType},

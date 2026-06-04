@@ -26,21 +26,11 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
-<<<<<<< .mine
-  static const _cardHeight = 58.0;
-=======
   static const _cardHeight = 52.0;
->>>>>>> .theirs
   static const _borderRadius = 8.0;
-<<<<<<< .mine
-  static const _thumbnailSize = 52.0;
-
-
-=======
   static const _thumbnailSize = 52.0;
   static const _coverWidth = 65.0;
   static const _coverHeight = 92.0;
->>>>>>> .theirs
 
   @override
   void initState() {
@@ -50,13 +40,6 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
       vsync: this,
     );
 
-<<<<<<< .mine
-    // 用 microtask 延迟到当前帧渲染完成后加载；
-    // load() 内部会等 token 就位后再发请求
-=======
-
-
->>>>>>> .theirs
     Future.microtask(() {
       ref.read(lastWatchedProvider.notifier).load();
     });
@@ -124,13 +107,11 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
       left: 12,
       right: 12,
       bottom: 20,
-<<<<<<< .mine
       child: SizedBox(
-        height: _cardHeight + _thumbnailSize, // 58 + 52 = 110，底部留20px给封面图
+        height: 20 + _coverHeight,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // 封面图
             Positioned(
               left: isRtl ? 0 : null,
               right: isRtl ? null : 0,
@@ -140,68 +121,9 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                 child: SlideTransition(
                   position: coverSlideAnimation,
                   child: _buildCoverCard(state.info, isRtl),
-
-
-
-=======
-      child: SizedBox(
-        // 封面图92px在下，卡片52px在上，封面图底部与卡片底部对齐，共用 bottom:20
-        height: 20 + _coverHeight, // 112
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            // 封面图：92px 固定高，底部距 Stack 底部 20px（=距底部tab 20px）
-            // LTR 缩略图在卡片左侧 → 封面图定位到卡片左侧缩略图位置
-            // RTL 缩略图在卡片右侧 → 封面图定位到卡片右侧缩略图位置
-            Positioned(
-              left: isRtl ? 0 : null,
-              right: isRtl ? null : 0,
-              bottom: 20,
-              child: FadeTransition(
-                opacity: coverOpacity,
-                child: SlideTransition(
-                  position: coverSlideAnimation,
-                  child: _buildCoverCard(state.info, isRtl),
->>>>>>> .theirs
                 ),
               ),
-<<<<<<< .mine
             ),
-            // 卡片：LTR 右滑+淡出，RTL 左滑+淡出
-            SlideTransition(
-              position: slideAnimation,
-              child: FadeTransition(
-                opacity: cardOpacity,
-                child: GestureDetector(
-                  onTap: _onTap,
-                  onHorizontalDragEnd: handleDragEnd,
-                  child: Container(
-                    height: _cardHeight,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF202A46), Color(0xFF392E40)],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                      borderRadius: BorderRadius.circular(_borderRadius),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                      children: [
-                        _buildThumbnail(state.info!.coverUrl),
-                        Expanded(
-                          child: _buildContent(state.info),
-=======
-            ),
-            // 卡片：52px 高，底部距 Stack 底部 20px（=距底部tab 20px）
-            // LTR 右滑+淡出，RTL 左滑+淡出
             Positioned(
               bottom: 20,
               left: 0,
@@ -228,12 +150,8 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
-
-
-
->>>>>>> .theirs
                         ],
-                      ],
+                      ),
                       child: Row(
                         textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
                         children: [
@@ -254,77 +172,6 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
     );
   }
 
-<<<<<<< .mine
-  Widget _buildCoverCard(LastWatchedInfo? info, bool isRtl) {
-    return SizedBox(
-      width: _thumbnailSize,
-      height: _cardHeight,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            width: _thumbnailSize,
-            height: _cardHeight,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(_borderRadius),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.6),
-                width: 2,
-              ),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(_borderRadius - 2),
-              child: info != null && info.coverUrl.isNotEmpty
-                  ? Image.network(
-                      info.coverUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _buildThumbnailPlaceholder(),
-                    )
-                  : _buildThumbnailPlaceholder(),
-            ),
-          ),
-          // 关闭按钮：LTR 在左侧，RTL 在右侧
-          Positioned(
-            top: -4,
-            left: isRtl ? null : -4,
-            right: isRtl ? -4 : null,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {
-                ref.read(lastWatchedProvider.notifier).clear();
-              },
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: Colors.black54,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(Icons.close, size: 16, color: Colors.white),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-=======
   Widget _buildCoverCard(LastWatchedInfo? info, bool isRtl) {
     return SizedBox(
       width: _coverWidth,
@@ -353,7 +200,6 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                   : _buildThumbnailPlaceholder(),
             ),
           ),
-          // 关闭按钮：LTR 在左侧，RTL 在右侧
           Positioned(
             top: -4,
             left: isRtl ? null : -4,
@@ -363,25 +209,15 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
               onTap: () {
                 ref.read(lastWatchedProvider.notifier).clear();
               },
-              child: Container(
-                // width: 28,
-                // height: 28,
-                // decoration: BoxDecoration(
-                //   color: Colors.black54,
-                //   borderRadius: BorderRadius.circular(14),
-                // ),
-                child: Image.asset(
+              child: Image.asset(
                 'assets/images/cover_close_icon.png',
                 width: 16,
                 height: 16,
-                // color: Colors.white,
                 errorBuilder: (_, __, ___) =>
                     const Icon(Icons.close, size: 16, color: Colors.white),
               ),
-              ),
             ),
           ),
-          // 播放按钮：居中显示
           Center(
             child: Image.asset(
               'assets/images/cover_play_icon.png',
@@ -394,7 +230,6 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
     );
   }
 
->>>>>>> .theirs
   Widget _buildThumbnail(String? coverUrl) {
     return SizedBox(
       width: _thumbnailSize,
@@ -426,7 +261,6 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
           height: 16,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            // color: Colors.white54,
           ),
         ),
       );
