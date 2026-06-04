@@ -6,6 +6,7 @@ import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../explore/pages/explore_page.dart';
 import '../models/navigation_item.dart';
+import '../providers/last_watched_provider.dart';
 import '../providers/tab_scroll_provider.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/history_resume_card.dart';
@@ -27,6 +28,15 @@ class _MainPageState extends ConsumerState<MainPage> {
   int _lastTappedIndex = -1;
   DateTime _lastTapTime = DateTime.fromMillisecondsSinceEpoch(0);
   static const _doubleTapInterval = Duration(milliseconds: 400);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(lastWatchedProvider.notifier).load();
+      debugPrint('=== MainPage initState: load() called ===');
+    });
+  }
 
   void _onTabTapped(int index, List<NavigationItem> items) {
     final now = DateTime.now();
@@ -66,6 +76,7 @@ class _MainPageState extends ConsumerState<MainPage> {
 
     return GradientScaffold(
       body: Stack(
+        fit: StackFit.expand,
         children: [
           widget.navigationShell,
           if (currentIndex == 0) HistoryResumeCard(),

@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../l10n/app_localizations.dart';
 import '../models/drama.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../payment/providers/membership_provider.dart';
-import '../../player/presentation/player_controller.dart';
 import '../../profile/providers/history_provider.dart';
 
 /// VIP 访问结果
@@ -84,13 +82,6 @@ Future<void> openDramaPlayerWithVipCheck({
   required AuthState authState,
   required MemberState memberState,
 }) async {
-  // 非 VIP 剧直接进入
-  if (!drama.isVipOnly) {
-    openDramaPlayer(context, drama);
-    return;
-  }
-
-  // VIP 剧：游客可以进入播放器看前3集，到锁定集时再弹窗
   openDramaPlayer(context, drama);
 }
 
@@ -99,47 +90,12 @@ Future<void> openDramaPlayerWithVipCheck({
 ///
 /// 【功能】封装跳转到播放器的逻辑
 /// 【使用】在其他页面点击短剧时调用 openDramaPlayer(context, drama)
-/// ============================================================================
+/// 【说明】只传 videoId，ShortVideoPage 内部请求真实数据
 void openDramaPlayer(BuildContext context, Drama drama) {
-  openDramaPlayerWithEpisodes(context, drama, const []);
-}
-
-/// 带剧集列表的跳转播放器
-void openDramaPlayerWithEpisodes(
-  BuildContext context,
-  Drama drama, [
-  List<EpisodeData> episodes = const [],
-]) {
-  final episodeList = episodes.isEmpty
-      ? List.generate(
-          drama.episodeCount,
-          (index) => EpisodeData(
-            id: '${drama.id}_ep_${index + 1}',
-            title: '${drama.title} EP.${index + 1}',
-            videoUrl: drama.videoUrl ?? AppConstants.testVideoUrl,
-            coverUrl: drama.coverUrl,
-            isUnlocked: index < 3,
-            isVipOnly: drama.isVipOnly,
-          ),
-        )
-      : episodes;
-
-  // 记录到观看历史
   try {
     final container = ProviderScope.containerOf(context);
     container.read(historyProvider.notifier).addHistory(drama);
   } catch (_) {}
 
-  context.push(
-    '/detail',
-    extra: {
-      'url': drama.videoUrl ?? AppConstants.testVideoUrl,
-      'title': drama.title,
-      'dramaId': drama.id,
-      'episodes': episodeList,
-      'currentIndex': 0,
-      'coverUrl': drama.coverUrl,
-      'isVipOnly': drama.isVipOnly,
-    },
-  );
+  context.push('/short-video', extra: {'videoId': drama.id});
 }

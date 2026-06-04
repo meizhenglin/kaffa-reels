@@ -24,8 +24,8 @@ class ApiEndpoints {
 
   // ==================== 剧场 Tab ====================
   static const String theaterBanner = '/api/banner/list';
-  static const String rankingList = '/api/VideoCharts/list';
-  static const String videoHotPicks = '/api/videoHotPicks/list';
+  static const String rankingList = '/api/videoCharts/list';
+  static const String videoHotPicks = '/api/videoHotPicks/list'; 
   static const String lastUserViewHistoryOne = '/api/video/lastUserViewHistoryOne';
   static const String userViewHistoryByVideoId = '/api/video/userViewHistory';
 
