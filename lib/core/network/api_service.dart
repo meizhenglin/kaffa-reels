@@ -693,27 +693,6 @@ class ApiResponse {
   int? get code => _code;
 }
 
-/// 登录结果（对应后端 /api/user/userAuthorization 返回结构）
-class LoginResult {
-  final String token;
-  final String uuid;
-  final int? id;
-
-  const LoginResult({
-    required this.token,
-    required this.uuid,
-    this.id,
-  });
-
-  factory LoginResult.fromJson(Map<String, dynamic> json) {
-    return LoginResult(
-      token: json['token'] as String,
-      uuid: json['uuid'] as String? ?? '',
-      id: json['id'] as int?,
-    );
-  }
-}
-
 /// App 更新信息
 class UpdateInfo {
   final String version;

@@ -68,7 +68,7 @@ class _MainPageState extends ConsumerState<MainPage> {
       body: Stack(
         children: [
           widget.navigationShell,
-          if (currentIndex == 0) const HistoryResumeCard(),
+          if (currentIndex == 0) HistoryResumeCard(),
         ],
       ),
       bottomNavigationBar: AppBottomNavBar(

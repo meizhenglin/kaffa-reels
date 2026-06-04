@@ -21,8 +21,26 @@ Future<void> _withTimeout(Future<void> future, Duration timeout) async {
   } catch (_) {}
 }
 
+/// 启动时统一完成 Guest 登录，确保 UI 渲染时 token 已就绪
+Future<void> _ensureGuestLogin(ProviderContainer container) async {
+  final storage = container.read(storageServiceProvider);
 
-void main() async {
+  // 检查 token 是否已存在
+  final cachedToken = await storage.getToken();
+  final authToken = await storage.getAuthTokenAsync();
+  if ((cachedToken != null && cachedToken.isNotEmpty) ||
+      (authToken != null && authToken.isNotEmpty)) {
+    debugPrint('[MAIN] token already exists, skip guest login');
+    return;
+  }
+
+  debugPrint('[MAIN] no token found, performing guest login...');
+  final authService = container.read(authServiceProvider);
+  final result = await authService.login();
+  debugPrint('[MAIN] guest login done: ${result?.token != null}');
+}
+
+Future<void> main() async {
   debugPrint('[MAIN] === main() started ===');
   WidgetsFlutterBinding.ensureInitialized();
   debugPrint('[MAIN] WidgetsFlutterBinding ready');
@@ -35,6 +53,12 @@ void main() async {
     FirebaseService.initialize(),
     const Duration(seconds: 15),
   );
+
+  // 在 ProviderScope 创建之前，先同步完成 Guest 登录
+  // 这样所有后续网络请求都有 token 可用，不会出现"空 token 先于登录"的问题
+  final _tempContainer = ProviderContainer();
+  await _ensureGuestLogin(_tempContainer);
+  _tempContainer.dispose();
 
   runApp(
     ProviderScope(
@@ -54,28 +78,18 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() async {
+    // 主题/语言加载，以及注册 DioClient 的 Guest 登录回调
+    // 注意：Guest 登录本身已在 main() 中同步完成，这里只做收尾工作
+    Future.microtask(() {
       ref.read(themeModeProvider.notifier).load();
       ref.read(localeProvider.notifier).load();
-      // 初始化 AuthService（加载缓存的 Token 和 UUID）
-      await ref.read(authServiceProvider).init().timeout(const Duration(seconds: 5), onTimeout: () {});
 
-      // 注册 Token 过期回调：先尝试刷新，刷新失败则登出
-      ref.read(dioClientProvider).setOnTokenExpired(() async {
-        final newToken = await ref.read(authServiceProvider).refreshToken();
-        if (newToken != null) return newToken;
-        // 刷新失败，强制登出
-        await ref.read(authServiceProvider).logout();
-        if (mounted) {
-          context.go('/auth/login');
-        }
-        return null;
+      // 注册 Guest 登录回调：用于 code=23 时自动 guest 登录重试
+      //（启动阶段 token 为空的场景已在 main() 中提前处理）
+      ref.read(dioClientProvider).setOnGuestLogin(() async {
+        final result = await ref.read(authServiceProvider).login();
+        return result?.token;
       });
-
-      // 启动时匿名登录（仅在没有 Token 时才登录，不覆盖已有登录态）
-      // 注意：AuthNotifier._init() 已在后台处理，这里不需要重复调用。
-      // guestLoginProvider 的状态由 AuthNotifier 内部管理。
-      // ref.read(guestLoginProvider.notifier).login();
     });
   }
 

@@ -66,10 +66,9 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
     setState(() => _isLoading = false);
 
       if (success) {
-      debugPrint('[RegisterEmail] success, fetching user info...');
-      // 立即拉取后端真实用户信息（包含正确 nickname 和 id）
+      debugPrint('[RegisterEmail] success, restoring user data...');
+      // 从登录/注册接口返回值中获取用户数据
       final authService = ref.read(authServiceProvider);
-      await authService.fetchUserInfo();
       final userData = await authService.getUserData();
       if (userData != null) {
         ref.read(authProvider.notifier).updateUserFromData(userData);

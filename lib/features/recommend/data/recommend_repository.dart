@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
-import '../../../core/auth/auth_service.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/storage/storage_service.dart';
 import '../models/banner.dart';
 import '../models/drama.dart';
 import '../models/recommend_feed.dart';
@@ -34,22 +34,18 @@ final Map<String, EpisodeUrlCache> _episodeUrlCache = {};
 class RecommendRepository {
   RecommendRepository({
     required DioClient dioClient,
-    required AuthService authService,
+    required StorageService storageService,
   })  : _dioClient = dioClient,
-        _authService = authService;
+        _storageService = storageService;
 
   final DioClient _dioClient;
-  final AuthService _authService;
+  final StorageService _storageService;
 
   // ==================== 沉浸式视频流 API ====================
 
   /// 获取推荐视频列表（沉浸式播放页使用）
   Future<List<VideoInfo>> fetchRecommendVideos() async {
-    final token = await _authService.ensureToken();
-    if (token == null) return [];
-
     try {
-      _dioClient.setAuthToken(token);
       final response = await _dioClient.dio.post(
         '/api/episodes/recommendIndex',
         data: {'pageSize': 10},
@@ -78,21 +74,9 @@ class RecommendRepository {
   /// 获取首页推荐数据
   /// 对应 /api/banner/list + /api/episodes/recommendIndex
   Future<RecommendFeed> fetchFeed({int page = 1, int pageSize = 10}) async {
-    final token = await _authService.ensureToken();
-    if (token == null) return const RecommendFeed(
-      banners: [],
-      hotPicks: [],
-      charts: [],
-      newEpisodes: [],
-      hasMore: false,
-      page: 1,
-    );
-
     List<BannerItem> banners = [];
 
     try {
-      _dioClient.setAuthToken(token);
-
       // 单独请求 /api/banner/list
       final bannerResp = await apiServiceProvider.getTheaterBanner();
       debugPrint('[Banner] isSuccess=${bannerResp.isSuccess} data=${bannerResp.data}');
@@ -167,17 +151,12 @@ class RecommendRepository {
   }) async {
     final cacheKey = '${videoId}_$episodesId';
 
-    // 缓存未过期直接返回
     final cached = _episodeUrlCache[cacheKey];
     if (cached != null && !cached.isExpired) {
       return cached;
     }
 
-    final token = await _authService.ensureToken();
-    if (token == null) return null;
-
     try {
-      _dioClient.setAuthToken(token);
       final response = await _dioClient.dio.post(
         '/api/episodes/getEpisodeInfo',
         data: {'videoId': videoId, 'episodesId': episodesId},

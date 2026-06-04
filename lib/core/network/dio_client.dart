@@ -20,13 +20,13 @@ import '../storage/storage_service.dart';
 /// - 添加请求/响应日志拦截器
 /// - 管理认证令牌
 /// - 自动注入 X-Client 平台标识头
-/// - Token 过期时自动刷新
 ///
-/// 【Token 刷新机制】
-/// 当收到 401 时，调用 onTokenExpired 回调获取新 token：
-/// - 返回新 token → 用新 token 重试请求
-/// - 返回 null → 回调内部已处理登出，原请求以 401 结束
-/// - 并发 401 时，后面的请求等待刷新完成后再重试
+/// 【自动 Guest 登录机制】
+/// 两种场景触发 guest 登录：
+/// 1. 发起请求时 token 为空 → 先 guest 登录，拿到 token 后再发请求
+/// 2. 请求返回 code=23（token 过期） → guest 登录后重试该请求
+///
+/// guest 登录为同步阻塞调用，并发多个请求时只执行一次，登录完成后统一重试。
 /// ============================================================================
 class DioClient {
   DioClient({Dio? dio, Logger? logger, StorageService? storage})
@@ -55,6 +55,12 @@ class DioClient {
             final token = await _storage.getToken();
             if (token != null && token.isNotEmpty) {
               options.headers['token'] = token;
+            } else {
+              // token 为空：先完成 guest 登录，再继续发请求
+              final newToken = await _ensureGuestLogin();
+              if (newToken != null) {
+                options.headers['token'] = newToken;
+              }
             }
             final clientParams = _storage.getString(AppConstants.clientParamsKey) ?? '';
             if (clientParams.isNotEmpty) {
@@ -129,12 +135,18 @@ class DioClient {
               _logger.e('');
             }
 
-            // Token 过期：401 或后端返回的特定 code
-            if (statusCode == ApiErrorCode.unauthorized ||
-                code == ApiErrorCode.unauthorized) {
-              _logger.w('【TOKEN EXPIRED】401 detected, attempting token refresh');
-              await _handleTokenExpired(error, handler);
-              return; // 重试在 _handleTokenExpired 内部通过 handler.next/err 结束
+            // 场景1：HTTP 401 → guest 登录后重试
+            if (statusCode == ApiErrorCode.unauthorized) {
+              _logger.w('【401】HTTP 401 detected, attempting guest login');
+              await _handleGuestLoginAndRetry(error, handler);
+              return;
+            }
+
+            // 场景2：业务 code=23（token 过期） → guest 登录后重试
+            if (code == ApiErrorCode.tokenExpired) {
+              _logger.w('【CODE 23】Token expired, attempting guest login');
+              await _handleGuestLoginAndRetry(error, handler);
+              return;
             }
 
             handler.next(error);
@@ -148,75 +160,86 @@ class DioClient {
   final StorageService _storage;
   Dio get dio => _dio;
 
-  /// Token 过期回调，返回新 token（刷新成功）或 null（刷新失败/已登出）
-  /// 签名兼容：支持 sync void 和 async Future<String?>
-  Future<String?> Function()? _onTokenExpired;
+  /// Guest 登录回调：返回新 token（登录成功）或 null（失败）
+  /// 由外部（通常是 AuthService）注入
+  Future<String?> Function()? _onGuestLogin;
 
-  /// 注册 Token 过期回调
-  void setOnTokenExpired(Future<String?> Function()? callback) {
-    _onTokenExpired = callback;
+  /// 注册 Guest 登录回调
+  void setOnGuestLogin(Future<String?> Function()? callback) {
+    _onGuestLogin = callback;
   }
 
   /// ============================================================
-  /// Token 刷新机制
+  /// Guest 登录并发控制
   /// ============================================================
 
-  /// 正在刷新时，等待刷新的请求队列（每个请求一个 Completer）
+  /// 正在执行 guest 登录时，等待登录结果的请求队列
   final List<_PendingRequest> _pendingRequests = [];
 
-  /// 是否正在刷新 token
-  bool _isRefreshing = false;
+  /// 是否正在执行 guest 登录
+  bool _isLoggingIn = false;
 
-  /// 刷新完成后，通知所有等待中的请求
-  Future<void> _handleTokenExpired(
-      DioException error, ErrorInterceptorHandler handler) async {
-    if (_isRefreshing) {
-      // 已有刷新在进行中，将请求加入等待队列，刷新完成后重试
-      final completer = Completer<String?>();
-      _pendingRequests.add(_PendingRequest(error, handler, completer));
-      // 等待刷新完成，收到结果后重试
-      final newToken = await completer.future;
-      if (newToken != null) {
-        _retryWithNewToken(error, newToken, handler);
-      }
-      // newToken == null 表示刷新失败，已在刷新流程中处理登出
-      return;
+  /// 确保已完成 guest 登录，返回最新 token（供 onRequest 调用）
+  Future<String?> _ensureGuestLogin() async {
+    final token = await _storage.getToken();
+    if (token != null && token.isNotEmpty) {
+      return token;
     }
 
-    _isRefreshing = true;
+    return _doGuestLogin();
+  }
+
+  /// 执行一次 guest 登录，供 onRequest / onError 共用
+  Future<String?> _doGuestLogin() async {
+    if (_isLoggingIn) {
+      // 已有登录在进行中，等待其完成
+      final completer = Completer<String?>();
+      _pendingRequests.add(_PendingRequest(completer));
+      return completer.future;
+    }
+
+    _isLoggingIn = true;
 
     try {
       String? newToken;
 
-      if (_onTokenExpired != null) {
-        // 调用回调获取新 token
-        final result = _onTokenExpired!();
+      if (_onGuestLogin != null) {
+        final result = _onGuestLogin!();
         if (result != null) {
           newToken = await result;
         }
-        // result == null 表示回调内部已处理登出（如 token 已无效，强制登出）
       }
 
       if (newToken != null) {
-        _logger.w('[TOKEN EXPIRED] refresh success, new token obtained');
-        // 通知所有等待中的请求，用新 token 重试
+        _logger.w('【GUEST LOGIN】success, token obtained');
+        // 通知所有等待中的请求
         for (final pending in _pendingRequests) {
           pending.completer.complete(newToken);
         }
         _pendingRequests.clear();
-        // 重试当前请求
-        _retryWithNewToken(error, newToken, handler);
+        return newToken;
       } else {
-        _logger.w('[TOKEN EXPIRED] refresh failed or returned null, rejecting pending requests');
-        // 刷新失败，通知所有等待中的请求以原错误结束
+        _logger.w('【GUEST LOGIN】failed, notifying pending requests');
         for (final pending in _pendingRequests) {
           pending.completer.complete(null);
         }
         _pendingRequests.clear();
-        handler.reject(error);
+        return null;
       }
     } finally {
-      _isRefreshing = false;
+      _isLoggingIn = false;
+    }
+  }
+
+  /// Guest 登录完成后，重试原请求（供 onError 调用）
+  Future<void> _handleGuestLoginAndRetry(
+      DioException error, ErrorInterceptorHandler handler) async {
+    final newToken = await _doGuestLogin();
+
+    if (newToken != null) {
+      _retryWithNewToken(error, newToken, handler);
+    } else {
+      handler.next(error);
     }
   }
 
@@ -280,10 +303,8 @@ class DioClient {
   }
 }
 
-/// 等待 token 刷新的请求
+/// 等待 guest 登录完成的请求（简化版，不再需要存储 DioException 和 handler）
 class _PendingRequest {
-  _PendingRequest(this.error, this.handler, this.completer);
-  final DioException error;
-  final ErrorInterceptorHandler handler;
+  _PendingRequest(this.completer);
   final Completer<String?> completer;
 }

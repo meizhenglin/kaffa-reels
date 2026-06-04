@@ -48,7 +48,6 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
     if (authState.status == AuthStatus.unauthenticated) return;
 
     final authService = ref.read(authServiceProvider);
-    await authService.fetchUserInfo();
     final userData = await authService.getUserData();
     if (userData != null && mounted) {
       ref.read(authProvider.notifier).updateUserFromData(userData);

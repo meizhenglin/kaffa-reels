@@ -5,9 +5,16 @@ import 'package:go_router/go_router.dart';
 import '../providers/last_watched_provider.dart';
 
 /// 首页底部 Tab 栏上方悬浮的"继续观看"卡片
-/// - 固定在距离底部导航栏上方 20pt
-/// - 可向左/右动画收缩，收缩后仅显示剧集封面图
-/// - 点击进入播放器从上次观看位置继续播放
+///
+/// LTR（中文/英文）：
+///   右滑卡片 → 卡片右滑+淡出，封面图从右侧淡入
+///   左滑封面图 → 封面图左滑+淡出，卡片从右滑入
+///   关闭按钮在封面图左侧
+///
+/// RTL（阿拉伯文）：
+///   左滑卡片 → 卡片左滑+淡出，封面图从左侧淡入
+///   右滑封面图 → 封面图右滑+淡出，卡片从左滑入
+///   关闭按钮在封面图右侧
 class HistoryResumeCard extends ConsumerStatefulWidget {
   const HistoryResumeCard({super.key});
 
@@ -18,15 +25,10 @@ class HistoryResumeCard extends ConsumerStatefulWidget {
 class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _widthAnimation;
-  late Animation<double> _iconRotationAnimation;
 
-  bool _isCollapsed = false;
-
-  static const _cardHeight = 52.0;
+  static const _cardHeight = 58.0;
   static const _borderRadius = 8.0;
-  static const _expandedContentWidth = 200.0; // 内容区宽度（不含封面）
-  static const _thumbnailSize = 52.0; // 封面图尺寸 = 卡片高度
+  static const _thumbnailSize = 52.0;
 
   @override
   void initState() {
@@ -35,23 +37,9 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
       duration: const Duration(milliseconds: 320),
       vsync: this,
     );
-    _widthAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOut,
-    );
-    _iconRotationAnimation = Tween<double>(
-      begin: 0,
-      end: 0.5,
-    ).animate(_widthAnimation);
 
-    _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        setState(() => _isCollapsed = true);
-      } else if (status == AnimationStatus.dismissed) {
-        setState(() => _isCollapsed = false);
-      }
-    });
-
+    // 用 microtask 延迟到当前帧渲染完成后加载；
+    // load() 内部会等 token 就位后再发请求
     Future.microtask(() {
       ref.read(lastWatchedProvider.notifier).load();
     });
@@ -61,14 +49,6 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
   void dispose() {
     _controller.dispose();
     super.dispose();
-  }
-
-  void _toggleCollapse() {
-    if (_controller.isCompleted) {
-      _controller.reverse();
-    } else {
-      _controller.forward();
-    }
   }
 
   void _onTap() {
@@ -87,66 +67,158 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
 
     if (state.info == null) return const SizedBox.shrink();
 
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+
+    // 卡片展开方向：LTR 右滑展开，RTL 左滑展开
+    // 封面图始终出现在卡片原位（卡片的右边缘 / 左边缘）
+    final slideDir = isRtl ? -1.0 : 1.0;
+    final slideAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: Offset(slideDir * 1.5, 0.0),
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+
+    final cardOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(_controller);
+    final coverOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
+    // 封面图滑入方向和卡片滑出方向相反，但都从屏幕外开始
+    final coverSlideAnimation = Tween<Offset>(
+      begin: Offset(slideDir * 2.0, 0.0), // 从屏幕外滑入
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+
+    // 滑动手势方向判断
+    void handleDragEnd(DragEndDetails details) {
+      final velocity = details.primaryVelocity ?? 0;
+      if (isRtl) {
+        if (velocity < -150) {
+          _controller.forward();
+        } else if (velocity > 150) {
+          _controller.reverse();
+        }
+      } else {
+        if (velocity > 150) {
+          _controller.forward();
+        } else if (velocity < -150) {
+          _controller.reverse();
+        }
+      }
+    }
+
     return Positioned(
       left: 12,
       right: 12,
       bottom: 20,
-      child: AnimatedBuilder(
-        animation: _widthAnimation,
-        builder: (context, _) {
-          return GestureDetector(
-            onTap: _onTap,
-            child: Container(
-              height: _cardHeight,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF202A46), Color(0xFF392E40)],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
+      child: SizedBox(
+        height: _cardHeight + _thumbnailSize, // 58 + 52 = 110，底部留20px给封面图
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // 封面图
+            Positioned(
+              left: isRtl ? 0 : null,
+              right: isRtl ? null : 0,
+              bottom: 20,
+              child: FadeTransition(
+                opacity: coverOpacity,
+                child: SlideTransition(
+                  position: coverSlideAnimation,
+                  child: _buildCoverCard(state.info, isRtl),
                 ),
-                borderRadius: BorderRadius.circular(_borderRadius),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  _buildThumbnail(state.info!.coverUrl),
-                  SizeTransition(
-                    axisAlignment: -1,
-                    sizeFactor: _widthAnimation,
-                    child: SizedBox(
-                      width: _expandedContentWidth,
-                      child: _buildContent(state.info),
-                    ),
-                  ),
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _toggleCollapse,
-                    child: SizedBox(
-                      width: 32,
-                      height: _cardHeight,
-                      child: Center(
-                        child: RotationTransition(
-                          turns: _iconRotationAnimation,
-                          child: const Icon(
-                            Icons.chevron_right,
-                            color: Colors.white60,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ),
-          );
-        },
+            // 卡片：LTR 右滑+淡出，RTL 左滑+淡出
+            SlideTransition(
+              position: slideAnimation,
+              child: FadeTransition(
+                opacity: cardOpacity,
+                child: GestureDetector(
+                  onTap: _onTap,
+                  onHorizontalDragEnd: handleDragEnd,
+                  child: Container(
+                    height: _cardHeight,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF202A46), Color(0xFF392E40)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ),
+                      borderRadius: BorderRadius.circular(_borderRadius),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+                      children: [
+                        _buildThumbnail(state.info!.coverUrl),
+                        Expanded(
+                          child: _buildContent(state.info),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCoverCard(LastWatchedInfo? info, bool isRtl) {
+    return SizedBox(
+      width: _thumbnailSize,
+      height: _cardHeight,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: _thumbnailSize,
+            height: _cardHeight,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(_borderRadius),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.6),
+                width: 2,
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(_borderRadius - 2),
+              child: info != null && info.coverUrl.isNotEmpty
+                  ? Image.network(
+                      info.coverUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _buildThumbnailPlaceholder(),
+                    )
+                  : _buildThumbnailPlaceholder(),
+            ),
+          ),
+          // 关闭按钮：LTR 在左侧，RTL 在右侧
+          Positioned(
+            top: -4,
+            left: isRtl ? null : -4,
+            right: isRtl ? -4 : null,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                ref.read(lastWatchedProvider.notifier).clear();
+              },
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(Icons.close, size: 16, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -189,7 +261,7 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
@@ -198,7 +270,7 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
             info.videoName,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
             ),
             maxLines: 1,
@@ -209,23 +281,23 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
             info.episodeLabel,
             style: const TextStyle(
               color: Colors.white70,
-              fontSize: 11,
+              fontSize: 10,
             ),
           ),
           const SizedBox(height: 2),
-          Row(
+          const Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.play_circle_outline,
                 color: Color(0xFF8F4EFF),
-                size: 12,
+                size: 11,
               ),
-              const SizedBox(width: 3),
-              const Text(
+              SizedBox(width: 3),
+              Text(
                 'Resume',
                 style: TextStyle(
                   color: Color(0xFF8F4EFF),
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -235,5 +307,4 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
       ),
     );
   }
-
 }

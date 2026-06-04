@@ -66,17 +66,6 @@ class AuthRepository {
     await refreshIdToken();
     final cached = await getCachedUser();
 
-    // 补充获取后端用户中心数据（昵称、头像等）
-    try {
-      final centerResp = await apiServiceProvider.getUserCenter();
-      debugPrint('[AuthRepo] getUserCenter (firebase user) resp: ${centerResp.data}');
-      if (centerResp.isSuccess && centerResp.data != null) {
-        final centerData = centerResp.data as Map<String, dynamic>;
-        await _storage.saveUserData(centerData);
-        return UserModel.fromJson(centerData);
-      }
-    } catch (_) {}
-
     return UserModel.fromFirebaseUser(
       user,
       membershipType: cached?.membershipType ?? MembershipType.regular,
@@ -123,18 +112,8 @@ class AuthRepository {
       await _storage.saveToken(token);
     }
 
-    // 登录接口只返回 userId 和 token，昵称/头像需要从用户中心获取
-    final centerResp = await apiServiceProvider.getUserCenter();
-    debugPrint('[AuthRepo] getUserCenter resp: ${centerResp.data}');
-    final centerData = (centerResp.isSuccess && centerResp.data != null)
-        ? centerResp.data as Map<String, dynamic>
-        : null;
-
-    // 合并登录接口和用户中心的数据，用户中心的字段优先
-    final userData = {
-      ...?data,
-      if (centerData != null) ...centerData,
-    };
+    // 登录接口直接返回用户数据（userId、token 等）
+    final userData = data ?? <String, dynamic>{};
 
     // 保存到 user_data（头像、昵称等展示数据）和 cached_user（完整 UserModel）
     await _storage.saveUserData(userData);

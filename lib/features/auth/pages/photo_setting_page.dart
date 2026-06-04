@@ -51,9 +51,8 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
   void _onContinue() async {
     if (_selectedAvatar != null) {
       await ref.read(authProvider.notifier).updateAvatar(_selectedAvatar!);
-      final authService = ref.read(authServiceProvider);
-      await authService.fetchUserInfo();
-      final userData = await authService.getUserData();
+    final authService = ref.read(authServiceProvider);
+    final userData = await authService.getUserData();
       if (userData != null && mounted) {
         ref.read(authProvider.notifier).updateUserFromData(userData);
       }
