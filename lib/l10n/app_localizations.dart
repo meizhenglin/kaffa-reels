@@ -590,6 +590,12 @@ abstract class AppLocalizations {
   /// **'Coming soon, stay tuned!'**
   String get comingSoon;
 
+  /// No description provided for @noDataAvailableAtTheMoment.
+  ///
+  /// In en, this message translates to:
+  /// **'No data available at the moment'**
+  String get noDataAvailableAtTheMoment;
+
   /// No description provided for @editProfile.
   ///
   /// In en, this message translates to:

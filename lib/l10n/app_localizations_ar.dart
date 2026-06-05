@@ -255,6 +255,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get comingSoon => 'Coming soon, stay tuned!';
 
   @override
+  String get noDataAvailableAtTheMoment =>
+      'لا توجد بيانات متاحة في الوقت الراهن';
+
+  @override
   String get editProfile => 'Edit Profile';
 
   @override

@@ -237,6 +237,10 @@ class _SearchPageState extends ConsumerState<SearchPage>
             height: 14,
           ),
         ),
+        prefixIconConstraints: const BoxConstraints(
+          minWidth: 34,
+          minHeight: 34,
+        ),
         suffixIcon: _searchController.text.isNotEmpty
             ? GestureDetector(
                 onTap: () {
@@ -244,9 +248,20 @@ class _SearchPageState extends ConsumerState<SearchPage>
                   ref.read(searchPageProvider.notifier).clearSearch();
                   setState(() {});
                 },
-                child: const Icon(Icons.clear, color: Color(0xFF999999), size: 18),
+                child: const Padding(
+                  padding: EdgeInsets.all(10),
+                  child: Image(
+                    image: AssetImage('assets/images/search_del_icon.png'),
+                    width: 18,
+                    height: 18,
+                  ),
+                ),
               )
             : null,
+        suffixIconConstraints: const BoxConstraints(
+          minWidth: 38,
+          minHeight: 38,
+        ),
         filled: true,
         fillColor: const Color(0x1AFFFFFF),
         border: OutlineInputBorder(

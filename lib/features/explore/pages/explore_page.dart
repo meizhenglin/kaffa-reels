@@ -1,31 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../payment/providers/membership_provider.dart';
 import '../../recommend/models/drama.dart';
 import '../../recommend/utils/drama_navigation.dart';
 import '../models/category.dart';
 import '../providers/explore_provider.dart';
-import '../providers/search_provider.dart';
 import '../widgets/explore_drama_grid_card.dart';
 import '../widgets/explore_search_bar.dart';
-import '../widgets/search_suggestions_panel.dart';
 
 class ExplorePage extends ConsumerStatefulWidget {
   const ExplorePage({super.key, this.scrollController});
   final ScrollController? scrollController;
 
-  static void unfocusSearch(BuildContext context) {
-    final state = context.findAncestorStateOfType<_ExplorePageState>();
-    state?._searchFocusNode.unfocus();
-  }
+  static void unfocusSearch(BuildContext context) {}
 
   @override ConsumerState<ExplorePage> createState() => _ExplorePageState();
 }
 
 class _ExplorePageState extends ConsumerState<ExplorePage> {
   late final ScrollController _scrollController = widget.scrollController ?? ScrollController();
-  final _searchFocusNode = FocusNode();
   final _moreButtonKey = GlobalKey();
   final _rightPanelKey = GlobalKey();
   final _filterBarKey = GlobalKey();
@@ -36,44 +35,27 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
     _dropdownOverlay?.remove();
     _dropdownOverlay = null;
     if (widget.scrollController == null) _scrollController.dispose();
-    _searchFocusNode.dispose();
     super.dispose();
   }
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _searchFocusNode.unfocus();
-    });
-  }
-
-  int _gridColumnCount(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    if (width >= 900) return 4;
-    if (width >= 600) return 3;
-    return 3;
   }
 
   bool _onScrollNotification(ScrollNotification notification) {
     if (notification is ScrollEndNotification) {
       final metrics = notification.metrics;
       if (metrics.pixels >= metrics.maxScrollExtent - 240) {
-        final search = ref.read(searchProvider);
-        if (search.hasActiveSearch) ref.read(searchProvider.notifier).loadMoreSearch();
-        else ref.read(exploreProvider.notifier).loadMore();
+        ref.read(exploreProvider.notifier).loadMore();
       }
     }
     return false;
   }
 
   Future<void> _onRefresh() async {
-    final search = ref.read(searchProvider);
-    if (search.hasActiveSearch) await ref.read(searchProvider.notifier).submitSearch(search.debouncedQuery);
-    else await ref.read(exploreProvider.notifier).refresh();
+    await ref.read(exploreProvider.notifier).refresh();
   }
-
-  void _onSuggestionTap(String keyword) { _searchFocusNode.unfocus(); ref.read(searchProvider.notifier).submitSearch(keyword); }
 
   void _showMoreCategoriesMenu(BuildContext context, List<Category> categories, String selectedId) {
     if (_dropdownOverlay != null) {
@@ -91,7 +73,7 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
     final double filterBarWidth = filterBarBox.size.width;
     final double dropdownWidth = filterBarWidth - 32;
     final double dropdownLeft = filterBarOffset.dx + 16;
-    final double dropdownTop = moreButtonOffset.dy + moreButtonBox.size.height;
+    final double dropdownTop = moreButtonOffset.dy + moreButtonBox.size.height + 2;
 
     _dropdownOverlay = OverlayEntry(
       builder: (ctx) => _CategoriesDropdown(
@@ -120,43 +102,46 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final explore = ref.watch(exploreProvider);
-    final search = ref.watch(searchProvider);
-    final showSearchResults = search.hasActiveSearch;
-    final dramas = showSearchResults ? search.searchResults : explore.dramas;
-    final isLoading = showSearchResults ? search.isLoadingResults && dramas.isEmpty : explore.isLoading && !explore.hasData;
-    final isLoadingMore = showSearchResults ? search.isLoadingResults && dramas.isNotEmpty : explore.isLoadingMore;
-    final showSuggestions = search.showSuggestions && _searchFocusNode.hasFocus && !showSearchResults;
 
     return GradientScaffold(
       body: SafeArea(
-        child: GestureDetector(
-          onTap: () => _searchFocusNode.unfocus(),
-          child: Column(children: [
-            Padding(padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 8), child: ExploreSearchBar(focusNode: _searchFocusNode, onSubmitted: (_) => _searchFocusNode.unfocus())),
-            if (showSuggestions) Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: SearchSuggestionsPanel(onSuggestionTap: _onSuggestionTap)),
-            if (!showSearchResults && explore.categories.isNotEmpty) ...[
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(16, 15, 16, 12),
+              child: ExploreSearchBar(
+                onTap: () => context.push('/search'),
+              ),
+            ),
+            if (explore.categories.isNotEmpty) ...[
               _buildFilterBar(context, l10n, explore),
-              const SizedBox(height: 8),
+              const SizedBox(height: 15),
             ],
-            Expanded(child: _buildContent(context, l10n, dramas: dramas, isLoading: isLoading, isLoadingMore: isLoadingMore, showSearchResults: showSearchResults, explore: explore, search: search)),
-          ]),
+            Expanded(
+              child: _buildContent(
+                context,
+                l10n,
+                dramas: explore.dramas,
+                isLoading: explore.isLoading && !explore.hasData,
+                isLoadingMore: explore.isLoadingMore,
+                explore: explore,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  /// 筛选栏：左边64%滚动分类chips，右边36%固定Hot/New/更多
+  /// 筛选栏：左侧滚动分类，右侧仅保留更多按钮
   Widget _buildFilterBar(BuildContext context, AppLocalizations l10n, ExploreState explore) {
     return SizedBox(
       key: _filterBarKey,
-      // height: 24,
       child: Row(
         children: [
-          // 左边64%：可滚动的分类chips
           Expanded(
-            flex: 64,
             child: Padding(
-              padding: const EdgeInsetsDirectional.only(start: 16, end: 16),
+              padding: const EdgeInsetsDirectional.only(start: 16, end: 8),
               child: ClipRect(
                 child: SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
@@ -169,8 +154,12 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
                           if (i > 0) const SizedBox(width: 10),
                           _CategoryChip(
                             category: explore.categories[i],
-                            isSelected: explore.categories[i].id == explore.selectedCategoryId,
-                            onTap: () => ref.read(exploreProvider.notifier).selectCategory(explore.categories[i].id),
+                            isSelected:
+                                explore.categories[i].id ==
+                                explore.selectedCategoryId,
+                            onTap: () => ref
+                                .read(exploreProvider.notifier)
+                                .selectCategory(explore.categories[i].id),
                           ),
                         ],
                       ],
@@ -180,46 +169,21 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
               ),
             ),
           ),
-          // 右边36%：固定的更多/Hot/New
-          Expanded(
-            flex: 36,
-            child: Padding(
-              key: _rightPanelKey,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: SizedBox(
-                height: 30,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    GestureDetector(
-                      key: _moreButtonKey,
-                      onTap: () => _showMoreCategoriesMenu(context, explore.categories, explore.selectedCategoryId),
-                  child: Row(
-                    textDirection: Directionality.of(context),
-                    mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            l10n.all,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(width: 2),
-                          const Image(
-                            image: AssetImage('assets/images/more_icon.png'),
-                            width: 20,
-                            height: 20,
-                          ),
-                        ],
-                      ),
-                    ),
-                    _FilterTab(label: l10n.hot, isSelected: true, onTap: () {}),
-                    _FilterTab(label: 'New', isSelected: false, onTap: () {}),
-                  ],
-                ),
+          Padding(
+            key: _rightPanelKey,
+            padding: const EdgeInsetsDirectional.only(end: 16, start: 8),
+            child: GestureDetector(
+              key: _moreButtonKey,
+              onTap: () => _showMoreCategoriesMenu(
+                context,
+                explore.categories,
+                explore.selectedCategoryId,
+              ),
+              behavior: HitTestBehavior.opaque,
+              child: const SizedBox(
+                width: 28,
+                height: 28,
+                child: Center(child: _MoreMenuIcon()),
               ),
             ),
           ),
@@ -228,20 +192,64 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
     );
   }
 
-  Widget _buildContent(BuildContext context, AppLocalizations l10n, {required List<Drama> dramas, required bool isLoading, required bool isLoadingMore, required bool showSearchResults, required ExploreState explore, required SearchState search}) {
-    if (isLoading) return const Center(child: CircularProgressIndicator());
-    if (!showSearchResults && explore.hasError && dramas.isEmpty) return _ErrorView(message: explore.errorMessage ?? l10n.unknownError, onRetry: () => ref.read(exploreProvider.notifier).refresh());
-    if (showSearchResults && search.errorMessage != null && dramas.isEmpty) return _ErrorView(message: search.errorMessage!, onRetry: () => ref.read(searchProvider.notifier).submitSearch());
-    if (dramas.isEmpty) return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.search_off, size: 48, color: Theme.of(context).colorScheme.outline), const SizedBox(height: 12),
-      Text(showSearchResults ? l10n.noResults : l10n.comingSoon, style: Theme.of(context).textTheme.bodyLarge)]));
+  Widget _buildContent(
+    BuildContext context,
+    AppLocalizations l10n, {
+    required List<Drama> dramas,
+    required bool isLoading,
+    required bool isLoadingMore,
+    required ExploreState explore,
+  }) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (explore.hasError && dramas.isEmpty) {
+      return _ErrorView(
+        message: explore.errorMessage ?? l10n.unknownError,
+        onRetry: () => ref.read(exploreProvider.notifier).refresh(),
+      );
+    }
+    if (dramas.isEmpty) {
+      return AppEmptyState(
+        message: l10n.noDataAvailableAtTheMoment,
+      );
+    }
 
-    final columnCount = _gridColumnCount(context);
-    return RefreshIndicator(onRefresh: _onRefresh, child: NotificationListener<ScrollNotification>(onNotification: _onScrollNotification,
-      child: CustomScrollView(controller: _scrollController, physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()), slivers: [
-        SliverPadding(padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 16), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columnCount, childAspectRatio: 0.52, crossAxisSpacing: 10, mainAxisSpacing: 12),
-          delegate: SliverChildBuilderDelegate((context, index) => ExploreDramaGridCard(drama: dramas[index], highlightQuery: showSearchResults ? search.debouncedQuery : null, onTap: () => openDramaPlayer(context, dramas[index])), childCount: dramas.length))),
-        if (isLoadingMore) const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))),
-      ])));
+    return RefreshIndicator(
+      onRefresh: _onRefresh,
+      child: NotificationListener<ScrollNotification>(
+        onNotification: _onScrollNotification,
+        child: GridView.builder(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 16),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.64,
+          ),
+          itemCount: dramas.length + (isLoadingMore ? 2 : 0),
+          itemBuilder: (context, index) {
+            if (index >= dramas.length) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final drama = dramas[index];
+            return ExploreDramaGridCard(
+              drama: drama,
+              onTap: () => openDramaPlayerWithVipCheck(
+                context: context,
+                drama: drama,
+                authState: ref.watch(authProvider),
+                memberState: ref.watch(memberStateProvider),
+              ),
+            );
+          },
+        ),
+      ),
+    );
   }
 }
 
@@ -269,6 +277,7 @@ class _CategoriesDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locale = Localizations.localeOf(context);
+    const dropdownMaxHeight = 120.0;
 
     return Stack(
       children: [
@@ -282,15 +291,15 @@ class _CategoriesDropdown extends StatelessWidget {
         // 正三角：直接定位在按钮正下方
         PositionedDirectional(
           top: top,
-          start: arrowCenterX - 10,
+          start: arrowCenterX - 7,
           child: CustomPaint(
-            size: const Size(20, 10),
+            size: const Size(14, 10),
             painter: _UpTrianglePainter(color: const Color(0xFFFFFFFF)),
           ),
         ),
         // 弹框：紧贴三角下方
         PositionedDirectional(
-          top: top + 10,
+          top: top + 9,
           start: left,
           child: Material(
             color: const Color(0xFFFFFFFF),
@@ -299,30 +308,36 @@ class _CategoriesDropdown extends StatelessWidget {
               width: barWidth,
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: categories.map((cat) {
-                    final isSelected = cat.id == selectedId;
-                    return GestureDetector(
-                      onTap: () => onSelect(cat.id),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isSelected ? const Color(0xFF8F4EFF) : const Color(0xFFF5F5F5),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          cat.localizedName(locale),
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.black87,
-                            fontSize: 13,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: dropdownMaxHeight),
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: categories.map((cat) {
+                        final isSelected = cat.id == selectedId;
+                        return GestureDetector(
+                          onTap: () => onSelect(cat.id),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isSelected ? const Color(0xFF8F4EFF) : const Color(0xFFF5F5F5),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              cat.localizedName(locale),
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.black87,
+                                fontSize: 13,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                        );
+                      }).toList(),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -347,7 +362,7 @@ class _UpTrianglePainter extends CustomPainter {
     final path = Path()
       ..moveTo(0, size.height)
       ..lineTo(size.width, size.height)
-      ..lineTo(size.width / 2, 0)
+      ..lineTo(size.width / 2, size.height * 0.08)
       ..close();
 
     canvas.drawPath(path, paint);
@@ -357,25 +372,23 @@ class _UpTrianglePainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _FilterTab extends StatelessWidget {
-  const _FilterTab({required this.label, required this.isSelected, required this.onTap});
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
+class _MoreMenuIcon extends StatelessWidget {
+  const _MoreMenuIcon();
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isSelected
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          fontSize: 13,
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(
+        3,
+        (_) => Container(
+          width: 16,
+          height: 2,
+          margin: const EdgeInsets.symmetric(vertical: 1.5),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(999),
+          ),
         ),
       ),
     );

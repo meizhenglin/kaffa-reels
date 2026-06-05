@@ -396,14 +396,22 @@ class ApiService {
 
   /// 全部剧集 - 标签列表
   Future<ApiResponse> getVideoLabelList() {
-    return request(ApiEndpoints.videoLabelList, method: 'GET');
+    return request(ApiEndpoints.videoLabelList, method: 'POST');
   }
 
   /// 全部剧集 - 根据标签搜索剧集列表
-  Future<ApiResponse> getVideoListByLabel({required int labelId}) {
+  Future<ApiResponse> getVideoListByLabel({
+    required int videoLabelId,
+    int pageNum = 1,
+    int pageSize = 12,
+  }) {
     return request(
       ApiEndpoints.videoListByLabel,
-      data: {'labelId': labelId},
+      data: {
+        'videoLabelId': videoLabelId,
+        'pageNum': pageNum,
+        'pageSize': pageSize,
+      },
     );
   }
 

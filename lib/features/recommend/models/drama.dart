@@ -61,7 +61,7 @@ class Drama extends Equatable {
       id: '${json['videoId'] ?? 0}',
       title: json['videoName'] as String? ?? '',
       coverUrl: json['videoPicture'] as String? ?? '',
-      views: json['views'] as int? ?? 0,
+      views: int.tryParse('${json['videoPlayNum'] ?? json['views'] ?? 0}') ?? 0,
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       description: json['videoIntroduce'] as String? ?? '',
       episodeCount: json['videoEpisodes'] as int? ?? 0,

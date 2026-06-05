@@ -4,13 +4,15 @@ import '../../../core/network/api_service.dart';
 import '../../recommend/models/drama.dart';
 import '../models/category.dart';
 
+const int _explorePageSize = 12;
+
 enum ExploreStatus { initial, loading, success, error }
 
 class ExploreState {
   const ExploreState({
     this.status = ExploreStatus.initial,
     this.categories = const [],
-    this.selectedCategoryId = 'all',
+    this.selectedCategoryId = '-1',
     this.dramas = const [],
     this.page = 1,
     this.hasMore = true,
@@ -76,7 +78,9 @@ class ExploreNotifier extends StateNotifier<ExploreState> {
       List<Category> categories = _defaultCategories;
       if (resp.isSuccess && resp.data != null) {
         final list = resp.data as List;
-        categories = list.map((json) => _categoryFromJson(json as Map<String, dynamic>)).toList();
+        categories = list
+            .map((json) => Category.fromJson(json as Map<String, dynamic>))
+            .toList();
         if (categories.isEmpty) categories = _defaultCategories;
       }
       state = state.copyWith(categories: categories);
@@ -115,19 +119,37 @@ class ExploreNotifier extends StateNotifier<ExploreState> {
 
   Future<void> _loadDramas({required int page, required bool append}) async {
     try {
-      final resp = await apiServiceProvider.getVideoHotPicks(
-        videoHotListType: state.selectedCategoryId == 'all' ? 1 : 2,
+      final videoLabelId = int.tryParse(state.selectedCategoryId) ?? -1;
+      final resp = await apiServiceProvider.getVideoListByLabel(
+        videoLabelId: videoLabelId,
+        pageNum: page,
+        pageSize: _explorePageSize,
       );
       List<Drama> dramas = [];
+      var hasMore = false;
       if (resp.isSuccess && resp.data != null) {
-        final list = resp.data as List;
-        dramas = list.map((json) => Drama.fromJson(json as Map<String, dynamic>)).toList();
+        final rawData = resp.data;
+        final records = rawData is List
+            ? rawData
+            : ((rawData as Map<String, dynamic>)['records'] as List? ??
+                (rawData['list'] as List? ?? const []));
+        dramas = records
+            .map((json) => Drama.fromJson(json as Map<String, dynamic>))
+            .toList();
+
+        if (rawData is Map<String, dynamic>) {
+          final current = (rawData['current'] as num?)?.toInt() ?? page;
+          final pages = (rawData['pages'] as num?)?.toInt() ?? current;
+          hasMore = current < pages;
+        } else {
+          hasMore = dramas.length >= _explorePageSize;
+        }
       }
       state = state.copyWith(
         status: ExploreStatus.success,
         dramas: append ? [...state.dramas, ...dramas] : dramas,
         page: page,
-        hasMore: dramas.length >= 12,
+        hasMore: hasMore,
       );
     } catch (e) {
       state = state.copyWith(
@@ -138,23 +160,7 @@ class ExploreNotifier extends StateNotifier<ExploreState> {
   }
 
   static List<Category> _defaultCategories = [
-    const Category(id: 'all', name: 'All', nameEn: 'All', nameAr: 'الكل'),
-    const Category(id: 'romance', name: 'Romance', nameEn: 'Romance', nameAr: 'رومانسي'),
-    const Category(id: 'action', name: 'Action', nameEn: 'Action', nameAr: 'أكشن'),
-    const Category(id: 'comedy', name: 'Comedy', nameEn: 'Comedy', nameAr: 'كوميديا'),
-    const Category(id: 'thriller', name: 'Thriller', nameEn: 'Thriller', nameAr: 'إثارة'),
-    const Category(id: 'sci-fi', name: 'Sci-Fi', nameEn: 'Sci-Fi', nameAr: 'خيال علمي'),
-    const Category(id: 'costume', name: 'Costume', nameEn: 'Costume', nameAr: 'تاريخي'),
-    const Category(id: 'urban', name: 'Urban', nameEn: 'Urban', nameAr: 'عصري'),
+    const Category(id: '-1', name: 'All', nameEn: 'All', nameAr: 'الكل'),
   ];
 
-  static Category _categoryFromJson(Map<String, dynamic> json) {
-    // 兼容不同的字段命名
-    return Category(
-      id: (json['id'] ?? json['labelId'] ?? json['categoryId'] ?? '').toString(),
-      name: (json['name'] ?? json['labelName'] ?? json['categoryName'] ?? '').toString(),
-      nameEn: (json['nameEn'] ?? json['name'] ?? '').toString(),
-      nameAr: (json['nameAr'] ?? '').toString(),
-    );
-  }
 }

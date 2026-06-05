@@ -255,6 +255,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get comingSoon => 'Coming soon, stay tuned!';
 
   @override
+  String get noDataAvailableAtTheMoment => 'No data available at the moment';
+
+  @override
   String get editProfile => 'Edit Profile';
 
   @override

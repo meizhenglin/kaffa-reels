@@ -78,5 +78,6 @@
   "vipSubtitle": "افتح جميع المسلسلات بنقرة واحدة",
   "subscribe": "اشترك",
   "activate": "تفعيل",
-  "viewAll": "عرض الكل"
+  "viewAll": "عرض الكل",
+  "noDataAvailableAtTheMoment": "لا توجد بيانات متاحة في الوقت الراهن"
 }
