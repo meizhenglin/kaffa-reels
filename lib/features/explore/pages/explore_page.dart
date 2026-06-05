@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../home/models/home_card_layout.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../payment/providers/membership_provider.dart';
@@ -64,6 +65,8 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
       return;
     }
 
+    final horizontalInset = HomeCardLayout.sectionHorizontalPadding(context);
+
     final RenderBox moreButtonBox = _moreButtonKey.currentContext!.findRenderObject() as RenderBox;
     final Offset moreButtonOffset = moreButtonBox.localToGlobal(Offset.zero);
     final double arrowCenterX = moreButtonOffset.dx + moreButtonBox.size.width / 2;
@@ -71,9 +74,9 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
     final RenderBox filterBarBox = _filterBarKey.currentContext!.findRenderObject() as RenderBox;
     final Offset filterBarOffset = filterBarBox.localToGlobal(Offset.zero);
     final double filterBarWidth = filterBarBox.size.width;
-    final double dropdownWidth = filterBarWidth - 32;
-    final double dropdownLeft = filterBarOffset.dx + 16;
-    final double dropdownTop = moreButtonOffset.dy + moreButtonBox.size.height + 2;
+    final double dropdownWidth = filterBarWidth - horizontalInset * 2;
+    final double dropdownLeft = filterBarOffset.dx + horizontalInset;
+    final double dropdownTop = moreButtonOffset.dy + moreButtonBox.size.height + HomeCardLayout.scaled(context, 2);
 
     _dropdownOverlay = OverlayEntry(
       builder: (ctx) => _CategoriesDropdown(
@@ -108,14 +111,19 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(16, 15, 16, 12),
+              padding: EdgeInsetsDirectional.fromSTEB(
+                HomeCardLayout.sectionHorizontalPadding(context),
+                HomeCardLayout.scaled(context, 15),
+                HomeCardLayout.sectionHorizontalPadding(context),
+                HomeCardLayout.scaled(context, 12),
+              ),
               child: ExploreSearchBar(
                 onTap: () => context.push('/search'),
               ),
             ),
             if (explore.categories.isNotEmpty) ...[
               _buildFilterBar(context, l10n, explore),
-              const SizedBox(height: 15),
+              SizedBox(height: HomeCardLayout.scaled(context, 15)),
             ],
             Expanded(
               child: _buildContent(
@@ -135,23 +143,30 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
 
   /// 筛选栏：左侧滚动分类，右侧仅保留更多按钮
   Widget _buildFilterBar(BuildContext context, AppLocalizations l10n, ExploreState explore) {
+    final chipGap = HomeCardLayout.scaled(context, 10);
+    final actionGap = HomeCardLayout.scaled(context, 8);
+    final filterBarHeight = HomeCardLayout.scaled(context, 24);
+
     return SizedBox(
       key: _filterBarKey,
       child: Row(
         children: [
           Expanded(
             child: Padding(
-              padding: const EdgeInsetsDirectional.only(start: 16, end: 8),
+              padding: EdgeInsetsDirectional.only(
+                start: HomeCardLayout.sectionHorizontalPadding(context),
+                end: actionGap,
+              ),
               child: ClipRect(
                 child: SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
                   scrollDirection: Axis.horizontal,
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 24),
+                    constraints: BoxConstraints(maxHeight: filterBarHeight),
                     child: Row(
                       children: [
                         for (int i = 0; i < explore.categories.length; i++) ...[
-                          if (i > 0) const SizedBox(width: 10),
+                          if (i > 0) SizedBox(width: chipGap),
                           _CategoryChip(
                             category: explore.categories[i],
                             isSelected:
@@ -171,7 +186,10 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
           ),
           Padding(
             key: _rightPanelKey,
-            padding: const EdgeInsetsDirectional.only(end: 16, start: 8),
+            padding: EdgeInsetsDirectional.only(
+              end: HomeCardLayout.sectionHorizontalPadding(context),
+              start: actionGap,
+            ),
             child: GestureDetector(
               key: _moreButtonKey,
               onTap: () => _showMoreCategoriesMenu(
@@ -224,12 +242,17 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
           physics: const AlwaysScrollableScrollPhysics(
             parent: BouncingScrollPhysics(),
           ),
-          padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 16),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 0.64,
+          padding: EdgeInsetsDirectional.fromSTEB(
+            HomeCardLayout.gridPadding(context),
+            0,
+            HomeCardLayout.gridPadding(context),
+            HomeCardLayout.gridPadding(context),
+          ),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            crossAxisSpacing: HomeCardLayout.cardGap(context),
+            mainAxisSpacing: HomeCardLayout.cardGap(context),
+            childAspectRatio: 106 / 178,
           ),
           itemCount: dramas.length + (isLoadingMore ? 2 : 0),
           itemBuilder: (context, index) {
@@ -276,8 +299,22 @@ class _CategoriesDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final triangleHalfWidth = HomeCardLayout.scaled(context, 7);
+    final triangleSize = Size(
+      HomeCardLayout.scaled(context, 14),
+      HomeCardLayout.scaled(context, 10),
+    );
+    final dropdownTopOffset = HomeCardLayout.scaled(context, 9);
+    final dropdownRadius = HomeCardLayout.scaled(context, 12);
+    final dropdownPadding = HomeCardLayout.scaled(context, 12);
+    final dropdownMaxHeight = HomeCardLayout.scaled(context, 120);
+    final dropdownChipGap = HomeCardLayout.scaled(context, 8);
+    final dropdownChipRadius = HomeCardLayout.scaled(context, 20);
+    final dropdownChipHorizontalPadding = HomeCardLayout.scaled(context, 12);
+    final dropdownChipVerticalPadding = HomeCardLayout.scaled(context, 6);
+    final dropdownChipFontSize = HomeCardLayout.scaled(context, 13);
+
     final locale = Localizations.localeOf(context);
-    const dropdownMaxHeight = 120.0;
 
     return Stack(
       children: [
@@ -291,45 +328,48 @@ class _CategoriesDropdown extends StatelessWidget {
         // 正三角：直接定位在按钮正下方
         PositionedDirectional(
           top: top,
-          start: arrowCenterX - 7,
+          start: arrowCenterX - triangleHalfWidth,
           child: CustomPaint(
-            size: const Size(14, 10),
+            size: triangleSize,
             painter: _UpTrianglePainter(color: const Color(0xFFFFFFFF)),
           ),
         ),
         // 弹框：紧贴三角下方
         PositionedDirectional(
-          top: top + 9,
+          top: top + dropdownTopOffset,
           start: left,
           child: Material(
             color: const Color(0xFFFFFFFF),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(dropdownRadius),
             child: SizedBox(
               width: barWidth,
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(dropdownPadding),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: dropdownMaxHeight),
+                  constraints: BoxConstraints(maxHeight: dropdownMaxHeight),
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
                     child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: dropdownChipGap,
+                      runSpacing: dropdownChipGap,
                       children: categories.map((cat) {
                         final isSelected = cat.id == selectedId;
                         return GestureDetector(
                           onTap: () => onSelect(cat.id),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: dropdownChipHorizontalPadding,
+                              vertical: dropdownChipVerticalPadding,
+                            ),
                             decoration: BoxDecoration(
                               color: isSelected ? const Color(0xFF8F4EFF) : const Color(0xFFF5F5F5),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(dropdownChipRadius),
                             ),
                             child: Text(
                               cat.localizedName(locale),
                               style: TextStyle(
                                 color: isSelected ? Colors.white : Colors.black87,
-                                fontSize: 13,
+                                fontSize: dropdownChipFontSize,
                                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                               ),
                             ),
@@ -377,14 +417,18 @@ class _MoreMenuIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lineWidth = HomeCardLayout.scaled(context, 16);
+    final lineHeight = HomeCardLayout.scaled(context, 2);
+    final lineMargin = HomeCardLayout.scaled(context, 1.5);
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(
         3,
         (_) => Container(
-          width: 16,
-          height: 2,
-          margin: const EdgeInsets.symmetric(vertical: 1.5),
+          width: lineWidth,
+          height: lineHeight,
+          margin: EdgeInsets.symmetric(vertical: lineMargin),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(999),
@@ -408,14 +452,22 @@ class _CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final chipHorizontalPadding = HomeCardLayout.scaled(context, 8);
+    final chipVerticalPadding = HomeCardLayout.scaled(context, 3);
+    final chipRadius = HomeCardLayout.scaled(context, 20);
+    final chipFontSize = HomeCardLayout.scaled(context, 13);
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: EdgeInsets.symmetric(
+          horizontal: chipHorizontalPadding,
+          vertical: chipVerticalPadding,
+        ),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF8F4EFF) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(chipRadius),
         ),
         child: Text(
           category.localizedName(Localizations.localeOf(context)),
@@ -424,7 +476,7 @@ class _CategoryChip extends StatelessWidget {
             color: isSelected
                 ? Colors.white
                 : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.65),
-            fontSize: 13,
+            fontSize: chipFontSize,
           ),
         ),
       ),
@@ -434,9 +486,28 @@ class _CategoryChip extends StatelessWidget {
 
 class _ErrorView extends StatelessWidget {
   const _ErrorView({required this.message, required this.onRetry});
-  final String message; final VoidCallback onRetry;
-  @override Widget build(BuildContext context) {
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return Center(child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [Text(message, textAlign: TextAlign.center), const SizedBox(height: 16), FilledButton(onPressed: onRetry, child: Text(l10n.retry))])));
+    final padding = HomeCardLayout.scaled(context, 24);
+    final spacing = HomeCardLayout.scaled(context, 16);
+
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(padding),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(message, textAlign: TextAlign.center),
+            SizedBox(height: spacing),
+            FilledButton(onPressed: onRetry, child: Text(l10n.retry)),
+          ],
+        ),
+      ),
+    );
   }
 }

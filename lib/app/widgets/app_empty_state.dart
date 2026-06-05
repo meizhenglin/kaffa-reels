@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../features/home/models/home_card_layout.dart';
+
 class AppEmptyState extends StatelessWidget {
   const AppEmptyState({
     super.key,
@@ -18,15 +20,15 @@ class AppEmptyState extends StatelessWidget {
         children: [
           Image.asset(
             imageAsset,
-            width: 130,
-            height: 130,
+            width: HomeCardLayout.scaled(context, 130),
+            height: HomeCardLayout.scaled(context, 130),
           ),
-          const SizedBox(height: 5),
+          SizedBox(height: HomeCardLayout.scaled(context, 5)),
           Text(
             message,
-            style: const TextStyle(
-              color: Color(0xFF808080),
-              fontSize: 13,
+            style: TextStyle(
+              color: const Color(0xFF808080),
+              fontSize: HomeCardLayout.scaled(context, 13),
               fontWeight: FontWeight.w500,
             ),
           ),

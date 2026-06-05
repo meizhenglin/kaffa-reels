@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../home/models/home_card_layout.dart';
 
 class ExploreSearchBar extends StatelessWidget {
   const ExploreSearchBar({
@@ -18,7 +19,7 @@ class ExploreSearchBar extends StatelessWidget {
       children: [
         Expanded(
           child: SizedBox(
-            height: 34,
+            height: HomeCardLayout.scaled(context, 34),
             child: GestureDetector(
               onTap: onTap,
               child: AbsorbPointer(
@@ -27,39 +28,47 @@ class ExploreSearchBar extends StatelessWidget {
                   textInputAction: TextInputAction.search,
                   decoration: InputDecoration(
                     hintText: l10n.searchHint,
-                    prefixIcon: const Padding(
-                      padding: EdgeInsetsDirectional.only(start: 14, end: 6),
+                    prefixIcon: Padding(
+                      padding: EdgeInsetsDirectional.only(
+                        start: HomeCardLayout.scaled(context, 14),
+                        end: HomeCardLayout.scaled(context, 6),
+                      ),
                       child: Image(
-                        image: AssetImage('assets/images/searchPage_icon.png'),
-                        width: 14,
-                        height: 14,
+                        image: const AssetImage('assets/images/searchPage_icon.png'),
+                        width: HomeCardLayout.scaled(context, 14),
+                        height: HomeCardLayout.scaled(context, 14),
                       ),
                     ),
-                    prefixIconConstraints: const BoxConstraints(
-                      minWidth: 34,
-                      minHeight: 34,
+                    prefixIconConstraints: BoxConstraints(
+                      minWidth: HomeCardLayout.scaled(context, 34),
+                      minHeight: HomeCardLayout.scaled(context, 34),
                     ),
                     filled: true,
                     fillColor: const Color(0x1AFFFFFF),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(50),
+                      borderRadius: BorderRadius.circular(HomeCardLayout.scaled(context, 50)),
                       borderSide: BorderSide.none,
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(50),
+                      borderRadius: BorderRadius.circular(HomeCardLayout.scaled(context, 50)),
                       borderSide: BorderSide.none,
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(50),
+                      borderRadius: BorderRadius.circular(HomeCardLayout.scaled(context, 50)),
                       borderSide: BorderSide.none,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                    hintStyle: const TextStyle(
-                      color: Color(0x80FFFFFF),
-                      fontSize: 14,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: HomeCardLayout.scaled(context, 16),
+                    ),
+                    hintStyle: TextStyle(
+                      color: const Color(0x80FFFFFF),
+                      fontSize: HomeCardLayout.scaled(context, 14),
                     ),
                   ),
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: HomeCardLayout.scaled(context, 14),
+                  ),
                 ),
               ),
             ),

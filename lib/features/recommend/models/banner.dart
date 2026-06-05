@@ -1,7 +1,6 @@
 import 'package:equatable/equatable.dart';
 
 import 'drama.dart';
-import '../utils/drama_navigation.dart';
 
 /// Banner数据模型
 /// 用于首页和推荐页顶部的轮播图
@@ -11,6 +10,8 @@ class BannerItem extends Equatable {
     required this.imageUrl,
     required this.dramaId,
     this.title,
+    this.videoName,
+    this.tags,
     this.videoId,
     this.bannerEpisodesId,
     this.bannerEpisodesName,
@@ -22,6 +23,8 @@ class BannerItem extends Equatable {
   final String imageUrl;              // 图片地址
   final String dramaId;               // 关联的短剧ID
   final String? title;                // 标题（可选）
+  final String? videoName;            // 剧名
+  final String? tags;                 // 标签字符串，逗号分隔
   final String? videoId;             // 视频ID（与 dramaId 相同）
   final String? bannerEpisodesId;     // 剧集ID
   final String? bannerEpisodesName;   // 剧集名称
@@ -33,6 +36,8 @@ class BannerItem extends Equatable {
     imageUrl: json['bannerPicture'] ?? json['imageUrl'] ?? '',
     dramaId: (json['videoId'] ?? json['dramaId'] ?? '').toString(),
     title: json['bannerEpisodesName'] ?? json['title'],
+    videoName: json['videoName']?.toString(),
+    tags: (json['videoLabelName'] ?? json['tags'] ?? json['tagNames'])?.toString(),
     videoId: json['videoId']?.toString(),
     bannerEpisodesId: json['bannerEpisodesId']?.toString(),
     bannerEpisodesName: json['bannerEpisodesName'],
@@ -45,6 +50,8 @@ class BannerItem extends Equatable {
     'imageUrl': imageUrl,
     'dramaId': dramaId,
     'title': title,
+    'videoName': videoName,
+    'tags': tags,
     'videoId': videoId,
     'bannerEpisodesId': bannerEpisodesId,
     'bannerEpisodesName': bannerEpisodesName,

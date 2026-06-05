@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../home/models/home_card_layout.dart';
 import '../../../components/preload_network_image.dart';
 import '../models/drama.dart';
 import '../models/drama_badge.dart';
@@ -55,13 +56,18 @@ class DramaCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
-    final cardWidth = width ?? 140.0;
+    final cardWidth = width ?? HomeCardLayout.bannerScaled(context, 140);
+    final cardRadius = HomeCardLayout.bannerScaled(context, 12);
+    final edgeInset = HomeCardLayout.bannerScaled(context, 8);
+    final titleSpacing = HomeCardLayout.bannerScaled(context, 8);
+    final compactSpacing = HomeCardLayout.bannerScaled(context, 4);
+    final starSize = HomeCardLayout.bannerScaled(context, 16);
 
     return SizedBox(
       width: cardWidth,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(cardRadius),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -70,7 +76,7 @@ class DramaCard extends StatelessWidget {
               children: [
                 // 封面图片
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(cardRadius),
                   child: AspectRatio(
                     aspectRatio: drama.aspectRatio,
                     child: _CoverImage(url: drama.coverUrl),
@@ -79,8 +85,8 @@ class DramaCard extends StatelessWidget {
                 // 标签
                 if (drama.badge != null)
                   PositionedDirectional(
-                    top: 8,
-                    end: 8,
+                    top: edgeInset,
+                    end: edgeInset,
                     child: _BadgeChip(
                       badge: drama.badge!,
                       isArabic: isArabic,
@@ -88,30 +94,30 @@ class DramaCard extends StatelessWidget {
                   ),
                 // VIP徽章
                 if (drama.isVipOnly)
-                  const PositionedDirectional(
-                    top: 8,
-                    start: 8,
-                    child: _VipBadge(),
+                  PositionedDirectional(
+                    top: edgeInset,
+                    start: edgeInset,
+                    child: _VipBadge(size: HomeCardLayout.bannerScaled(context, 10)),
                   ),
                 // 播放量
                 PositionedDirectional(
-                  start: 8,
-                  bottom: 8,
+                  start: edgeInset,
+                  bottom: edgeInset,
                   child: _ViewsChip(views: drama.formattedViews),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: titleSpacing),
 
             // ========== 评分和集数 ==========
             Row(
               children: [
                 Icon(
                   Icons.star_rounded,
-                  size: 16,
+                  size: starSize,
                   color: Colors.amber.shade600,
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: compactSpacing),
                 Text(
                   drama.rating.toStringAsFixed(1),
                   style: theme.textTheme.labelMedium?.copyWith(
@@ -127,7 +133,7 @@ class DramaCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: compactSpacing),
 
             // ========== 标题 ==========
             Text(
@@ -142,7 +148,7 @@ class DramaCard extends StatelessWidget {
 
             // ========== 简介（可选）==========
             if (showDescription) ...[
-              const SizedBox(height: 4),
+              SizedBox(height: compactSpacing),
               Text(
                 drama.description,
                 maxLines: 2,
@@ -245,17 +251,25 @@ class _BadgeChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final horizontalPadding = HomeCardLayout.bannerScaled(context, 8);
+    final verticalPadding = HomeCardLayout.bannerScaled(context, 4);
+    final radius = HomeCardLayout.bannerScaled(context, 6);
+    final fontSize = HomeCardLayout.bannerScaled(context, 10);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalPadding,
+        vertical: verticalPadding,
+      ),
       decoration: BoxDecoration(
-        color: badge.color,  // 使用 DramaBadge 扩展的颜色
-        borderRadius: BorderRadius.circular(6),
+        color: badge.color,
+        borderRadius: BorderRadius.circular(radius),
       ),
       child: Text(
-        badge.label(isArabic),  // 使用 DramaBadge 扩展的方法
-        style: const TextStyle(
+        badge.label(isArabic),
+        style: TextStyle(
           color: Colors.white,
-          fontSize: 10,
+          fontSize: fontSize,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -272,21 +286,31 @@ class _BadgeChip extends StatelessWidget {
 /// - 金色"VIP"文字
 /// ============================================================================
 class _VipBadge extends StatelessWidget {
-  const _VipBadge();
+  const _VipBadge({required this.size});
+
+  final double size;
 
   @override
   Widget build(BuildContext context) {
+    final horizontalPadding = size * 0.6;
+    final verticalPadding = size * 0.3;
+    final radius = size * 0.6;
+    final fontSize = size;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalPadding,
+        vertical: verticalPadding,
+      ),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.65),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(radius),
       ),
-      child: const Text(
+      child: Text(
         'VIP',
         style: TextStyle(
-          color: Color(0xFFFFD700),
-          fontSize: 10,
+          color: const Color(0xFFFFD700),
+          fontSize: fontSize,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -311,22 +335,32 @@ class _ViewsChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final horizontalPadding = HomeCardLayout.bannerScaled(context, 8);
+    final verticalPadding = HomeCardLayout.bannerScaled(context, 4);
+    final radius = HomeCardLayout.bannerScaled(context, 6);
+    final iconSize = HomeCardLayout.bannerScaled(context, 14);
+    final gap = HomeCardLayout.bannerScaled(context, 2);
+    final fontSize = HomeCardLayout.bannerScaled(context, 11);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalPadding,
+        vertical: verticalPadding,
+      ),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(radius),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 14),
-          const SizedBox(width: 2),
+          Icon(Icons.play_arrow_rounded, color: Colors.white, size: iconSize),
+          SizedBox(width: gap),
           Text(
             views,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 11,
+              fontSize: fontSize,
               fontWeight: FontWeight.w500,
             ),
           ),

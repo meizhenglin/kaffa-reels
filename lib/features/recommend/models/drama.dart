@@ -21,6 +21,9 @@ class Drama extends Equatable {
     this.videoUrl,
     this.badge,
     this.aspectRatio = 0.72,
+    this.videoAccessType = 0,
+    this.videoLabelNames = const [],
+    this.hotIndex = 0,
   });
 
   /// 唯一标识符
@@ -45,6 +48,12 @@ class Drama extends Equatable {
   final DramaBadge? badge;
   /// 瀑布流卡片比例
   final double aspectRatio;
+  /// 访问类型：0 免费，1 VIP，2 整集解锁
+  final int videoAccessType;
+  /// 视频标签名列表
+  final List<String> videoLabelNames;
+  /// 热度指数
+  final int hotIndex;
 
   /// 播放量
   String get formattedViews => views.toString();
@@ -57,6 +66,16 @@ class Drama extends Equatable {
   ///   videoIntroduce → description
   ///   videoEpisodes → episodeCount
   factory Drama.fromJson(Map<String, dynamic> json) {
+    final rawLabelList = json['videoLabelList'];
+    final videoLabelNames = rawLabelList is List
+        ? rawLabelList
+              .map(
+                (item) => (item as Map<String, dynamic>)['videoLabelName']?.toString() ?? '',
+              )
+              .where((name) => name.isNotEmpty)
+              .toList()
+        : <String>[];
+
     return Drama(
       id: '${json['videoId'] ?? 0}',
       title: json['videoName'] as String? ?? '',
@@ -69,6 +88,9 @@ class Drama extends Equatable {
       videoUrl: json['videoUrl'] as String?,
       badge: null,
       aspectRatio: (json['aspectRatio'] as num?)?.toDouble() ?? 0.72,
+      videoAccessType: int.tryParse('${json['videoAccessType'] ?? 0}') ?? 0,
+      videoLabelNames: videoLabelNames,
+      hotIndex: int.tryParse('${json['hotIndex'] ?? 0}') ?? 0,
     );
   }
 
@@ -85,8 +107,20 @@ class Drama extends Equatable {
     'videoUrl': videoUrl,
     'badge': badge?.name,
     'aspectRatio': aspectRatio,
+    'videoAccessType': videoAccessType,
+    'videoLabelNames': videoLabelNames,
+    'hotIndex': hotIndex,
   };
 
   @override
-  List<Object?> get props => [id, title, coverUrl, views, rating];
+  List<Object?> get props => [
+    id,
+    title,
+    coverUrl,
+    views,
+    rating,
+    videoAccessType,
+    videoLabelNames,
+    hotIndex,
+  ];
 }

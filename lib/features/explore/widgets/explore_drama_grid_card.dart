@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../components/preload_network_image.dart';
+import '../../../core/utils/localized_badge_assets.dart';
+import '../../home/models/home_card_layout.dart';
 import '../../recommend/models/drama.dart';
 
 class ExploreDramaGridCard extends StatelessWidget {
@@ -15,34 +17,54 @@ class ExploreDramaGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final vipBadgeAsset = localizedHomeVipBadgeAsset(context);
+    final cardHeight = HomeCardLayout.smallCardHeight(context);
+    final cardRadius = HomeCardLayout.smallCardRadius(context);
+    final titleSpacing = HomeCardLayout.scaled(context, 5);
+    final vipBadgeWidth = HomeCardLayout.scaled(context, 42);
+    final vipBadgeHeight = HomeCardLayout.scaled(context, 18);
+
     return GestureDetector(
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            height: 200,
+            height: cardHeight,
             width: double.infinity,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: PreloadNetworkImage(
-                imageUrl: drama.coverUrl,
-                preloadAsset: 'assets/images/small_preload_bg.png',
-                fit: BoxFit.cover,
-              ),
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(cardRadius),
+                  child: PreloadNetworkImage(
+                    imageUrl: drama.coverUrl,
+                    preloadAsset: 'assets/images/small_preload_bg.png',
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                if (drama.videoAccessType == 1)
+                  PositionedDirectional(
+                    top: 0,
+                    start: 0,
+                    child: Image.asset(
+                      vipBadgeAsset,
+                      width: vipBadgeWidth,
+                      height: vipBadgeHeight,
+                    ),
+                  ),
+              ],
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: titleSpacing),
           Text(
             drama.title.split(' / ').first,
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              height: 1.3,
-            ),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white,
+                  fontSize: HomeCardLayout.scaled(context, 13),
+                ),
           ),
         ],
       ),

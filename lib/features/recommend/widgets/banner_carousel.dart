@@ -1,8 +1,11 @@
+import 'dart:ui';
+
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../home/models/home_card_layout.dart';
 import '../models/banner.dart';
 
 /// ============================================================================
@@ -66,55 +69,9 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
               return Stack(
                 fit: StackFit.expand,
                 children: [
-                  // 图片内容：loading 时静态预加载图，真实数据时带淡入动画
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    child: isLoading
-                        ? Image.asset(
-                            'assets/images/banner_preload_bg.png',
-                            key: const ValueKey('preload'),
-                            fit: BoxFit.contain,
-                            width: double.infinity,
-                            height: double.infinity,
-                            alignment: Alignment.center,
-                          )
-                        : Image.network(
-                            key: ValueKey(banner.id),
-                            banner.imageUrl,
-                            fit: BoxFit.contain,
-                            width: double.infinity,
-                            height: double.infinity,
-                            alignment: Alignment.center,
-                            loadingBuilder: (_, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  ColoredBox(
-                                    color: const Color(0xFF1F2025),
-                                    child: Center(
-                                      child: Image.asset(
-                                        'assets/images/banner_preload_bg.png',
-                                        fit: BoxFit.contain,
-                                        width: double.infinity,
-                                        height: double.infinity,
-                                        alignment: Alignment.center,
-                                      ),
-                                    ),
-                                  ),
-                                  AnimatedOpacity(
-                                    opacity: 1.0,
-                                    duration: const Duration(milliseconds: 300),
-                                    child: child,
-                                  ),
-                                ],
-                              );
-                            },
-                            errorBuilder: (_, __, ___) => Container(
-                              color: Colors.grey.shade300,
-                              child: const Icon(Icons.image_not_supported),
-                            ),
-                          ),
+                  _BannerImageLayer(
+                    imageUrl: banner.imageUrl,
+                    isLoading: isLoading,
                   ),
                   DecoratedBox(
                     decoration: BoxDecoration(
@@ -133,7 +90,7 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
                     bottom: 0,
                     start: 0,
                     end: 0,
-                    height: 300,
+                    height: HomeCardLayout.bannerScaled(context, 300),
                     child: Container(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -144,34 +101,25 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
                       ),
                     ),
                   ),
-                  // 播放按钮
                   PositionedDirectional(
-                    bottom: 49,
-                    start: 0,
-                    end: 0,
-                    child: Center(
-                      child: _PlayButton(onTap: () => _onPlayTap(banner)),
+                    start: HomeCardLayout.bannerScaled(context, 38),
+                    end: HomeCardLayout.bannerScaled(context, 38),
+                    bottom: HomeCardLayout.bannerScaled(context, 49),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _BannerTextOverlay(
+                          title: banner.videoName ?? banner.title,
+                          tags: banner.tags,
+                          showExclusiveBadge: index == 0,
+                        ),
+                        SizedBox(height: HomeCardLayout.bannerScaled(context, 15)),
+                        Center(
+                          child: _PlayButton(onTap: () => _onPlayTap(banner)),
+                        ),
+                      ],
                     ),
                   ),
-                  // 标题
-                  if (banner.title != null)
-                    PositionedDirectional(
-                      bottom: 121,
-                      start: 0,
-                      end: 0, // 同时设置 start 和 end 为 0 实现横向拉伸居中
-                      child: Center(
-                        child: Text(
-                          banner.title!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 25,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
                 ],
               );
             },
@@ -193,7 +141,7 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
             top: 0,
             start: 0,
             end: 0,
-            height: topPadding + 60,
+            height: topPadding + HomeCardLayout.bannerScaled(context, 60),
             child: IgnorePointer(
               child: Container(
                 decoration: BoxDecoration(
@@ -209,8 +157,8 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
 
           // 左侧 logo
           PositionedDirectional(
-            top: topPadding + 16,
-            start: 16,
+            top: topPadding + HomeCardLayout.bannerScaled(context, 16),
+            start: HomeCardLayout.bannerScaled(context, 16),
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
               onTap: () {
@@ -220,37 +168,41 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
               },
               child: Image.asset(
                 'assets/images/logo.png', // 这里才是真正显示图片的地方
-                width: 74,
-                height: 32,
+                width: HomeCardLayout.bannerScaled(context, 74),
+                height: HomeCardLayout.bannerScaled(context, 32),
               ),
             ),
           ),
 
           // 右侧按钮组
           PositionedDirectional(
-            top: topPadding + 16,
-            end: 12,
+            top: topPadding + HomeCardLayout.bannerScaled(context, 16),
+            end: HomeCardLayout.bannerScaled(context, 12),
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
-              child: Row(
-                children: [ 
-                  _ActionButton(
-                    // icon: Icons.search_rounded,
-                    onTap: () => widget.onSearchTap?.call(),
-                    isVip: false,
-                    // child:Image(image:  AssetImage('assets/images/search.png'),width: 24,height: 24,),
-                    child:Image.asset('assets/images/search_icon.png',width: 32,height: 32,)
-
-                  ),
-                  const SizedBox(width: 8),
-                  _ActionButton(
-                    onTap: () => context.push('/membership'),
-                    isVip: true,
-                    child: Image.asset('assets/images/vip_icon.png', width: 32, height: 32),
-
-                  ),
-                ],
-              ),
+                    child: Row(
+                      children: [
+                        _ActionButton(
+                          onTap: () => widget.onSearchTap?.call(),
+                          isVip: false,
+                          child: Image.asset(
+                            'assets/images/search_icon.png',
+                            width: HomeCardLayout.bannerScaled(context, 32),
+                            height: HomeCardLayout.bannerScaled(context, 32),
+                          ),
+                        ),
+                        SizedBox(width: HomeCardLayout.bannerScaled(context, 8)),
+                        _ActionButton(
+                          onTap: () => context.push('/membership'),
+                          isVip: true,
+                          child: Image.asset(
+                            'assets/images/vip_icon.png',
+                            width: HomeCardLayout.bannerScaled(context, 32),
+                            height: HomeCardLayout.bannerScaled(context, 32),
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
 
@@ -258,7 +210,7 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
           PositionedDirectional(
             start: 0,
             end: 0,
-            bottom: 11,
+            bottom: HomeCardLayout.bannerScaled(context, 11),
             child: isLoading
                 ? const SizedBox.shrink()
                 : _buildIndicator(hasRealBanners),
@@ -279,15 +231,112 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
         return AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOutCubic,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: 7,
-          height: 7,
+          margin: EdgeInsets.symmetric(
+            horizontal: HomeCardLayout.bannerScaled(context, 4),
+          ),
+          width: HomeCardLayout.bannerScaled(context, 7),
+          height: HomeCardLayout.bannerScaled(context, 7),
           decoration: BoxDecoration(
             color: isActive ? const Color(0xFFFFFFFF) : const Color(0xFF777777),
             shape: BoxShape.circle,
           ),
         );
       }),
+    );
+  }
+}
+
+class _BannerTextOverlay extends StatelessWidget {
+  const _BannerTextOverlay({
+    required this.title,
+    required this.tags,
+    required this.showExclusiveBadge,
+  });
+
+  final String? title;
+  final String? tags;
+  final bool showExclusiveBadge;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalizedTitle = title?.trim();
+    final tagItems = (tags ?? '')
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+
+    if ((normalizedTitle == null || normalizedTitle.isEmpty) && tagItems.isEmpty && !showExclusiveBadge) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (showExclusiveBadge) ...[
+          Image.asset(
+            'assets/images/exclusive.png',
+            width: HomeCardLayout.bannerScaled(context, 103),
+            height: HomeCardLayout.bannerScaled(context, 24),
+          ),
+          SizedBox(height: HomeCardLayout.bannerScaled(context, 15)),
+        ],
+        if (normalizedTitle != null && normalizedTitle.isNotEmpty)
+          Text(
+            normalizedTitle,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: HomeCardLayout.bannerScaled(context, 25),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        if (tagItems.isNotEmpty) ...[
+          SizedBox(height: HomeCardLayout.bannerScaled(context, 5)),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              for (var i = 0; i < tagItems.length; i++) ...[
+                if (i > 0) const _BannerTagSeparator(),
+                Text(
+                  tagItems[i],
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: HomeCardLayout.bannerScaled(context, 13),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _BannerTagSeparator extends StatelessWidget {
+  const _BannerTagSeparator();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: HomeCardLayout.bannerScaled(context, 8),
+      ),
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+        ),
+        child: SizedBox(
+          width: HomeCardLayout.bannerScaled(context, 3),
+          height: HomeCardLayout.bannerScaled(context, 3),
+        ),
+      ),
     );
   }
 }
@@ -303,12 +352,17 @@ class _PlayButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 164,
-        height: 45,
+        width: HomeCardLayout.bannerScaled(context, 164),
+        height: HomeCardLayout.bannerScaled(context, 45),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: const Color(0xFF9843FF), width: 3),
+          borderRadius: BorderRadius.circular(
+            HomeCardLayout.bannerScaled(context, 30),
+          ),
+          border: Border.all(
+            color: const Color(0xFF9843FF),
+            width: HomeCardLayout.bannerScaled(context, 3),
+          ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -318,17 +372,17 @@ class _PlayButton extends StatelessWidget {
             //   color: Color(0xFF8F4EFF),
             //   size: 28,
             // ),
-            const Image(
-              image: AssetImage('assets/images/action_icon.png'),
-              width: 22,
-              height: 22,
+            Image(
+              image: const AssetImage('assets/images/action_icon.png'),
+              width: HomeCardLayout.bannerScaled(context, 22),
+              height: HomeCardLayout.bannerScaled(context, 22),
             ),
-            const SizedBox(width: 9),
+            SizedBox(width: HomeCardLayout.bannerScaled(context, 9)),
             Text(
               'Watch Now',
               style: TextStyle(
                 color: const Color(0xFF8F4EFF),
-                fontSize: 16,
+                fontSize: HomeCardLayout.bannerScaled(context, 16),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -340,16 +394,116 @@ class _PlayButton extends StatelessWidget {
 }
 
 /// 操作按钮组件
+class _BannerImageLayer extends StatelessWidget {
+  const _BannerImageLayer({
+    required this.imageUrl,
+    required this.isLoading,
+  });
+
+  final String imageUrl;
+  final bool isLoading;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return _buildPreloadBackground();
+    }
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: Stack(
+        key: ValueKey(imageUrl),
+        fit: StackFit.expand,
+        children: [
+          _BlurredBannerBackground(imageUrl: imageUrl),
+          ColoredBox(color: Colors.black.withValues(alpha: 0.18)),
+          Center(
+            child: Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              alignment: Alignment.center,
+              loadingBuilder: (_, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    _buildPreloadBackground(),
+                    Center(child: child),
+                  ],
+                );
+              },
+              errorBuilder: (_, __, ___) => Container(
+                color: Colors.grey.shade300,
+                child: const Icon(Icons.image_not_supported),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreloadBackground() {
+    return ColoredBox(
+      color: const Color(0xFF1F2025),
+      child: Center(
+        child: Image.asset(
+          'assets/images/banner_preload_bg.png',
+          fit: BoxFit.contain,
+          width: double.infinity,
+          height: double.infinity,
+          alignment: Alignment.center,
+        ),
+      ),
+    );
+  }
+}
+
+class _BlurredBannerBackground extends StatelessWidget {
+  const _BlurredBannerBackground({required this.imageUrl});
+
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          alignment: Alignment.center,
+          errorBuilder: (_, __, ___) => const ColoredBox(
+            color: Color(0xFF1F2025),
+          ),
+        ),
+        ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(
+              sigmaX: HomeCardLayout.bannerScaled(context, 18),
+              sigmaY: HomeCardLayout.bannerScaled(context, 18),
+            ),
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.18),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _ActionButton extends StatelessWidget {
   const _ActionButton({
-    // required this.icon,
     required this.child,
-
     required this.onTap,
     required this.isVip,
   });
 
-  // final IconData icon;
   final Widget child;
   final VoidCallback onTap;
   final bool isVip;
@@ -358,19 +512,12 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      // child: Container(
-      //   // padding: const EdgeInsets.all(10),
-      //   decoration: BoxDecoration(
-      //     color: isVip
-      //         ? Colors.amber.withValues(alpha: 0.9)
-      //         : Colors.black.withValues(alpha: 0.3),
-      //     borderRadius: BorderRadius.circular(12),
-      //   ),
-      //   // child: Icon(icon, color: isVip ? Colors.black : Colors.white, size: 24),
-      //   child: child,
-      // ),
+      behavior: HitTestBehavior.translucent,
+      child: SizedBox(
+        width: HomeCardLayout.bannerScaled(context, 32),
+        height: HomeCardLayout.bannerScaled(context, 32),
         child: child,
-
+      ),
     );
   }
 }

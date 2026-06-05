@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../home/models/home_card_layout.dart';
 import '../../../l10n/app_localizations.dart';
 import '../models/drama.dart';
 import 'drama_card.dart';
@@ -45,6 +46,11 @@ class HotDramaSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final sectionSpacing = HomeCardLayout.bannerScaled(context, 12);
+    final horizontalPadding = HomeCardLayout.bannerScaled(context, 16);
+    final cardWidth = HomeCardLayout.bannerScaled(context, 130);
+    final listSpacing = HomeCardLayout.bannerScaled(context, 12);
+    final listHeight = cardWidth / (140 / 250);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -54,20 +60,23 @@ class HotDramaSection extends StatelessWidget {
           title: l10n.trending,
           onSeeMore: onSeeMore,
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: sectionSpacing),
         // 横向滚动列表
         SizedBox(
-          height: 250,
+          height: listHeight,
           child: ListView.separated(
-            scrollDirection: Axis.horizontal,  // 水平滚动
-            padding: const EdgeInsetsDirectional.only(start: 16, end: 16),
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsetsDirectional.only(
+              start: horizontalPadding,
+              end: horizontalPadding,
+            ),
             itemCount: dramas.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),  // 卡片间距
+            separatorBuilder: (_, __) => SizedBox(width: listSpacing),
             itemBuilder: (context, index) {
               final drama = dramas[index];
               return DramaCard(
                 drama: drama,
-                width: 130,  // 卡片宽度
+                width: cardWidth,
                 onTap: () => onDramaTap(drama),
               );
             },
@@ -105,10 +114,18 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final horizontalPadding = HomeCardLayout.bannerScaled(context, 16);
+    final headerEndPadding = HomeCardLayout.bannerScaled(context, 8);
+    final textGap = HomeCardLayout.bannerScaled(context, 4);
+    final iconSize = HomeCardLayout.bannerScaled(context, 20);
+
     final l10n = AppLocalizations.of(context);
 
     return Padding(
-      padding: const EdgeInsetsDirectional.only(start: 16, end: 8),
+      padding: EdgeInsetsDirectional.only(
+        start: horizontalPadding,
+        end: headerEndPadding,
+      ),
       child: Row(
         children: [
           // 标题
@@ -127,11 +144,11 @@ class _SectionHeader extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(l10n.viewAll),
-                const SizedBox(width: 4),
+                SizedBox(width: textGap),
                 Icon(
-                  Icons.chevron_right,  // 右箭头图标
-                  size: 20,
-                  textDirection: Directionality.of(context),  // 根据语言方向调整
+                  Icons.chevron_right,
+                  size: iconSize,
+                  textDirection: Directionality.of(context),
                 ),
               ],
             ),

@@ -110,7 +110,7 @@ class _DramaListPageState extends ConsumerState<DramaListPage> {
   Widget _buildHeader(BuildContext context, AppLocalizations l10n) {
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: HomeCardLayout.scaled(context, 16),
+        horizontal: HomeCardLayout.sectionHorizontalPadding(context),
         vertical: HomeCardLayout.scaled(context, 8),
       ),
       child: Row(
@@ -160,7 +160,7 @@ class _DramaListPageState extends ConsumerState<DramaListPage> {
           crossAxisCount: 3,
           mainAxisSpacing: gridGap,
           crossAxisSpacing: gridGap,
-          childAspectRatio: 106 / 165,
+          childAspectRatio: 106 / 178,
         ),
         itemCount: 9,
         itemBuilder: (context, index) => _buildLoadingCard(context, index),
@@ -183,7 +183,7 @@ class _DramaListPageState extends ConsumerState<DramaListPage> {
           crossAxisCount: 3,
           mainAxisSpacing: gridGap,
           crossAxisSpacing: gridGap,
-          childAspectRatio: 106 / 165,
+          childAspectRatio: 106 / 178,
         ),
         itemCount: dramas.length + (isLoadingMore ? 3 : 0),
         itemBuilder: (context, index) {
@@ -259,8 +259,14 @@ class _DramaListPageState extends ConsumerState<DramaListPage> {
   ) {
     final coverUrl = drama.coverUrl;
     final rankBadgeAsset = localizedTopRankBadgeAsset(context, index + 1);
+    final vipBadgeAsset = localizedHomeVipBadgeAsset(context);
     final cardWidth = HomeCardLayout.smallCardWidth(context);
     final cardHeight = HomeCardLayout.smallCardHeight(context);
+    final showRankBadge = widget.type == DramaListType.topRecommend && index < 5;
+    final showVipBadge =
+        (widget.type == DramaListType.newForThisMonth ||
+            widget.type == DramaListType.vipZone) &&
+        drama.videoAccessType == 1;
 
     return SizedBox(
       width: cardWidth,
@@ -287,7 +293,7 @@ class _DramaListPageState extends ConsumerState<DramaListPage> {
                     fit: BoxFit.cover,
                   ),
                 ),
-                if (index < 5)
+                if (showRankBadge)
                   PositionedDirectional(
                     top: 0,
                     start: 0,
@@ -295,6 +301,16 @@ class _DramaListPageState extends ConsumerState<DramaListPage> {
                       rankBadgeAsset,
                       width: HomeCardLayout.scaled(context, 22),
                       height: HomeCardLayout.scaled(context, 22),
+                    ),
+                  ),
+                if (showVipBadge)
+                  PositionedDirectional(
+                    top: 0,
+                    start: 0,
+                    child: Image.asset(
+                      vipBadgeAsset,
+                      width: HomeCardLayout.scaled(context, 42),
+                      height: HomeCardLayout.scaled(context, 18),
                     ),
                   ),
               ],

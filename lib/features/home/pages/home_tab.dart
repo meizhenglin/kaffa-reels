@@ -37,6 +37,8 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final recommendState = ref.watch(recommendProvider);
+    final authState = ref.watch(authProvider);
+    final memberState = ref.watch(memberStateProvider);
 
     return RefreshIndicator(
       onRefresh: _onRefresh,
@@ -53,119 +55,62 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
                   : recommendState.isLoading
                       ? [preloadBanner]
                       : _buildMockBanners(),
-              height: 540,
+              height: HomeCardLayout.scaled(context, 540),
               onBannerTap: (banner) => _onBannerTap(banner),
               onSearchTap: () => context.push('/search'),
             ),
           ),
           SliverToBoxAdapter(
-            child: _buildSection(
-              context,
+            child: _HomeSectionHeader(
               title: l10n.topRecommend,
               onViewAll: () => context.push('/recommend/hot'),
               topPadding: 30,
-              // bottomPadding: 0,
             ),
           ),
           SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.only(bottom: HomeCardLayout.scaled(context, 30)),
-                child: SizedBox(
-                  height: HomeCardLayout.smallCardHeight(context) + HomeCardLayout.scaled(context, 25),
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: HomeCardLayout.sectionHorizontalPadding(context),
-                    ),
-                  itemCount: recommendState.topRecommend.isNotEmpty
-                      ? recommendState.topRecommend.length.clamp(0, 5)
-                      : 5,
-                  itemBuilder: (context, index) {
-                    final drama = recommendState.topRecommend.isNotEmpty
-                        ? recommendState.topRecommend[index]
-                        : null;
-                    return _buildHorizontalCard(
-                      context,
-                      index,
-                      drama,
-                      onTap: drama != null
-                          ? () => openDramaPlayerWithVipCheck(
-                                context: context,
-                                drama: drama,
-                                authState: ref.watch(authProvider),
-                                memberState: ref.watch(memberStateProvider),
-                              )
-                          : null,
-                    );
-                  },
-                ),
+            child: _TopRecommendList(
+              dramas: recommendState.topRecommend,
+              onTapDrama: (drama) => openDramaPlayerWithVipCheck(
+                context: context,
+                drama: drama,
+                authState: authState,
+                memberState: memberState,
               ),
             ),
           ),
           SliverToBoxAdapter(
-            child: _buildSection(
-              context,
+            child: _HomeSectionHeader(
               title: l10n.newForThisMonth,
               onViewAll: () => context.push('/recommend/new'),
               topPadding: 0,
             ),
           ),
           SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(
-                HomeCardLayout.sectionHorizontalPadding(context),
-                0,
-                HomeCardLayout.sectionHorizontalPadding(context),
-                0,
+            child: _NewForThisMonthGrid(
+              dramas: recommendState.newForThisMonth,
+              onTapDrama: (drama) => openDramaPlayerWithVipCheck(
+                context: context,
+                drama: drama,
+                authState: authState,
+                memberState: memberState,
               ),
-              child: _buildNewForThisMonthSection(context, recommendState),
             ),
           ),
           SliverToBoxAdapter(
-            child: _buildSection(
-              context,
+            child: _HomeSectionHeader(
               title: l10n.vipZone,
               onViewAll: () => context.push('/recommend/vip'),
               topPadding: 30,
             ),
           ),
-          SliverPadding(
-            padding: EdgeInsetsDirectional.fromSTEB(
-              HomeCardLayout.sectionHorizontalPadding(context),
-              0,
-              HomeCardLayout.sectionHorizontalPadding(context),
-              0,
-            ),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 15,
-                crossAxisSpacing: 15,
-                childAspectRatio: 106 / 150,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final drama = recommendState.vipZone.isNotEmpty &&
-                          index < recommendState.vipZone.length
-                      ? recommendState.vipZone[index]
-                      : null;
-                  return _buildVipCard(
-                    context,
-                    recommendState,
-                    index,
-                    onTap: drama != null
-                        ? () => openDramaPlayerWithVipCheck(
-                              context: context,
-                              drama: drama,
-                              authState: ref.watch(authProvider),
-                              memberState: ref.watch(memberStateProvider),
-                            )
-                        : null,
-                  );
-                },
-                childCount: recommendState.vipZone.isNotEmpty
-                    ? recommendState.vipZone.length.clamp(0, 6)
-                    : 6,
+          SliverToBoxAdapter(
+            child: _VipZoneGrid(
+              dramas: recommendState.vipZone,
+              onTapDrama: (drama) => openDramaPlayerWithVipCheck(
+                context: context,
+                drama: drama,
+                authState: authState,
+                memberState: memberState,
               ),
             ),
           ),
@@ -215,19 +160,104 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     }
   }
 
-  Widget _buildSection(
-    BuildContext context, {
-    required String title,
-    required VoidCallback onViewAll,
-    double topPadding = 15,
-    double bottomPadding = 15,
-  }) {
+}
+
+class _HomeDramaCard extends StatelessWidget {
+  const _HomeDramaCard({
+    required this.width,
+    required this.height,
+    required this.borderRadius,
+    required this.title,
+    required this.imageUrl,
+    this.titleSpacing = 8,
+    this.overlayBadge,
+    this.cornerBadge,
+    this.onTap,
+  });
+
+  final double width;
+  final double height;
+  final double borderRadius;
+  final String title;
+  final String imageUrl;
+  final double titleSpacing;
+  final Widget? overlayBadge;
+  final Widget? cornerBadge;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final image = GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(borderRadius),
+            child: PreloadNetworkImage(
+              imageUrl: imageUrl,
+              preloadAsset: 'assets/images/small_preload_bg.png',
+              width: width,
+              height: height,
+              fit: BoxFit.cover,
+            ),
+          ),
+          if (overlayBadge != null)
+            PositionedDirectional(
+              top: 0,
+              start: 0,
+              child: overlayBadge!,
+            ),
+          if (cornerBadge != null)
+            PositionedDirectional(
+              top: 0,
+              start: 0,
+              child: cornerBadge!,
+            ),
+        ],
+      ),
+    );
+
+    return SizedBox(
+      width: width,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          image,
+          SizedBox(height: titleSpacing),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.white,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeSectionHeader extends StatelessWidget {
+  const _HomeSectionHeader({
+    required this.title,
+    required this.onViewAll,
+    this.topPadding = 15,
+  });
+
+  final String title;
+  final VoidCallback onViewAll;
+  final double topPadding;
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsetsDirectional.fromSTEB(
         HomeCardLayout.sectionHorizontalPadding(context),
         HomeCardLayout.scaled(context, topPadding),
         HomeCardLayout.sectionHorizontalPadding(context),
-        HomeCardLayout.scaled(context, bottomPadding),
+        HomeCardLayout.scaled(context, 15),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -242,7 +272,11 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
           ),
           TextButton(
             onPressed: onViewAll,
-            style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
             child: Image.asset(
               'assets/images/more_icon.png',
               width: HomeCardLayout.scaled(context, 20),
@@ -253,243 +287,268 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
       ),
     );
   }
+}
 
-  Widget _buildNewForThisMonthSection(
-    BuildContext context,
-    RecommendState state,
-  ) {
-    const visibleCount = 4;
-    final items = state.newForThisMonth.isNotEmpty
-        ? state.newForThisMonth.take(visibleCount).toList()
-        : List<Drama?>.filled(visibleCount, null);
+class _TopRecommendList extends StatelessWidget {
+  const _TopRecommendList({
+    required this.dramas,
+    required this.onTapDrama,
+  });
 
-    return Column(
-      children: List.generate(2, (rowIndex) {
-        final leftIndex = rowIndex * 2;
-        final rightIndex = leftIndex + 1;
+  final List<Drama> dramas;
+  final ValueChanged<Drama> onTapDrama;
 
-        return Padding(
-          padding: EdgeInsetsDirectional.only(
-            bottom: rowIndex == 0 ? HomeCardLayout.cardGap(context) : 0,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildDramaCardFromDrama(
-                context,
-                items[leftIndex],
-                leftIndex,
-                onTap: items[leftIndex] != null
-                    ? () => openDramaPlayerWithVipCheck(
-                          context: context,
-                          drama: items[leftIndex]!,
-                          authState: ref.watch(authProvider),
-                          memberState: ref.watch(memberStateProvider),
-                        )
-                    : null,
-              ),
-              _buildDramaCardFromDrama(
-                context,
-                items[rightIndex],
-                rightIndex,
-                onTap: items[rightIndex] != null
-                    ? () => openDramaPlayerWithVipCheck(
-                          context: context,
-                          drama: items[rightIndex]!,
-                          authState: ref.watch(authProvider),
-                          memberState: ref.watch(memberStateProvider),
-                        )
-                    : null,
-              ),
-            ],
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildDramaCardFromDrama(
-    BuildContext context,
-    Drama? drama,
-    int index, {
-    VoidCallback? onTap,
-  }) {
-    final coverUrl = drama?.coverUrl;
-    final vipBadgeAsset = localizedHomeVipBadgeAsset(context);
-
-    final cardWidth = HomeCardLayout.largeCardWidth(context);
-    final cardHeight = HomeCardLayout.largeCardHeight(context);
-
-    return SizedBox(
-      width: cardWidth,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          GestureDetector(
-            onTap: onTap,
-            child: Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(HomeCardLayout.largeCardRadius(context)),
-                  child: PreloadNetworkImage(
-                    imageUrl: coverUrl ?? '',
-                    preloadAsset: 'assets/images/small_preload_bg.png',
-                    width: cardWidth,
-                    height: cardHeight,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                if (drama != null && drama.isVipOnly)
-                  PositionedDirectional(
-                    top: 0,
-                    start: 0,
-                    child: Image.asset(
-                      vipBadgeAsset,
-                      width: HomeCardLayout.scaled(context, 42),
-                      height: HomeCardLayout.scaled(context, 18),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          SizedBox(height: HomeCardLayout.scaled(context, 8)),
-          Text(
-            drama?.title.split(' / ').first ?? 'Drama ${index + 1}',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: Colors.white),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVipCard(
-    BuildContext context,
-    RecommendState state,
-    int index, {
-    VoidCallback? onTap,
-  }) {
-    // VIP Zone 使用 vipZone 数据
-    final drama = state.vipZone.isNotEmpty && index < state.vipZone.length
-        ? state.vipZone[index]
-        : null;
-    final coverUrl = drama?.coverUrl;
-    final vipBadgeAsset = localizedHomeVipBadgeAsset(context);
-    final cardWidth = HomeCardLayout.smallCardWidth(context);
-    final cardHeight = HomeCardLayout.smallCardHeight(context);
-
-    return SizedBox(
-      width: cardWidth,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: onTap,
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(HomeCardLayout.smallCardRadius(context)),
-                    child: PreloadNetworkImage(
-                      imageUrl: coverUrl ?? '',
-                      preloadAsset: 'assets/images/small_preload_bg.png',
-                      width: cardWidth,
-                      height: cardHeight,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  if (drama != null && drama.isVipOnly)
-                    PositionedDirectional(
-                      top: 0,
-                      start: 0,
-                      child: Image.asset(
-                        vipBadgeAsset,
-                        width: HomeCardLayout.scaled(context, 42),
-                        height: HomeCardLayout.scaled(context, 18),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          SizedBox(height: HomeCardLayout.scaled(context, 8)),
-          Text(
-            drama?.title.split(' / ').first ?? 'VIP Drama ${index + 1}',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: Colors.white),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHorizontalCard(
-    BuildContext context,
-    int index,
-    Drama? drama, {
-    VoidCallback? onTap,
-  }) {
-    final coverUrl = drama?.coverUrl;
-    final rankBadgeAsset = localizedTopRankBadgeAsset(context, index + 1);
-    final cardWidth = HomeCardLayout.smallCardWidth(context);
-    final cardHeight = HomeCardLayout.smallCardHeight(context);
-
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsetsDirectional.only(end: HomeCardLayout.cardGap(context)),
+      padding: EdgeInsets.only(bottom: HomeCardLayout.scaled(context, 30)),
       child: SizedBox(
-        width: cardWidth,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            GestureDetector(
-              onTap: onTap,
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(HomeCardLayout.smallCardRadius(context)),
-                    child: PreloadNetworkImage(
-                      imageUrl: coverUrl ?? '',
-                      preloadAsset: 'assets/images/small_preload_bg.png',
-                      width: cardWidth,
-                      height: cardHeight,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  if (drama != null && index < 5)
-                    PositionedDirectional(
-                      top: 0,
-                      start: 0,
-                      child: Image.asset(
-                        rankBadgeAsset,
-                        width: HomeCardLayout.scaled(context, 22),
-                        height: HomeCardLayout.scaled(context, 22),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            SizedBox(height: HomeCardLayout.scaled(context, 6)),
-            Text(
-              drama?.title.split(' / ').first ?? 'Drama ${index + 1}',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: Colors.white),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+        height: HomeCardLayout.smallCardTotalHeight(context),
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.symmetric(
+            horizontal: HomeCardLayout.sectionHorizontalPadding(context),
+          ),
+          itemCount: dramas.isNotEmpty ? dramas.length.clamp(0, 5) : 5,
+          separatorBuilder: (_, __) => SizedBox(width: HomeCardLayout.cardGap(context)),
+          itemBuilder: (context, index) {
+            final drama = dramas.isNotEmpty ? dramas[index] : null;
+            return _TopRecommendCard(
+              drama: drama,
+              index: index,
+              onTap: drama != null ? () => onTapDrama(drama) : null,
+            );
+          },
         ),
       ),
+    );
+  }
+}
+
+class _TopRecommendCard extends StatelessWidget {
+  const _TopRecommendCard({
+    required this.drama,
+    required this.index,
+    this.onTap,
+  });
+
+  final Drama? drama;
+  final int index;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _HomeDramaCard(
+      width: HomeCardLayout.smallCardWidth(context),
+      height: HomeCardLayout.smallCardHeight(context),
+        borderRadius: HomeCardLayout.smallCardRadius(context),
+        title: drama?.title.split(' / ').first ?? 'Drama ${index + 1}',
+        imageUrl: drama?.coverUrl ?? '',
+        titleSpacing: HomeCardLayout.scaled(context, 6),
+        overlayBadge: drama != null && index < 5
+            ? _HomeCardBadge(
+                assetPath: localizedTopRankBadgeAsset(context, index + 1),
+                width: HomeCardLayout.scaled(context, 22),
+                height: HomeCardLayout.scaled(context, 22),
+              )
+            : null,
+        onTap: onTap,
+      );
+  }
+}
+
+class _NewForThisMonthGrid extends StatelessWidget {
+  const _NewForThisMonthGrid({
+    required this.dramas,
+    required this.onTapDrama,
+  });
+
+  final List<Drama> dramas;
+  final ValueChanged<Drama> onTapDrama;
+
+  @override
+  Widget build(BuildContext context) {
+    const visibleCount = 4;
+    final items = dramas.isNotEmpty
+        ? dramas.take(visibleCount).toList()
+        : List<Drama?>.filled(visibleCount, null);
+
+    return Padding(
+      padding: EdgeInsetsDirectional.fromSTEB(
+        HomeCardLayout.sectionHorizontalPadding(context),
+        0,
+        HomeCardLayout.sectionHorizontalPadding(context),
+        0,
+      ),
+      child: Column(
+        children: List.generate(2, (rowIndex) {
+          final leftIndex = rowIndex * 2;
+          final rightIndex = leftIndex + 1;
+
+          return Padding(
+            padding: EdgeInsetsDirectional.only(
+              bottom: rowIndex == 0 ? HomeCardLayout.cardGap(context) : 0,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _NewForThisMonthCard(
+                  drama: items[leftIndex],
+                  index: leftIndex,
+                  onTap: items[leftIndex] != null
+                      ? () => onTapDrama(items[leftIndex]!)
+                      : null,
+                ),
+                _NewForThisMonthCard(
+                  drama: items[rightIndex],
+                  index: rightIndex,
+                  onTap: items[rightIndex] != null
+                      ? () => onTapDrama(items[rightIndex]!)
+                      : null,
+                ),
+              ],
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _NewForThisMonthCard extends StatelessWidget {
+  const _NewForThisMonthCard({
+    required this.drama,
+    required this.index,
+    this.onTap,
+  });
+
+  final Drama? drama;
+  final int index;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _HomeDramaCard(
+      width: HomeCardLayout.largeCardWidth(context),
+      height: HomeCardLayout.largeCardHeight(context),
+      borderRadius: HomeCardLayout.largeCardRadius(context),
+      title: drama?.title.split(' / ').first ?? 'Drama ${index + 1}',
+      imageUrl: drama?.coverUrl ?? '',
+      titleSpacing: HomeCardLayout.scaled(context, 8),
+      cornerBadge: drama != null && drama!.videoAccessType == 1
+          ? _HomeCardBadge(
+              assetPath: localizedHomeVipBadgeAsset(context),
+              width: HomeCardLayout.scaled(context, 42),
+              height: HomeCardLayout.scaled(context, 18),
+            )
+          : null,
+      onTap: onTap,
+    );
+  }
+}
+
+class _VipZoneGrid extends StatelessWidget {
+  const _VipZoneGrid({
+    required this.dramas,
+    required this.onTapDrama,
+  });
+
+  final List<Drama> dramas;
+  final ValueChanged<Drama> onTapDrama;
+
+  @override
+  Widget build(BuildContext context) {
+    const visibleCount = 6;
+    final items = dramas.isNotEmpty
+        ? dramas.take(visibleCount).toList()
+        : List<Drama?>.filled(visibleCount, null);
+
+    return Padding(
+      padding: EdgeInsetsDirectional.fromSTEB(
+        HomeCardLayout.sectionHorizontalPadding(context),
+        0,
+        HomeCardLayout.sectionHorizontalPadding(context),
+        0,
+      ),
+      child: Column(
+        children: List.generate(2, (rowIndex) {
+          final startIndex = rowIndex * 3;
+
+          return Padding(
+            padding: EdgeInsetsDirectional.only(
+              bottom: rowIndex == 0 ? HomeCardLayout.cardGap(context) : 0,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: List.generate(3, (columnIndex) {
+                final itemIndex = startIndex + columnIndex;
+                final drama = items[itemIndex];
+
+                return _VipZoneCard(
+                  drama: drama,
+                  index: itemIndex,
+                  onTap: drama != null ? () => onTapDrama(drama) : null,
+                );
+              }),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _VipZoneCard extends StatelessWidget {
+  const _VipZoneCard({
+    required this.drama,
+    required this.index,
+    this.onTap,
+  });
+
+  final Drama? drama;
+  final int index;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _HomeDramaCard(
+      width: HomeCardLayout.smallCardWidth(context),
+      height: HomeCardLayout.smallCardHeight(context),
+      borderRadius: HomeCardLayout.smallCardRadius(context),
+      title: drama?.title.split(' / ').first ?? 'VIP Drama ${index + 1}',
+      imageUrl: drama?.coverUrl ?? '',
+      titleSpacing: HomeCardLayout.scaled(context, 8),
+      cornerBadge: drama != null && drama!.videoAccessType == 1
+          ? _HomeCardBadge(
+              assetPath: localizedHomeVipBadgeAsset(context),
+              width: HomeCardLayout.scaled(context, 42),
+              height: HomeCardLayout.scaled(context, 18),
+            )
+          : null,
+      onTap: onTap,
+    );
+  }
+}
+
+class _HomeCardBadge extends StatelessWidget {
+  const _HomeCardBadge({
+    required this.assetPath,
+    required this.width,
+    required this.height,
+  });
+
+  final String assetPath;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      assetPath,
+      width: width,
+      height: height,
     );
   }
 }

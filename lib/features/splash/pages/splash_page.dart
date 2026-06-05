@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../home/models/home_card_layout.dart';
 import '../../auth/providers/auth_provider.dart';
 
 /// ============================================================================
@@ -90,10 +92,31 @@ class _SplashPageState extends ConsumerState<SplashPage> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
+    final splashWidth = HomeCardLayout.splashWidth(context);
+    final splashHeight = HomeCardLayout.splashHeight(context);
+    final screenHeight = HomeCardLayout.screenHeight(context);
+
     return Scaffold(
-      body: FadeTransition(opacity: _fadeAnimation,
-        child: ScaleTransition(scale: _scaleAnimation,
-          child: SizedBox.expand(child: Image.asset('assets/images/splash.png', fit: BoxFit.cover)))),
+      body: ColoredBox(
+        color: Colors.black,
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: Center(
+              child: SizedBox(
+                width: splashWidth,
+                height: splashHeight > screenHeight ? screenHeight : splashHeight,
+                child: Image.asset(
+                  'assets/images/splash.png',
+                  fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

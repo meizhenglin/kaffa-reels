@@ -3,6 +3,7 @@ import 'dart:async' show Timer;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../home/models/home_card_layout.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../../components/preload_network_image.dart';
@@ -94,7 +95,6 @@ class _SearchPageState extends ConsumerState<SearchPage>
     final search = ref.watch(searchPageProvider);
     final hasSearch = search.hasActiveSearch;
 
-    // 使用 RepaintBoundary 包裹整个页面，避免不必要的重绘
     return RepaintBoundary(
       child: GradientScaffold(
         body: SafeArea(
@@ -154,7 +154,6 @@ class _SearchPageState extends ConsumerState<SearchPage>
   }
 
   void _onSubmitted(String query) {
-    // 不强制取消焦点，让系统自然处理键盘
     if (query.trim().isEmpty) return;
     ref.read(searchPageProvider.notifier).submitSearch(query);
   }
@@ -177,33 +176,34 @@ class _SearchPageState extends ConsumerState<SearchPage>
               child: SizedBox(
                 height: 34,
                 child: showHint
-                  ? Stack(
-                      children: [
-                        _buildTextField(),
-                        Positioned.fill(
-                          child: IgnorePointer(
-                            child: Align(
-                              alignment: AlignmentDirectional.centerStart,
-                              child: Padding(
-                                padding: const EdgeInsetsDirectional.only(start: 46),
-                                child: ClipRect(
-                                  child: SlideTransition(
-                                    position: Tween<Offset>(
-                                      begin: const Offset(0, 0.5),
-                                      end: Offset.zero,
-                                    ).animate(CurvedAnimation(
-                                      parent: _hintAnimController,
-                                      curve: Curves.easeOut,
-                                    )),
-                                    child: FadeTransition(
-                                      opacity: _hintAnimController,
-                                      child: Text(
-                                        words[_displayedWordIndex % words.length],
-                                        style: const TextStyle(
-                                          color: Color(0x80FFFFFF),
-                                          fontSize: 14,
+                    ? Stack(
+                        children: [
+                          _buildTextField(),
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: Align(
+                                alignment: AlignmentDirectional.centerStart,
+                                child: Padding(
+                                  padding: const EdgeInsetsDirectional.only(start: 46),
+                                  child: ClipRect(
+                                    child: SlideTransition(
+                                      position: Tween<Offset>(
+                                        begin: const Offset(0, 0.5),
+                                        end: Offset.zero,
+                                      ).animate(CurvedAnimation(
+                                        parent: _hintAnimController,
+                                        curve: Curves.easeOut,
+                                      )),
+                                      child: FadeTransition(
+                                        opacity: _hintAnimController,
+                                        child: Text(
+                                          words[_displayedWordIndex % words.length],
+                                          style: const TextStyle(
+                                            color: Color(0x80FFFFFF),
+                                            fontSize: 14,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                   ),
@@ -211,10 +211,9 @@ class _SearchPageState extends ConsumerState<SearchPage>
                               ),
                             ),
                           ),
-                        ),
-                      ],
-                    )
-                  : _buildTextField(),
+                        ],
+                      )
+                    : _buildTextField(),
               ),
             ),
           ],
@@ -224,135 +223,142 @@ class _SearchPageState extends ConsumerState<SearchPage>
   }
 
   Widget _buildTextField() {
-    return TextField(
-      controller: _searchController,
-      focusNode: _searchFocusNode,
-      textInputAction: TextInputAction.search,
-      decoration: InputDecoration(
-        prefixIcon: const Padding(
-          padding: EdgeInsetsDirectional.only(start: 14, end: 6),
-          child: Image(
-            image: AssetImage('assets/images/searchPage_icon.png'),
-            width: 14,
-            height: 14,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color.fromRGBO(255, 255, 255, 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: TextField(
+        controller: _searchController,
+        focusNode: _searchFocusNode,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          prefixIcon: const Padding(
+            padding: EdgeInsetsDirectional.only(start: 14, end: 6),
+            child: Image(
+              image: AssetImage('assets/images/searchPage_icon.png'),
+              width: 14,
+              height: 14,
+            ),
+          ),
+          prefixIconConstraints: const BoxConstraints(
+            minWidth: 34,
+            minHeight: 34,
+          ),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? GestureDetector(
+                  onTap: () {
+                    _searchController.clear();
+                    ref.read(searchPageProvider.notifier).clearSearch();
+                    setState(() {});
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(10),
+                    child: Image(
+                      image: AssetImage('assets/images/search_del_icon.png'),
+                      width: 18,
+                      height: 18,
+                    ),
+                  ),
+                )
+              : null,
+          filled: true,
+          fillColor: Colors.transparent,
+          hintText: '',
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(999),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(999),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(999),
+            borderSide: BorderSide.none,
           ),
         ),
-        prefixIconConstraints: const BoxConstraints(
-          minWidth: 34,
-          minHeight: 34,
-        ),
-        suffixIcon: _searchController.text.isNotEmpty
-            ? GestureDetector(
-                onTap: () {
-                  _searchController.clear();
-                  ref.read(searchPageProvider.notifier).clearSearch();
-                  setState(() {});
-                },
-                child: const Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Image(
-                    image: AssetImage('assets/images/search_del_icon.png'),
-                    width: 18,
-                    height: 18,
-                  ),
-                ),
-              )
-            : null,
-        suffixIconConstraints: const BoxConstraints(
-          minWidth: 38,
-          minHeight: 38,
-        ),
-        filled: true,
-        fillColor: const Color(0x1AFFFFFF),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(50),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(50),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(50),
-          borderSide: BorderSide.none,
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-        hintStyle: const TextStyle(color: Color(0x80FFFFFF), fontSize: 14),
-      ),
-      style: const TextStyle(color: Colors.white, fontSize: 14),
-      onChanged: (v) {
-        ref.read(searchPageProvider.notifier).setQuery(v);
-        setState(() {});
-      },
-      onSubmitted: _onSubmitted,
-    );
-  }
-
-  Widget _buildRankingList() {
-    final dramas = _rankingDramas;
-    return RepaintBoundary(
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        itemCount: dramas.length,
-        itemBuilder: (context, index) => _RankingListItem(
-          key: ValueKey(dramas[index].id),
-          drama: dramas[index],
-          rank: index + 1,
-          onTap: () => _onDramaTap(dramas[index]),
-        ),
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+        cursorColor: Colors.white,
+        onChanged: (value) {
+          setState(() {});
+          ref.read(searchPageProvider.notifier).setQuery(value);
+        },
+        onSubmitted: _onSubmitted,
       ),
     );
   }
 
   Widget _buildSearchResults(SearchPageState search) {
     if (search.isLoadingResults && search.searchResults.isEmpty) {
-      return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF8F4EFF)),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
-
-    if (search.searchResults.isEmpty && !search.isLoadingResults) {
+    if (search.errorMessage != null && search.searchResults.isEmpty) {
       return Center(
         child: Text(
-          'No results found',
-          style: TextStyle(color: Colors.grey[500], fontSize: 14),
+          search.errorMessage!,
+          style: const TextStyle(color: Colors.white70),
+        ),
+      );
+    }
+    if (search.searchResults.isEmpty) {
+      return const Center(
+        child: Text(
+          'No results',
+          style: TextStyle(color: Colors.white70),
         ),
       );
     }
 
-    return RepaintBoundary(
-      child: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          if (notification is ScrollEndNotification) {
-            final metrics = notification.metrics;
-            if (metrics.pixels >= metrics.maxScrollExtent - 240) {
-              ref.read(searchPageProvider.notifier).loadMoreSearch();
-            }
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification.metrics.pixels >=
+            notification.metrics.maxScrollExtent - 200) {
+          ref.read(searchPageProvider.notifier).loadMoreSearch();
+        }
+        return false;
+      },
+      child: ListView.builder(
+        padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 24),
+        itemCount: search.searchResults.length + (search.isLoadingResults ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index >= search.searchResults.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            );
           }
-          return false;
-        },
-        child: ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          itemCount: search.searchResults.length,
-          itemBuilder: (context, index) => _SearchResultItem(
-            key: ValueKey(search.searchResults[index].id),
+          return _SearchResultItem(
             drama: search.searchResults[index],
             onTap: () => _onDramaTap(search.searchResults[index]),
-          ),
-        ),
+          );
+        },
       ),
+    );
+  }
+
+  Widget _buildRankingList() {
+    final dramas = _rankingDramas;
+    if (dramas.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return ListView.builder(
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 24),
+      itemCount: dramas.length,
+      itemBuilder: (context, index) {
+        return _RankingListItem(
+          drama: dramas[index],
+          rank: index + 1,
+          onTap: () => _onDramaTap(dramas[index]),
+        );
+      },
     );
   }
 }
 
-/// ============================================================================
-/// 搜索结果卡片（ListView 风格）
-///
-/// 封面图 + 标题 + 观看数 + 评分
-/// ============================================================================
 class _SearchResultItem extends StatelessWidget {
   const _SearchResultItem({
-    super.key,
     required this.drama,
     required this.onTap,
   });
@@ -370,7 +376,6 @@ class _SearchResultItem extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 12),
           child: Row(
             children: [
-              // 封面
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: PreloadNetworkImage(
@@ -382,7 +387,6 @@ class _SearchResultItem extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              // 文字区
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -427,14 +431,28 @@ class _SearchResultItem extends StatelessWidget {
   }
 }
 
-/// ============================================================================
-/// 排行列表卡片
-///
-/// 左侧排名号 + 封面图 + 标题 + 观看数 + 评分
-/// ============================================================================
+class _SearchTagSeparator extends StatelessWidget {
+  const _SearchTagSeparator({required this.gap});
+
+  final double gap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: gap),
+      child: const DecoratedBox(
+        decoration: BoxDecoration(
+          color: Color(0xFF999999),
+          shape: BoxShape.circle,
+        ),
+        child: SizedBox(width: 3, height: 3),
+      ),
+    );
+  }
+}
+
 class _RankingListItem extends StatelessWidget {
   const _RankingListItem({
-    super.key,
     required this.drama,
     required this.rank,
     required this.onTap,
@@ -459,101 +477,144 @@ class _RankingListItem extends StatelessWidget {
 
   bool get _hasRankImage => rank <= 3;
 
+  double _titleMaxWidth(BuildContext context) {
+    return HomeCardLayout.bannerScaled(context, 153);
+  }
+
+  List<String> get _labelItems =>
+      drama.videoLabelNames
+          .map((item) => item.trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+
   @override
   Widget build(BuildContext context) {
+    final rankWidth = HomeCardLayout.bannerScaled(context, 24);
+    final rankGap = HomeCardLayout.bannerScaled(context, 7);
+    final coverWidth = HomeCardLayout.bannerScaled(context, 74);
+    final coverHeight = HomeCardLayout.bannerScaled(context, 105);
+    final coverGap = HomeCardLayout.bannerScaled(context, 10);
+    final rowGap = HomeCardLayout.bannerScaled(context, 4);
+    final hotIconSize = HomeCardLayout.bannerScaled(context, 18);
+    final hotGap = HomeCardLayout.bannerScaled(context, 4);
+
     return RepaintBoundary(
       child: GestureDetector(
         onTap: onTap,
-        child: Container(
-          height: 105,
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Row(
-            children: [
-              // 排行标签
-              SizedBox(
-                width: 24,
-                child: _hasRankImage
-                    ? Image.asset(_rankAsset, width: 24, height: 24)
-                    : Text(
-                        '$rank',
-                        style: const TextStyle(
-                          color: Color(0xFF999999),
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+        child: IntrinsicHeight(
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: HomeCardLayout.bannerScaled(context, 12),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: rankWidth,
+                  child: _hasRankImage
+                      ? Image.asset(
+                          _rankAsset,
+                          width: rankWidth,
+                          height: rankWidth,
+                        )
+                      : Text(
+                          '$rank',
+                          style: TextStyle(
+                            color: const Color(0xFF999999),
+                            fontSize: HomeCardLayout.bannerScaled(context, 18),
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-              ),
-              const SizedBox(width: 7),
-              // 封面
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: PreloadNetworkImage(
-                  imageUrl: drama.coverUrl,
-                  preloadAsset: 'assets/images/small_preload_bg.png',
-                  width: 74,
-                  height: 105,
-                  fit: BoxFit.cover,
                 ),
-              ),
-              const SizedBox(width: 10),
-              // 文字区
-              Expanded(
-                child: Column(
+                SizedBox(width: rankGap),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(
+                    HomeCardLayout.bannerScaled(context, 10),
+                  ),
+                  child: PreloadNetworkImage(
+                    imageUrl: drama.coverUrl,
+                    preloadAsset: 'assets/images/small_preload_bg.png',
+                    width: coverWidth,
+                    height: coverHeight,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                SizedBox(width: coverGap),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: _titleMaxWidth(context)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        drama.title,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: HomeCardLayout.bannerScaled(context, 14),
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: rowGap),
+                      Text(
+                        drama.description,
+                        style: TextStyle(
+                          color: const Color(0xFF999999),
+                          fontSize: HomeCardLayout.bannerScaled(context, 11),
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (_labelItems.isNotEmpty) ...[
+                        SizedBox(height: rowGap),
+                        SizedBox(
+                          width: _titleMaxWidth(context),
+                          child: Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              for (var i = 0; i < _labelItems.length; i++) ...[
+                                if (i > 0) _SearchTagSeparator(gap: HomeCardLayout.bannerScaled(context, 8)),
+                                Text(
+                                  _labelItems[i],
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w400,
+                                    fontSize: HomeCardLayout.bannerScaled(context, 12),
+                                    color: const Color(0xFF999999),
+                                    height: 18 / 12,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Row(
+                  textDirection: TextDirection.ltr,
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      drama.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Image.asset(
+                      'assets/images/search_hot_icon.png',
+                      width: hotIconSize,
+                      height: hotIconSize,
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(width: hotGap),
                     Text(
-                      drama.description,
-                      style: const TextStyle(
-                        color: Color(0xFF999999),
-                        fontSize: 11,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Translated Series',
+                      '${drama.hotIndex}',
                       style: TextStyle(
-                        color: Color(0xFF666666),
-                        fontSize: 11,
+                        color: const Color(0xFFFFB92E),
+                        fontSize: HomeCardLayout.bannerScaled(context, 12),
                       ),
                     ),
                   ],
                 ),
-              ),
-              // 热度
-              Row(
-                textDirection: TextDirection.ltr,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Image(
-                    image: AssetImage('assets/images/search_hot_icon.png'),
-                    width: 18,
-                    height: 18,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    drama.formattedViews,
-                    style: const TextStyle(
-                      color: Color(0xFFFFB92E),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
