@@ -193,6 +193,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
+      textDirection: Directionality.of(context),
       children: [
         // 头像区域
         GestureDetector(
@@ -235,7 +236,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
               if (isLoggedIn)
                 Container(
                   height: 18,
-                  padding: const EdgeInsets.only(right: 5),
+                  padding: const EdgeInsetsDirectional.only(end: 5),
                   decoration: BoxDecoration(
                     color: const Color(0x26FFFFFF),
                     borderRadius: BorderRadius.circular(7),
@@ -265,7 +266,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
           GestureDetector(
             onTap: () => context.push('/auth/login?redirect=/profile'),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsetsDirectional.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
                 color: const Color(0xFFFFFFFF),
                 borderRadius: BorderRadius.circular(10),
@@ -400,7 +401,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                 );
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsetsDirectional.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(31),
                   image: const DecorationImage(
@@ -421,7 +422,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
             GestureDetector(
               onTap: () => context.go('/membership'),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsetsDirectional.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(31),
                   image: const DecorationImage(
@@ -445,6 +446,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
 
   Widget _buildFunctionIcons(BuildContext context) {
     return Row(
+      textDirection: Directionality.of(context),
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         _buildIconButton(

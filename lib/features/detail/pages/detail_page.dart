@@ -14,6 +14,7 @@ import '../../recommend/pages/ali_player_preload.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../payment/providers/membership_provider.dart';
 import '../../payment/widgets/vip_paywall_overlay.dart';
+import '../../../components/rtl_back_button.dart';
 
 /// 详情页 — 完全复用 ShortVideoListPage 模式，唯一区别是传入 overlayBuilder
 class DetailPage extends ConsumerStatefulWidget {
@@ -364,15 +365,15 @@ class _DetailPageState extends ConsumerState<DetailPage> {
   }
 
   Widget _buildTopBar(String episodeTitle, bool isFirst, bool isLast) {
-    return Positioned(
+    return PositionedDirectional(
       top: 0,
-      left: 0,
-      right: 0,
+      start: 0,
+      end: 0,
       child: Container(
-        padding: EdgeInsets.only(
+        padding: EdgeInsetsDirectional.only(
           top: MediaQuery.paddingOf(context).top + 8,
-          left: 48,
-          right: 16,
+          start: 48,
+          end: 16,
           bottom: 12,
         ),
         decoration: const BoxDecoration(
@@ -407,8 +408,8 @@ class _DetailPageState extends ConsumerState<DetailPage> {
   }
 
   Widget _buildActionColumn(int index, bool isFirst, bool isLast) {
-    return Positioned(
-      right: 12,
+    return PositionedDirectional(
+      end: 12,
       bottom: 100,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -473,13 +474,13 @@ class _DetailPageState extends ConsumerState<DetailPage> {
                         );
                       },
                     ),
-                    Positioned(
+                    PositionedDirectional(
                       top: MediaQuery.paddingOf(context).top + 8,
-                      left: 8,
+                      start: 8,
                       child: SafeArea(
-                        child: IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        child: RtlBackButton(
                           onPressed: () => Navigator.pop(context),
+                          color: Colors.white,
                         ),
                       ),
                     ),

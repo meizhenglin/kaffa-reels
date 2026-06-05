@@ -11,6 +11,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../payment/models/subscription_product.dart';
 import '../../payment/providers/membership_provider.dart';
 import '../../payment/services/payment_service.dart';
+import '../../../components/rtl_back_button.dart';
 
 class MembershipPage extends ConsumerStatefulWidget {
   const MembershipPage({super.key});
@@ -165,12 +166,12 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
             ),
           ),
           // 返回按钮
-          Positioned(
+          PositionedDirectional(
             top: MediaQuery.of(context).padding.top + 8,
-            left: 8,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
+            start: 8,
+            child: RtlBackButton(
               onPressed: () => context.pop(),
+              color: Colors.white,
             ),
           ),
         ],
@@ -221,7 +222,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                  padding: const EdgeInsetsDirectional.only(start: 16, end: 16, bottom: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -341,7 +342,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         : null;
 
     return Container(
-      padding: EdgeInsets.fromLTRB(
+      padding: EdgeInsetsDirectional.fromSTEB(
         16,
         10,
         16,

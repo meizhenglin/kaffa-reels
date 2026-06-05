@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../components/rtl_back_button.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 
 class RechargeAgreementPage extends StatelessWidget {
@@ -15,9 +16,9 @@ class RechargeAgreementPage extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => context.pop(),
-                    child: Image.asset('assets/images/back_icon.png', width: 20, height: 20),
+                  RtlBackButton(
+                    onPressed: () => context.pop(),
+                    color: Colors.white,
                   ),
                   const Expanded(
                     child: Center(
@@ -31,7 +32,13 @@ class RechargeAgreementPage extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 48),
+                  const Opacity(
+                    opacity: 0,
+                    child: RtlBackButton(
+                      onPressed: null,
+                      color: Colors.white,
+                    ),
+                  ),
                 ],
               ),
             ),

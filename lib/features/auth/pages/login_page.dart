@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../providers/auth_provider.dart';
+import '../../../components/rtl_back_button.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key, this.redirect});
@@ -53,8 +54,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   const SizedBox(height: 18),
                   Row(
                     children: [
-                      GestureDetector(
-                        onTap: () {
+                      RtlBackButton(
+                        onPressed: () {
                           final navigator = Navigator.of(context);
                           if (navigator.canPop()) {
                             navigator.pop();
@@ -62,17 +63,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             context.go('/');
                           }
                         },
-                        child: Image.asset(
-                          'assets/images/back.png',
-                          width: 20,
-                          height: 20,
-                          color: Colors.white,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.arrow_forward,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
+                        color: Colors.white,
+                        constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
                       ),
                       const Expanded(
                         child: Center(
@@ -86,7 +78,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 20),
+                      const Opacity(
+                        opacity: 0,
+                        child: RtlBackButton(
+                          onPressed: null,
+                          color: Colors.white,
+                          constraints: BoxConstraints(minWidth: 20, minHeight: 20),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 67),

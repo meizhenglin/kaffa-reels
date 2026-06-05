@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../components/preload_network_image.dart';
+import '../../../components/rtl_back_button.dart';
+import '../../../core/utils/localized_badge_assets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -67,13 +69,9 @@ class DramaListPage extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: () => context.pop(),
-            child: Image.asset(
-              'assets/images/back_icon.png',
-              width: 20,
-              height: 20,
-            ),
+          RtlBackButton(
+            color: Colors.white,
+            onPressed: () => context.pop(),
           ),
           Expanded(
             child: Text(
@@ -152,6 +150,7 @@ class DramaListPage extends ConsumerWidget {
     Drama drama,
   ) {
     final coverUrl = drama.coverUrl;
+    final rankBadgeAsset = localizedTopRankBadgeAsset(context, index + 1);
 
     return SizedBox(
       width: 106,
@@ -180,11 +179,11 @@ class DramaListPage extends ConsumerWidget {
                 ),
                 // 前5名角标
                 if (index < 5)
-                  Positioned(
+                  PositionedDirectional(
                     top: 0,
-                    left: 0,
+                    start: 0,
                     child: Image.asset(
-                      'assets/images/top_${index + 1}_icon.png',
+                      rankBadgeAsset,
                       width: 22,
                       height: 22,
                     ),

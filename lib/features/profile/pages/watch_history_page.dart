@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/preload_network_image.dart';
+import '../../../components/rtl_back_button.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/storage/storage_service.dart';
 
@@ -36,7 +37,7 @@ class _WatchHistoryPageState extends ConsumerState<WatchHistoryPage> {
   }
 
   Future<void> _clearHistory() async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -71,7 +72,7 @@ class _WatchHistoryPageState extends ConsumerState<WatchHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
 
     return GradientScaffold(
       body: SafeArea(
@@ -82,8 +83,8 @@ class _WatchHistoryPageState extends ConsumerState<WatchHistoryPage> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  RtlBackButton(
+                    color: Colors.white,
                     onPressed: () => context.pop(),
                   ),
                   const SizedBox(width: 8),
@@ -208,7 +209,7 @@ class _WatchHistoryPageState extends ConsumerState<WatchHistoryPage> {
     final progress = (item['progress'] as num?)?.toDouble() ?? 0.0;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsetsDirectional.only(bottom: 12),
       decoration: BoxDecoration(
         color: const Color(0xFF1F2025),
         borderRadius: BorderRadius.circular(12),

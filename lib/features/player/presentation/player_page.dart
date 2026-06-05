@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_aliplayer/flutter_aliplayer.dart';
-import 'package:flutter_aliplayer/flutter_aliplayer_factory.dart' show AliPlayerView, AliPlayerViewTypeForAndroid, FlutterAliPlayerFactory;
+import 'package:flutter_aliplayer/flutter_aliplayer_factory.dart' show FlutterAliPlayerFactory;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:logger/logger.dart';
@@ -13,6 +13,7 @@ import 'episode_sheet.dart';
 import 'player_controller.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../payment/providers/membership_provider.dart';
+import '../../../components/rtl_back_button.dart';
 
 /// ============================================================================
 /// 全屏播放器页面
@@ -147,10 +148,8 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
 
   void _showLockedEpisodeDialog(int index) {
     final authState = ref.read(authProvider);
-    final memberState = ref.read(memberStateProvider);
 
     final bool isGuest = !authState.isAuthenticated || authState.user?.isGuest == true;
-    final bool needsVip = !memberState.isVip || memberState.isExpired;
 
     showDialog(
       context: context,
@@ -424,8 +423,8 @@ class _EpisodeCardState extends State<_EpisodeCard> {
         ),
 
         // 右侧操作列
-        Positioned(
-          right: 12,
+        PositionedDirectional(
+          end: 12,
           bottom: 80,
           child: _ActionColumn(
             episodeCount: widget.episodes.length,
@@ -439,9 +438,9 @@ class _EpisodeCardState extends State<_EpisodeCard> {
         ),
 
         // 底部进度条
-        Positioned(
-          left: 0,
-          right: 0,
+        PositionedDirectional(
+          start: 0,
+          end: 0,
           bottom: 0,
           child: _BottomBar(
             player: widget.player,
@@ -472,9 +471,9 @@ class _TopBar extends StatelessWidget {
     final padding = MediaQuery.paddingOf(context);
 
     return Container(
-      padding: EdgeInsets.only(
-        left: 8,
-        right: 16,
+      padding: EdgeInsetsDirectional.only(
+        start: 8,
+        end: 16,
         top: padding.top + 4,
         bottom: 8,
       ),
@@ -490,9 +489,9 @@ class _TopBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // 返回按钮
-          IconButton(
+          RtlBackButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            color: Colors.white,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
           ),
@@ -760,9 +759,9 @@ class _BottomBar extends StatelessWidget {
     final padding = MediaQuery.paddingOf(context);
 
     return Container(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
+      padding: EdgeInsetsDirectional.only(
+        start: 16,
+        end: 16,
         bottom: padding.bottom + 16,
         top: 24,
       ),

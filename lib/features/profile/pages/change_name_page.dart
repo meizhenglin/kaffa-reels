@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../components/rtl_back_button.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class ChangeNamePage extends ConsumerStatefulWidget {
@@ -64,8 +65,8 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () async {
+                  RtlBackButton(
+                    onPressed: () async {
                       final didPop = await Navigator.of(context).maybePop();
                       if (!context.mounted) {
                         return;
@@ -74,11 +75,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
                         context.go('/profile');
                       }
                     },
-                    child: Image.asset(
-                      'assets/images/back.png',
-                      width: 24,
-                      height: 24,
-                    ),
+                    constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                   ),
                   const Expanded(
                     child: Text(
@@ -91,7 +88,13 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 24),
+                  const Opacity(
+                    opacity: 0,
+                    child: RtlBackButton(
+                      onPressed: null,
+                      constraints: BoxConstraints(minWidth: 24, minHeight: 24),
+                    ),
+                  ),
                 ],
               ),
             ),

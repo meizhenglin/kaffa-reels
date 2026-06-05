@@ -13,6 +13,7 @@ import '../features/player/presentation/episode_sheet.dart';
 import '../features/player/presentation/player_controller.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/payment/providers/membership_provider.dart';
+import 'rtl_back_button.dart';
 
 /// Common video player component.
 ///
@@ -162,15 +163,15 @@ class _RecommendPlayerViewState extends State<_RecommendPlayerView> {
   }
 
   Widget _buildTopBar(BuildContext context) {
-    return Positioned(
+    return PositionedDirectional(
       top: 0,
-      left: 0,
-      right: 0,
+      start: 0,
+      end: 0,
       child: Container(
-        padding: EdgeInsets.only(
+        padding: EdgeInsetsDirectional.only(
           top: MediaQuery.paddingOf(context).top + 8,
-          left: 8,
-          right: 8,
+          start: 8,
+          end: 8,
           bottom: 12,
         ),
         decoration: const BoxDecoration(
@@ -183,8 +184,8 @@ class _RecommendPlayerViewState extends State<_RecommendPlayerView> {
         child: Row(
           children: [
             if (widget.onBackPressed != null)
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
+              RtlBackButton(
+                color: Colors.white,
                 onPressed: widget.onBackPressed,
               ),
             Expanded(
@@ -255,7 +256,6 @@ class _FullscreenPlayerView extends ConsumerStatefulWidget {
 
 class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
   late FlutterAliplayer _player;
-  int? _viewId;
   bool _isPlaying = false;
   bool _isBuffering = false;
   bool _hasError = false;
@@ -386,7 +386,6 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
   }
 
   void _onViewCreated(int viewId) {
-    _viewId = viewId;
     _player.setPlayerView(viewId);
     _loadUrl(_urlForQuality(widget.currentQuality));
   }
@@ -530,15 +529,15 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
   }
 
   Widget _buildTopBar(BuildContext context) {
-    return Positioned(
+    return PositionedDirectional(
       top: 0,
-      left: 0,
-      right: 0,
+      start: 0,
+      end: 0,
       child: Container(
-        padding: EdgeInsets.only(
+        padding: EdgeInsetsDirectional.only(
           top: MediaQuery.paddingOf(context).top + 8,
-          left: 8,
-          right: 8,
+          start: 8,
+          end: 8,
           bottom: 12,
         ),
         decoration: const BoxDecoration(
@@ -551,7 +550,7 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
         child: Row(
           children: [
             IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              icon: const Icon(Icons.close, color: Colors.white),
               onPressed: widget.onBackPressed ?? () => context.pop(),
             ),
             Expanded(
@@ -573,8 +572,8 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
   }
 
   Widget _buildActionColumn(BuildContext context) {
-    return Positioned(
-      right: 12,
+    return PositionedDirectional(
+      end: 12,
       bottom: 120,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -841,7 +840,7 @@ class _QualitySheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            margin: const EdgeInsets.only(top: 12),
+            margin: const EdgeInsetsDirectional.only(top: 12),
             width: 40,
             height: 4,
             decoration: BoxDecoration(

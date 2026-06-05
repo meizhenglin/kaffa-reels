@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../components/preload_network_image.dart';
+import '../../../core/utils/localized_badge_assets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../payment/providers/membership_provider.dart';
@@ -209,7 +210,7 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     double bottomPadding = 15,
   }) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(14, topPadding, 14, bottomPadding),
+      padding: EdgeInsetsDirectional.fromSTEB(14, topPadding, 14, bottomPadding),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -250,7 +251,7 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
         final rightIndex = leftIndex + 1;
 
         return Padding(
-          padding: EdgeInsets.only(bottom: rowIndex == 0 ? 15 : 0),
+          padding: EdgeInsetsDirectional.only(bottom: rowIndex == 0 ? 15 : 0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -295,6 +296,7 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     VoidCallback? onTap,
   }) {
     final coverUrl = drama?.coverUrl;
+    final vipBadgeAsset = localizedHomeVipBadgeAsset(context);
 
     return SizedBox(
       width: 165,
@@ -317,11 +319,11 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
                   ),
                 ),
                 if (drama != null && drama.isVipOnly)
-                  Positioned(
+                  PositionedDirectional(
                     top: 0,
-                    left: 0,
+                    start: 0,
                     child: Image.asset(
-                      'assets/images/home_vip_icon.png',
+                      vipBadgeAsset,
                       width: 42,
                       height: 18,
                     ),
@@ -354,6 +356,7 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
         ? state.vipZone[index]
         : null;
     final coverUrl = drama?.coverUrl;
+    final vipBadgeAsset = localizedHomeVipBadgeAsset(context);
 
     return SizedBox(
       width: 106,
@@ -378,11 +381,11 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
                   ),
                   // VIP 徽章（强制显示，左上角）
                   if (drama != null && drama.isVipOnly)
-                    Positioned(
+                    PositionedDirectional(
                       top: 0,
-                      left: 0,
+                      start: 0,
                       child: Image.asset(
-                        'assets/images/home_vip_icon.png',
+                        vipBadgeAsset,
                         width: 42,
                         height: 18,
                       ),
@@ -412,9 +415,10 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     VoidCallback? onTap,
   }) {
     final coverUrl = drama?.coverUrl;
+    final rankBadgeAsset = localizedTopRankBadgeAsset(context, index + 1);
 
     return Padding(
-      padding: const EdgeInsets.only(right: 15),
+      padding: const EdgeInsetsDirectional.only(end: 15),
       child: SizedBox(
         width: 106,
         child: Column(
@@ -437,11 +441,11 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
                   ),
                   // 前5名角标
                   if (drama != null && index < 5)
-                    Positioned(
+                    PositionedDirectional(
                       top: 0,
-                      left: 0,
+                      start: 0,
                       child: Image.asset(
-                        'assets/images/top_${index + 1}_icon.png',
+                        rankBadgeAsset,
                         width: 22,
                         height: 22,
                       ),

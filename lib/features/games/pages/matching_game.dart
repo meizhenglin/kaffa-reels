@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../components/rtl_back_button.dart';
 import '../providers/games_provider.dart';
 
 class MatchingItem {
@@ -49,7 +50,6 @@ class _MatchingGamePageState extends ConsumerState<MatchingGamePage> {
   int _elapsedSeconds = 0;
   Timer? _timer;
   bool _gameStarted = false;
-  bool _gameCompleted = false;
 
   @override
   void initState() {
@@ -85,7 +85,6 @@ class _MatchingGamePageState extends ConsumerState<MatchingGamePage> {
       _isProcessing = false;
       _elapsedSeconds = 0;
       _gameStarted = false;
-      _gameCompleted = false;
     });
 
     _timer?.cancel();
@@ -169,7 +168,6 @@ class _MatchingGamePageState extends ConsumerState<MatchingGamePage> {
   void _checkCompletion() {
     if (_items.every((item) => item.isMatched)) {
       _timer?.cancel();
-      setState(() => _gameCompleted = true);
 
       ref.read(gameScoresProvider.notifier).updateMatchingTime(_elapsedSeconds);
 
@@ -236,8 +234,8 @@ class _MatchingGamePageState extends ConsumerState<MatchingGamePage> {
               // 返回按钮和时间
               Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  RtlBackButton(
+                    color: Colors.white,
                     onPressed: () => Navigator.pop(context),
                   ),
                   const Spacer(),

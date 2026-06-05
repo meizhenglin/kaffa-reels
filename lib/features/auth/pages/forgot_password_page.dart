@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../components/rtl_back_button.dart';
 import '../../../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_text_field.dart';
@@ -51,8 +52,8 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
+              RtlBackButton(
+                color: Colors.white,
                 onPressed: () => context.pop(),
               ),
               const SizedBox(height: 16),

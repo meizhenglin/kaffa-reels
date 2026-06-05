@@ -9,6 +9,7 @@ import '../../../core/providers/auth_provider.dart' show apiServiceProviderRef;
 import '../../../core/utils/app_restart.dart';
 import '../../../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
+import '../../../components/rtl_back_button.dart';
 
 class LoginEmailPage extends ConsumerStatefulWidget {
   const LoginEmailPage({super.key, this.redirect});
@@ -148,8 +149,8 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                   const SizedBox(height: 18),
                   Row(
                     children: [
-                      GestureDetector(
-                        onTap: () {
+                      RtlBackButton(
+                        onPressed: () {
                           final navigator = Navigator.of(context);
                           if (navigator.canPop()) {
                             navigator.pop();
@@ -157,17 +158,8 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                             context.push('/auth/login');
                           }
                         },
-                        child: Image.asset(
-                          'assets/images/back.png',
-                          width: 20,
-                          height: 20,
-                          color: Colors.white,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.arrow_forward,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
+                        color: Colors.white,
+                        constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
                       ),
                       const Expanded(
                         child: Center(
@@ -181,7 +173,14 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 20),
+                  const Opacity(
+                    opacity: 0,
+                    child: RtlBackButton(
+                      onPressed: null,
+                      color: Colors.white,
+                      constraints: BoxConstraints(minWidth: 20, minHeight: 20),
+                    ),
+                  ),
                     ],
                   ),
                   const SizedBox(height: 67),
@@ -239,7 +238,7 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                         ),
                         const SizedBox(height: 20),
                         Align(
-                          alignment: Alignment.centerRight,
+                          alignment: AlignmentDirectional.centerEnd,
                           child: GestureDetector(
                             onTap: () => context.push('/auth/forgot-password'),
                             child: const Text(
@@ -311,6 +310,7 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                           onTap: () =>
                               setState(() => _autoLogin = !_autoLogin),
                           child: Row(
+                            textDirection: Directionality.of(context),
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               SizedBox(
@@ -404,7 +404,7 @@ class _EmailInput extends StatelessWidget {
           fontWeight: FontWeight.w500,
         ),
         prefixIcon: Padding(
-          padding: const EdgeInsets.only(left: 20, right: 12),
+          padding: const EdgeInsetsDirectional.only(start: 20, end: 12),
           child: Image.asset(
             'assets/images/login_email_icon.png',
             width: 20,
@@ -482,7 +482,7 @@ class _PasswordInput extends StatelessWidget {
         suffixIcon: GestureDetector(
           onTap: onToggle,
           child: Padding(
-            padding: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsetsDirectional.only(end: 16),
             child: Image.asset(
               obscureText
                   ? 'assets/images/dontShowPsw_icon.png'

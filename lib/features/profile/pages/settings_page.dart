@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/router/router_config.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../components/rtl_back_button.dart';
 import '../../../core/utils/app_restart.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -83,13 +84,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => context.pop(),
-                    child: Image.asset(
-                      'assets/images/back_icon.png',
-                      width: 20,
-                      height: 20,
-                    ),
+                  RtlBackButton(
+                    onPressed: () => context.pop(),
+                    color: Colors.white,
                   ),
                   Expanded(
                     child: Center(
@@ -103,7 +100,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 48),
+                  const Opacity(
+                    opacity: 0,
+                    child: RtlBackButton(
+                      onPressed: null,
+                      color: Colors.white,
+                    ),
+                  ),
                 ],
               ),
             ),

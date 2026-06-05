@@ -71,7 +71,7 @@ class EpisodeSheet extends StatelessWidget {
 
   Widget _buildHandle() {
     return Container(
-      margin: const EdgeInsets.only(top: 12),
+      margin: const EdgeInsetsDirectional.only(top: 12),
       width: 40,
       height: 4,
       decoration: BoxDecoration(
@@ -85,6 +85,7 @@ class EpisodeSheet extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
+        textDirection: Directionality.of(context),
         children: [
           Text(
             'Episodes',
@@ -119,7 +120,7 @@ class EpisodeSheet extends StatelessWidget {
       ),
       child: GridView.builder(
         shrinkWrap: true,
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+        padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 32),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 5,
           mainAxisSpacing: 12,
@@ -229,34 +230,6 @@ class _EpisodeItem extends StatelessWidget {
                 ),
         ),
       ),
-    );
-  }
-}
-
-class _UnlockDialog extends StatelessWidget {
-  const _UnlockDialog({
-    required this.episodeNumber,
-    required this.onUnlock,
-  });
-
-  final int episodeNumber;
-  final VoidCallback onUnlock;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Unlock Episode'),
-      content: Text('Do you want to unlock Episode $episodeNumber?'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: onUnlock,
-          child: const Text('Unlock'),
-        ),
-      ],
     );
   }
 }

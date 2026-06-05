@@ -93,10 +93,10 @@ class _GradientBackground extends StatelessWidget {
         // 渐变区域固定高度 182px
         SizedBox(height: 182),
         // 底部纯色区域（182px 以下）
-        Positioned(
+        PositionedDirectional(
           top: 182,
-          left: 0,
-          right: 0,
+          start: 0,
+          end: 0,
           bottom: 0,
           child: Container(
             color: const Color(0xFF1F2025),

@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../components/rtl_back_button.dart';
 import '../providers/games_provider.dart';
 
 class GuessLineQuestion {
@@ -229,8 +230,8 @@ class _GuessLineGamePageState extends ConsumerState<GuessLineGamePage> {
               // 返回按钮和分数
               Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  RtlBackButton(
+                    color: Colors.white,
                     onPressed: () => Navigator.pop(context),
                   ),
                   const Spacer(),

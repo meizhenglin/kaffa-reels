@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../components/rtl_back_button.dart';
 import '../../../core/utils/app_restart.dart';
 
 class LanguagePage extends ConsumerStatefulWidget {
@@ -65,13 +66,9 @@ class _LanguagePageState extends ConsumerState<LanguagePage> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => context.pop(),
-                    child: Image.asset(
-                      'assets/images/back_icon.png',
-                      width: 20,
-                      height: 20,
-                    ),
+                  RtlBackButton(
+                    onPressed: () => context.pop(),
+                    color: Colors.white,
                   ),
                   const Expanded(
                     child: Center(
@@ -113,7 +110,7 @@ class _LanguagePageState extends ConsumerState<LanguagePage> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+              padding: const EdgeInsetsDirectional.fromSTEB(14, 0, 14, 8),
               child: GestureDetector(
                 onTap: _isSaving ? null : _saveLanguage,
                 child: Opacity(

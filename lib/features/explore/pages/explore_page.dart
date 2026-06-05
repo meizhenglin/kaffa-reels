@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../home/pages/main_page.dart';
 import '../../recommend/models/drama.dart';
 import '../../recommend/utils/drama_navigation.dart';
 import '../models/category.dart';
@@ -133,7 +132,7 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
         child: GestureDetector(
           onTap: () => _searchFocusNode.unfocus(),
           child: Column(children: [
-            Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 8), child: ExploreSearchBar(focusNode: _searchFocusNode, onSubmitted: (_) => _searchFocusNode.unfocus())),
+            Padding(padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 8), child: ExploreSearchBar(focusNode: _searchFocusNode, onSubmitted: (_) => _searchFocusNode.unfocus())),
             if (showSuggestions) Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: SearchSuggestionsPanel(onSuggestionTap: _onSuggestionTap)),
             if (!showSearchResults && explore.categories.isNotEmpty) ...[
               _buildFilterBar(context, l10n, explore),
@@ -148,8 +147,6 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
 
   /// 筛选栏：左边64%滚动分类chips，右边36%固定Hot/New/更多
   Widget _buildFilterBar(BuildContext context, AppLocalizations l10n, ExploreState explore) {
-    final locale = Localizations.localeOf(context);
-
     return SizedBox(
       key: _filterBarKey,
       // height: 24,
@@ -198,8 +195,9 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
                     GestureDetector(
                       key: _moreButtonKey,
                       onTap: () => _showMoreCategoriesMenu(context, explore.categories, explore.selectedCategoryId),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                  child: Row(
+                    textDirection: Directionality.of(context),
+                    mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
@@ -240,7 +238,7 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
     final columnCount = _gridColumnCount(context);
     return RefreshIndicator(onRefresh: _onRefresh, child: NotificationListener<ScrollNotification>(onNotification: _onScrollNotification,
       child: CustomScrollView(controller: _scrollController, physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()), slivers: [
-        SliverPadding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columnCount, childAspectRatio: 0.52, crossAxisSpacing: 10, mainAxisSpacing: 12),
+        SliverPadding(padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 16), sliver: SliverGrid(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columnCount, childAspectRatio: 0.52, crossAxisSpacing: 10, mainAxisSpacing: 12),
           delegate: SliverChildBuilderDelegate((context, index) => ExploreDramaGridCard(drama: dramas[index], highlightQuery: showSearchResults ? search.debouncedQuery : null, onTap: () => openDramaPlayer(context, dramas[index])), childCount: dramas.length))),
         if (isLoadingMore) const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))),
       ])));
@@ -282,18 +280,18 @@ class _CategoriesDropdown extends StatelessWidget {
           ),
         ),
         // 正三角：直接定位在按钮正下方
-        Positioned(
-          left: arrowCenterX - 10,
+        PositionedDirectional(
           top: top,
+          start: arrowCenterX - 10,
           child: CustomPaint(
             size: const Size(20, 10),
             painter: _UpTrianglePainter(color: const Color(0xFFFFFFFF)),
           ),
         ),
         // 弹框：紧贴三角下方
-        Positioned(
-          left: left,
+        PositionedDirectional(
           top: top + 10,
+          start: left,
           child: Material(
             color: const Color(0xFFFFFFFF),
             borderRadius: BorderRadius.circular(12),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../components/rtl_back_button.dart';
 import '../providers/games_provider.dart';
 
 class DailySigninPage extends ConsumerStatefulWidget {
@@ -115,8 +116,8 @@ class _DailySigninPageState extends ConsumerState<DailySigninPage> {
               // 返回按钮
               Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  RtlBackButton(
+                    color: Colors.white,
                     onPressed: () => Navigator.pop(context),
                   ),
                   const SizedBox(width: 8),
@@ -226,7 +227,6 @@ class _DailySigninPageState extends ConsumerState<DailySigninPage> {
                   final isToday = index == today;
                   final isPast = index < today;
                   final isSigned = isPast || (isToday && hasSignedToday);
-                  final isFuture = index > today;
 
                   return Expanded(
                     child: AspectRatio(

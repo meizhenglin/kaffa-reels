@@ -159,15 +159,15 @@ class ShortVideoItemState extends State<ShortVideoItem> {
   }
 
   Widget _buildTopBar(BuildContext context) {
-    return Positioned(
+    return PositionedDirectional(
       top: 0,
-      left: 0,
-      right: 0,
+      start: 0,
+      end: 0,
       child: Container(
-        padding: EdgeInsets.only(
+        padding: EdgeInsetsDirectional.only(
           top: MediaQuery.paddingOf(context).top + 8,
-          left: 8,
-          right: 8,
+          start: 8,
+          end: 8,
           bottom: 12,
         ),
         child: Row(
@@ -191,8 +191,8 @@ class ShortVideoItemState extends State<ShortVideoItem> {
   }
 
   Widget _buildRightSideActionsOverlay(BuildContext context) {
-    return Positioned(
-      right: 12,
+    return PositionedDirectional(
+      end: 12,
       bottom: 100,
       child: Column(
         mainAxisSize: MainAxisSize.min,

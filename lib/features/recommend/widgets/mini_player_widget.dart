@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_aliplayer/flutter_aliplayer.dart';
 import 'package:go_router/go_router.dart';
-import 'package:logger/logger.dart';
 
 import '../../player/presentation/player_controller.dart';
 import 'mini_player_controller.dart';
@@ -24,8 +23,6 @@ class MiniPlayerWidget extends ConsumerStatefulWidget {
 
 class _MiniPlayerState extends ConsumerState<MiniPlayerWidget>
     with WidgetsBindingObserver {
-  final Logger _logger = Logger();
-
   @override
   void initState() {
     super.initState();
@@ -159,10 +156,10 @@ class _MiniPlayerState extends ConsumerState<MiniPlayerWidget>
             ),
 
             // Title overlay at top
-            Positioned(
+            PositionedDirectional(
+              start: 0,
+              end: 0,
               top: 0,
-              left: 0,
-              right: 0,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
@@ -185,8 +182,8 @@ class _MiniPlayerState extends ConsumerState<MiniPlayerWidget>
             ),
 
             // Vertical action buttons — bottom-right
-            Positioned(
-              right: 12,
+            PositionedDirectional(
+              end: 12,
               bottom: 12,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -356,7 +353,7 @@ class _MiniProgressBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(2),
                 ),
                 child: FractionallySizedBox(
-                  alignment: Alignment.centerLeft,
+                  alignment: AlignmentDirectional.centerStart,
                   widthFactor: progress.clamp(0.0, 1.0),
                   child: Container(
                     decoration: BoxDecoration(
@@ -393,7 +390,7 @@ class _WatchButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 16, 8),
       child: GestureDetector(
         onTap: () {
           if (dramaId == null) return;

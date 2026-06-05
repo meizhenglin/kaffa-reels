@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../components/rtl_back_button.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 
 class MessageSettingsPage extends StatefulWidget {
@@ -24,9 +25,9 @@ class _MessageSettingsPageState extends State<MessageSettingsPage> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => context.pop(),
-                    child: Image.asset('assets/images/back_icon.png', width: 20, height: 20),
+                  RtlBackButton(
+                    onPressed: () => context.pop(),
+                    color: Colors.white,
                   ),
                   const Expanded(
                     child: Center(
@@ -40,7 +41,13 @@ class _MessageSettingsPageState extends State<MessageSettingsPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 48),
+                  const Opacity(
+                    opacity: 0,
+                    child: RtlBackButton(
+                      onPressed: null,
+                      color: Colors.white,
+                    ),
+                  ),
                 ],
               ),
             ),

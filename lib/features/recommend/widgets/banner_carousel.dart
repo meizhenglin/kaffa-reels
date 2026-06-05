@@ -42,7 +42,7 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
   /// 跳转到播放器，只需传 videoId，播放器自己请求数据
   void _onPlayTap(BannerItem banner) {
     final videoId = banner.videoId ?? banner.dramaId;
-    if (videoId == null || videoId.isEmpty) return;
+    if (videoId.isEmpty) return;
     context.push('/short-video', extra: {'videoId': videoId});
   }
 
@@ -122,10 +122,10 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
                     ),
                   ),
                   // 底部蒙层
-                  Positioned(
+                  PositionedDirectional(
                     bottom: 0,
-                    left: 0,
-                    right: 0,
+                    start: 0,
+                    end: 0,
                     height: 300,
                     child: Container(
                       decoration: BoxDecoration(
@@ -138,10 +138,10 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
                     ),
                   ),
                   // 播放按钮
-                  Positioned(
+                  PositionedDirectional(
                     bottom: 49,
-                    left: 0,
-                    right: 0,
+                    start: 0,
+                    end: 0,
                     child: Center(
                       child: _PlayButton(onTap: () => _onPlayTap(banner)),
                     ),
@@ -182,10 +182,10 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
           ),
 
           // 顶部渐变遮罩（IgnorePointer，不拦截触摸）
-          Positioned(
+          PositionedDirectional(
             top: 0,
-            left: 0,
-            right: 0,
+            start: 0,
+            end: 0,
             height: topPadding + 60,
             child: IgnorePointer(
               child: Container(
@@ -201,9 +201,9 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
           ),
 
           // 左侧 logo
-          Positioned(
+          PositionedDirectional(
             top: topPadding + 16,
-            left: 16,
+            start: 16,
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
               onTap: () {
@@ -220,9 +220,9 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
           ),
 
           // 右侧按钮组
-          Positioned(
+          PositionedDirectional(
             top: topPadding + 16,
-            right: 12,
+            end: 12,
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
               child: Row(
@@ -248,9 +248,9 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
           ),
 
           // 指示器（loading 时隐藏）
-          Positioned(
-            left: 0,
-            right: 0,
+          PositionedDirectional(
+            start: 0,
+            end: 0,
             bottom: 11,
             child: isLoading
                 ? const SizedBox.shrink()

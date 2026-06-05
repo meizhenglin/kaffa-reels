@@ -107,8 +107,8 @@ class ShortVideoItemState extends State<ShortVideoItem> {
   /// Build right-side action buttons overlay
   /// Mirrors Java: right side action buttons in AUIVideoItemView
   Widget _buildRightSideActionsOverlay(BuildContext context) {
-    return Positioned(
-      right: 12,
+    return PositionedDirectional(
+      end: 12,
       bottom: 100,
       child: Column(
         mainAxisSize: MainAxisSize.min,

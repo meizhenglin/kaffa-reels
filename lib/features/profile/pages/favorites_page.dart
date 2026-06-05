@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/preload_network_image.dart';
+import '../../../components/rtl_back_button.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/storage/storage_service.dart';
 
@@ -36,7 +37,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   }
 
   Future<void> _removeFavorite(Map<String, dynamic> item) async {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -80,7 +81,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
 
     return GradientScaffold(
       body: SafeArea(
@@ -91,8 +92,8 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  RtlBackButton(
+                    color: Colors.white,
                     onPressed: () => context.pop(),
                   ),
                   const SizedBox(width: 8),
@@ -208,9 +209,9 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
                         : const Icon(Icons.play_circle_outline, size: 40, color: Colors.white54),
                     ),
                   ),
-                  Positioned(
+                  PositionedDirectional(
                     top: 8,
-                    right: 8,
+                    end: 8,
                     child: GestureDetector(
                       onTap: () => _removeFavorite(item),
                       child: Container(
@@ -227,9 +228,9 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
                       ),
                     ),
                   ),
-                  Positioned(
+                  PositionedDirectional(
                     bottom: 8,
-                    left: 8,
+                    start: 8,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
@@ -237,6 +238,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Row(
+                        textDirection: TextDirection.ltr,
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(Icons.star, color: Colors.amber, size: 12),
@@ -273,6 +275,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
                       ),
                       const Spacer(),
                       Row(
+                        textDirection: TextDirection.ltr,
                         children: [
                           Icon(Icons.play_circle, size: 14, color: Colors.grey[400]),
                           const SizedBox(width: 4),

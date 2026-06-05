@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../components/rtl_back_button.dart';
 import '../../../components/preload_network_image.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../payment/providers/membership_provider.dart';
@@ -103,9 +104,9 @@ class _SearchPageState extends ConsumerState<SearchPage>
               const SizedBox(height: 12),
               if (!hasSearch) ...[
                 const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsetsDirectional.symmetric(horizontal: 16),
                   child: Align(
-                    alignment: Alignment.centerLeft,
+                    alignment: AlignmentDirectional.centerStart,
                     child: Text(
                       'Popularity Hot List',
                       style: TextStyle(
@@ -164,31 +165,27 @@ class _SearchPageState extends ConsumerState<SearchPage>
     final showHint = words.isNotEmpty && !isFocused;
     return RepaintBoundary(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 15, 16, 12),
+        padding: const EdgeInsetsDirectional.fromSTEB(16, 15, 16, 12),
         child: Row(
           children: [
-            GestureDetector(
-              onTap: () => context.pop(),
-              child: const Image(
-                image: AssetImage('assets/images/back_icon.png'),
-                width: 20,
-                height: 20,
-              ),
+            RtlBackButton(
+              onPressed: () => context.pop(),
+              color: Colors.white,
             ),
-            const SizedBox(width: 6),
-            SizedBox(
-              width: 320,
-              height: 34,
-              child: showHint
+            const SizedBox(width: 8),
+            Expanded(
+              child: SizedBox(
+                height: 34,
+                child: showHint
                   ? Stack(
                       children: [
                         _buildTextField(),
                         Positioned.fill(
                           child: IgnorePointer(
                             child: Align(
-                              alignment: Alignment.centerLeft,
+                              alignment: AlignmentDirectional.centerStart,
                               child: Padding(
-                                padding: const EdgeInsets.only(left: 46),
+                                padding: const EdgeInsetsDirectional.only(start: 46),
                                 child: ClipRect(
                                   child: SlideTransition(
                                     position: Tween<Offset>(
@@ -218,6 +215,7 @@ class _SearchPageState extends ConsumerState<SearchPage>
                       ],
                     )
                   : _buildTextField(),
+              ),
             ),
           ],
         ),
@@ -232,7 +230,7 @@ class _SearchPageState extends ConsumerState<SearchPage>
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
         prefixIcon: const Padding(
-          padding: EdgeInsets.only(left: 14, right: 6),
+          padding: EdgeInsetsDirectional.only(start: 14, end: 6),
           child: Image(
             image: AssetImage('assets/images/searchPage_icon.png'),
             width: 14,
@@ -522,6 +520,7 @@ class _RankingListItem extends StatelessWidget {
               ),
               // 热度
               Row(
+                textDirection: TextDirection.ltr,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Image(

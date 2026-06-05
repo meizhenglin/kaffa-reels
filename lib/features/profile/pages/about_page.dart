@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../components/rtl_back_button.dart';
 import '../../../l10n/app_localizations.dart';
 
 class AboutPage extends ConsumerWidget {
@@ -18,7 +19,7 @@ class AboutPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
 
     return GradientScaffold(
       body: SafeArea(
@@ -29,8 +30,8 @@ class AboutPage extends ConsumerWidget {
               // 返回按钮
               Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  RtlBackButton(
+                    color: Colors.white,
                     onPressed: () => context.pop(),
                   ),
                 ],

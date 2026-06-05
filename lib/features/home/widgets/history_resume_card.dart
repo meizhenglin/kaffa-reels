@@ -111,18 +111,17 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
       }
     }
 
-    return Positioned(
-      left: 12,
-      right: 12,
+    return PositionedDirectional(
+      start: 12,
+      end: 12,
       bottom: 20,
       child: SizedBox(
         height: 20 + _coverHeight,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            Positioned(
-              left: isRtl ? 0 : null,
-              right: isRtl ? null : 0,
+            PositionedDirectional(
+              start: 0,
               bottom: 20,
               child: FadeTransition(
                 opacity: coverOpacity,
@@ -132,10 +131,10 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                 ),
               ),
             ),
-            Positioned(
+            PositionedDirectional(
               bottom: 20,
-              left: 0,
-              right: 0,
+              start: 0,
+              end: 0,
               child: SlideTransition(
                 position: slideAnimation,
                 child: FadeTransition(
@@ -146,10 +145,14 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                     child: Container(
                       height: _cardHeight,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF202A46), Color(0xFF392E40)],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
+                        gradient: LinearGradient(
+                          colors: const [Color(0xFF202A46), Color(0xFF392E40)],
+                          begin: isRtl
+                              ? AlignmentDirectional.centerEnd
+                              : AlignmentDirectional.centerStart,
+                          end: isRtl
+                              ? AlignmentDirectional.centerStart
+                              : AlignmentDirectional.centerEnd,
                         ),
                         borderRadius: BorderRadius.circular(_borderRadius),
                         boxShadow: [
@@ -225,10 +228,9 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                   : _buildThumbnailPlaceholder(),
             ),
           ),
-          Positioned(
+          PositionedDirectional(
             top: -4,
-            left: isRtl ? null : -4,
-            right: isRtl ? -4 : null,
+            end: -4,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () {

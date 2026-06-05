@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../components/rtl_back_button.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../recommend/utils/drama_navigation.dart';
 import '../providers/history_provider.dart';
@@ -42,13 +43,9 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => context.pop(),
-                    child: Image.asset(
-                      'assets/images/back.png',
-                      width: 24,
-                      height: 24,
-                    ),
+                  RtlBackButton(
+                    onPressed: () => context.pop(),
+                    constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                   ),
                   const Expanded(
                     child: Text(
@@ -195,15 +192,15 @@ class _HistoryListItem extends StatelessWidget {
                   ),
                 ),
                 // 进度条
-                Positioned(
-                  left: 0,
-                  right: 0,
+                PositionedDirectional(
+                  start: 0,
+                  end: 0,
                   bottom: 0,
                   child: Container(
                     height: 3,
                     color: Colors.grey[700],
                     child: FractionallySizedBox(
-                      alignment: Alignment.centerLeft,
+                      alignment: AlignmentDirectional.centerStart,
                       widthFactor: item.progress.clamp(0.0, 1.0),
                       child: Container(color: const Color(0xFF9843FF)),
                     ),

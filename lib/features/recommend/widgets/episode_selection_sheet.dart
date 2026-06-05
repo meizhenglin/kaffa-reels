@@ -46,7 +46,7 @@ class EpisodeSelectionSheet extends StatelessWidget {
 
   Widget _buildHandle() {
     return Container(
-      margin: const EdgeInsets.only(top: 12),
+      margin: const EdgeInsetsDirectional.only(top: 12),
       width: 40,
       height: 4,
       decoration: BoxDecoration(
@@ -60,6 +60,7 @@ class EpisodeSelectionSheet extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
+        textDirection: Directionality.of(context),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Cover thumbnail
@@ -120,7 +121,7 @@ class EpisodeSelectionSheet extends StatelessWidget {
 
   Widget _buildEpisodeGrid(BuildContext context) {
     return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 32),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 5,
         mainAxisSpacing: 12,
@@ -182,9 +183,9 @@ class _EpisodeTile extends StatelessWidget {
             ),
             // Lock icon overlay
             if (isLocked)
-              Positioned(
+              PositionedDirectional(
                 bottom: 4,
-                right: 4,
+                end: 4,
                 child: Icon(
                   Icons.lock_rounded,
                   color: Colors.grey.shade500,

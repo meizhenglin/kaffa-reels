@@ -9,7 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/app_localizations.dart';
-import '../../../app/providers/app_providers.dart';
+import '../../../components/rtl_back_button.dart';
 import '../../../core/network/api_service.dart';
 import '../providers/auth_provider.dart';
 
@@ -211,8 +211,8 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
                   const SizedBox(height: 18),
                   Row(
                     children: [
-                      GestureDetector(
-                        onTap: () {
+                      RtlBackButton(
+                        onPressed: () {
                           final navigator = Navigator.of(context);
                           if (navigator.canPop()) {
                             navigator.pop();
@@ -220,17 +220,8 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
                             context.push('/auth/login');
                           }
                         },
-                        child: Image.asset(
-                          'assets/images/back.png',
-                          width: 20,
-                          height: 20,
-                          color: Colors.white,
-                          errorBuilder: (_, __, ___) => const Icon(
-                            Icons.arrow_forward,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
+                        color: Colors.white,
+                        constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
                       ),
                       const Expanded(
                         child: Center(
@@ -244,7 +235,14 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 20),
+                      const Opacity(
+                        opacity: 0,
+                        child: RtlBackButton(
+                          onPressed: null,
+                          color: Colors.white,
+                          constraints: BoxConstraints(minWidth: 20, minHeight: 20),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 67),
@@ -280,10 +278,10 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
                         enabled: !_showConfirm,
                         validator: (v) {
                           if (v == null || v.trim().isEmpty) {
-                            return l10n?.requiredField ?? 'Required';
+                            return l10n.requiredField;
                           }
                           if (!EmailValidator.validate(v.trim())) {
-                            return l10n?.invalidEmail ?? 'Invalid email';
+                            return l10n.invalidEmail;
                           }
                           return null;
                         },
@@ -303,7 +301,7 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
                               onResend: _isLoading ? null : _sendCode,
                               validator: (v) {
                                 if (v == null || v.isEmpty) {
-                                  return l10n?.requiredField ?? 'Required';
+                                  return l10n.requiredField;
                                 }
                                 return null;
                               },
@@ -420,7 +418,7 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
                             hintText: 'Enter Password',
                             validator: (v) {
                               if (v == null || v.isEmpty) {
-                                return l10n?.requiredField ?? 'Required';
+                                return l10n.requiredField;
                               }
                               if (v.length < 6) {
                                 return 'Minimum 6 characters';
@@ -434,7 +432,7 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
                             hintText: 'Re-enter New Password',
                             validator: (v) {
                               if (v == null || v.isEmpty) {
-                                return l10n?.requiredField ?? 'Required';
+                                return l10n.requiredField;
                               }
                               if (v != _passwordController.text) {
                                 return 'Passwords do not match';
@@ -529,7 +527,7 @@ class _EmailInput extends StatelessWidget {
           fontWeight: FontWeight.w500,
         ),
         prefixIcon: Padding(
-          padding: const EdgeInsets.only(left: 20, right: 12),
+          padding: const EdgeInsetsDirectional.only(start: 20, end: 12),
           child: Image.asset(
             'assets/images/login_email_icon.png',
             width: 20,
@@ -601,7 +599,7 @@ class _CodeInput extends StatelessWidget {
           fontWeight: FontWeight.w500,
         ),
         prefixIcon: const Padding(
-          padding: EdgeInsets.only(left: 20, right: 12),
+          padding: EdgeInsetsDirectional.only(start: 20, end: 12),
           child: Icon(
             Icons.verified_user_outlined,
             size: 20,
@@ -610,8 +608,9 @@ class _CodeInput extends StatelessWidget {
         prefixIconConstraints: const BoxConstraints(minWidth: 46),
         suffixIcon: (countdown > 0 || isLoading)
             ? Padding(
-                padding: const EdgeInsets.only(right: 20),
+                padding: const EdgeInsetsDirectional.only(end: 20),
                 child: Row(
+                  textDirection: TextDirection.ltr,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
@@ -640,8 +639,9 @@ class _CodeInput extends StatelessWidget {
                 ),
               )
             : Padding(
-                padding: const EdgeInsets.only(right: 20),
+                padding: const EdgeInsetsDirectional.only(end: 20),
                 child: Row(
+                  textDirection: TextDirection.ltr,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
@@ -718,7 +718,7 @@ class _PasswordInput extends StatelessWidget {
           fontWeight: FontWeight.w500,
         ),
         prefixIcon: const Padding(
-          padding: EdgeInsets.only(left: 20, right: 12),
+          padding: EdgeInsetsDirectional.only(start: 20, end: 12),
           child: Icon(
             Icons.lock_outline,
             size: 20,
@@ -802,6 +802,7 @@ class _PolicyCheckboxState extends State<_PolicyCheckbox>
       child: GestureDetector(
         onTap: () => widget.onChanged(!widget.value),
         child: Row(
+          textDirection: Directionality.of(context),
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SizedBox(

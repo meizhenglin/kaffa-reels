@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../components/rtl_back_button.dart';
 import '../../../l10n/app_localizations.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -51,8 +52,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               ),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  RtlBackButton(
+                    color: Colors.white,
                     onPressed: () => context.pop(),
                   ),
                   const SizedBox(width: 8),
@@ -97,7 +98,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   final msg = _messages[index];
                   final isMe = msg['isMe'] as bool;
                   return Align(
-                    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                    alignment: isMe
+                        ? AlignmentDirectional.centerEnd
+                        : AlignmentDirectional.centerStart,
                     child: Container(
                       margin: const EdgeInsets.only(bottom: 10),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -135,9 +138,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
             // Input bar
             Container(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 8,
+              padding: EdgeInsetsDirectional.only(
+                start: 16,
+                end: 8,
                 top: 8,
                 bottom: MediaQuery.of(context).padding.bottom + 8,
               ),
@@ -152,7 +155,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       controller: _controller,
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        hintText: l10n?.searchHint ?? 'Type a message...',
+                        hintText: l10n.searchHint,
                         hintStyle: TextStyle(color: Colors.grey[600]),
                         filled: true,
                         fillColor: const Color(0xFF2A2B2F),
