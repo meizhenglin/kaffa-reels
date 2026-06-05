@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/preload_network_image.dart';
 import '../../../components/rtl_back_button.dart';
@@ -123,34 +124,20 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   }
 
   Widget _buildEmptyState(AppLocalizations l10n) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.favorite_border,
-            size: 80,
-            color: Colors.grey[400],
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        AppEmptyState(message: l10n.noFavorites),
+        const SizedBox(height: 8),
+        Text(
+          l10n.addFavoritesHint,
+          style: TextStyle(
+            fontSize: 14,
+            color: Colors.grey[500],
           ),
-          const SizedBox(height: 16),
-          Text(
-            l10n.noFavorites,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[400],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            l10n.addFavoritesHint,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 

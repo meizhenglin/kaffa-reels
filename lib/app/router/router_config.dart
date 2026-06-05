@@ -223,13 +223,37 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   /// 热门短剧列表页
                   /// 【路径】/recommend/hot
-                  /// 【传入参数】DramaListType.hot
+                  /// 【传入参数】DramaListType.topRecommend
                   GoRoute(
                     parentNavigatorKey: rootNavigatorKey,
                     path: 'hot',
                     name: 'recommend-hot',
                     builder: (context, state) => const DramaListPage(
-                      type: DramaListType.hot,
+                      type: DramaListType.topRecommend,
+                    ),
+                  ),
+
+                  /// New For This Month 列表页
+                  /// 【路径】/recommend/new
+                  /// 【传入参数】DramaListType.newForThisMonth
+                  GoRoute(
+                    parentNavigatorKey: rootNavigatorKey,
+                    path: 'new',
+                    name: 'recommend-new',
+                    builder: (context, state) => const DramaListPage(
+                      type: DramaListType.newForThisMonth,
+                    ),
+                  ),
+
+                  /// VIP Zone 列表页
+                  /// 【路径】/recommend/vip
+                  /// 【传入参数】DramaListType.vipZone
+                  GoRoute(
+                    parentNavigatorKey: rootNavigatorKey,
+                    path: 'vip',
+                    name: 'recommend-vip',
+                    builder: (context, state) => const DramaListPage(
+                      type: DramaListType.vipZone,
                     ),
                   ),
 

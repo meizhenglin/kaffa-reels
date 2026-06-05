@@ -12,6 +12,7 @@ import '../../recommend/providers/recommend_provider.dart';
 import '../../recommend/utils/drama_navigation.dart';
 import '../../recommend/widgets/banner_carousel.dart';
 import '../mixins/tab_scroll_mixin.dart';
+import '../models/home_card_layout.dart';
 
 class HomeTab extends ConsumerStatefulWidget {
   const HomeTab({super.key});
@@ -67,13 +68,15 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
             ),
           ),
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 30),
-              child: SizedBox(
-                height: 175,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Padding(
+                padding: EdgeInsets.only(bottom: HomeCardLayout.scaled(context, 30)),
+                child: SizedBox(
+                  height: HomeCardLayout.smallCardHeight(context) + HomeCardLayout.scaled(context, 25),
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: HomeCardLayout.sectionHorizontalPadding(context),
+                    ),
                   itemCount: recommendState.topRecommend.isNotEmpty
                       ? recommendState.topRecommend.length.clamp(0, 5)
                       : 5,
@@ -103,13 +106,18 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
             child: _buildSection(
               context,
               title: l10n.newForThisMonth,
-              onViewAll: () => context.push('/recommend/all'),
+              onViewAll: () => context.push('/recommend/new'),
               topPadding: 0,
             ),
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+              padding: EdgeInsetsDirectional.fromSTEB(
+                HomeCardLayout.sectionHorizontalPadding(context),
+                0,
+                HomeCardLayout.sectionHorizontalPadding(context),
+                0,
+              ),
               child: _buildNewForThisMonthSection(context, recommendState),
             ),
           ),
@@ -117,12 +125,17 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
             child: _buildSection(
               context,
               title: l10n.vipZone,
-              onViewAll: () => context.go('/membership'),
+              onViewAll: () => context.push('/recommend/vip'),
               topPadding: 30,
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+            padding: EdgeInsetsDirectional.fromSTEB(
+              HomeCardLayout.sectionHorizontalPadding(context),
+              0,
+              HomeCardLayout.sectionHorizontalPadding(context),
+              0,
+            ),
             sliver: SliverGrid(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
@@ -210,14 +223,19 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     double bottomPadding = 15,
   }) {
     return Padding(
-      padding: EdgeInsetsDirectional.fromSTEB(14, topPadding, 14, bottomPadding),
+      padding: EdgeInsetsDirectional.fromSTEB(
+        HomeCardLayout.sectionHorizontalPadding(context),
+        HomeCardLayout.scaled(context, topPadding),
+        HomeCardLayout.sectionHorizontalPadding(context),
+        HomeCardLayout.scaled(context, bottomPadding),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             title,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontSize: 16,
+              fontSize: HomeCardLayout.scaled(context, 16),
               fontWeight: FontWeight.w600,
               color: Colors.white,
             ),
@@ -227,8 +245,8 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
             style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
             child: Image.asset(
               'assets/images/more_icon.png',
-              width: 20,
-              height: 20,
+              width: HomeCardLayout.scaled(context, 20),
+              height: HomeCardLayout.scaled(context, 20),
             ),
           ),
         ],
@@ -251,7 +269,9 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
         final rightIndex = leftIndex + 1;
 
         return Padding(
-          padding: EdgeInsetsDirectional.only(bottom: rowIndex == 0 ? 15 : 0),
+          padding: EdgeInsetsDirectional.only(
+            bottom: rowIndex == 0 ? HomeCardLayout.cardGap(context) : 0,
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,8 +318,11 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     final coverUrl = drama?.coverUrl;
     final vipBadgeAsset = localizedHomeVipBadgeAsset(context);
 
+    final cardWidth = HomeCardLayout.largeCardWidth(context);
+    final cardHeight = HomeCardLayout.largeCardHeight(context);
+
     return SizedBox(
-      width: 165,
+      width: cardWidth,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -309,12 +332,12 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
             child: Stack(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(HomeCardLayout.largeCardRadius(context)),
                   child: PreloadNetworkImage(
                     imageUrl: coverUrl ?? '',
                     preloadAsset: 'assets/images/small_preload_bg.png',
-                    width: 165,
-                    height: 224,
+                    width: cardWidth,
+                    height: cardHeight,
                     fit: BoxFit.cover,
                   ),
                 ),
@@ -324,14 +347,14 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
                     start: 0,
                     child: Image.asset(
                       vipBadgeAsset,
-                      width: 42,
-                      height: 18,
+                      width: HomeCardLayout.scaled(context, 42),
+                      height: HomeCardLayout.scaled(context, 18),
                     ),
                   ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: HomeCardLayout.scaled(context, 8)),
           Text(
             drama?.title.split(' / ').first ?? 'Drama ${index + 1}',
             style: Theme.of(
@@ -357,44 +380,45 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
         : null;
     final coverUrl = drama?.coverUrl;
     final vipBadgeAsset = localizedHomeVipBadgeAsset(context);
+    final cardWidth = HomeCardLayout.smallCardWidth(context);
+    final cardHeight = HomeCardLayout.smallCardHeight(context);
 
     return SizedBox(
-      width: 106,
+      width: cardWidth,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Expanded(
-            child:             GestureDetector(
+            child: GestureDetector(
               onTap: onTap,
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(HomeCardLayout.smallCardRadius(context)),
                     child: PreloadNetworkImage(
                       imageUrl: coverUrl ?? '',
                       preloadAsset: 'assets/images/small_preload_bg.png',
-                      width: 106,
-                      height: 150,
+                      width: cardWidth,
+                      height: cardHeight,
                       fit: BoxFit.cover,
                     ),
                   ),
-                  // VIP 徽章（强制显示，左上角）
                   if (drama != null && drama.isVipOnly)
                     PositionedDirectional(
                       top: 0,
                       start: 0,
                       child: Image.asset(
                         vipBadgeAsset,
-                        width: 42,
-                        height: 18,
+                        width: HomeCardLayout.scaled(context, 42),
+                        height: HomeCardLayout.scaled(context, 18),
                       ),
                     ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: HomeCardLayout.scaled(context, 8)),
           Text(
             drama?.title.split(' / ').first ?? 'VIP Drama ${index + 1}',
             style: Theme.of(
@@ -416,11 +440,13 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
   }) {
     final coverUrl = drama?.coverUrl;
     final rankBadgeAsset = localizedTopRankBadgeAsset(context, index + 1);
+    final cardWidth = HomeCardLayout.smallCardWidth(context);
+    final cardHeight = HomeCardLayout.smallCardHeight(context);
 
     return Padding(
-      padding: const EdgeInsetsDirectional.only(end: 15),
+      padding: EdgeInsetsDirectional.only(end: HomeCardLayout.cardGap(context)),
       child: SizedBox(
-        width: 106,
+        width: cardWidth,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -430,44 +456,29 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
               child: Stack(
                 children: [
                   ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(HomeCardLayout.smallCardRadius(context)),
                     child: PreloadNetworkImage(
                       imageUrl: coverUrl ?? '',
                       preloadAsset: 'assets/images/small_preload_bg.png',
-                      width: 106,
-                      height: 150,
+                      width: cardWidth,
+                      height: cardHeight,
                       fit: BoxFit.cover,
                     ),
                   ),
-                  // 前5名角标
                   if (drama != null && index < 5)
                     PositionedDirectional(
                       top: 0,
                       start: 0,
                       child: Image.asset(
                         rankBadgeAsset,
-                        width: 22,
-                        height: 22,
+                        width: HomeCardLayout.scaled(context, 22),
+                        height: HomeCardLayout.scaled(context, 22),
                       ),
                     ),
-                  // VIP 角标（仅非前3名显示）
-                  // if (drama != null && drama.isVipOnly && index >= 3)
-                  //   Positioned(
-                  //     top: 4,
-                  //     left: 4,
-                  //     child: Container(
-                  //       padding: const EdgeInsets.all(2),
-                  //       decoration: BoxDecoration(
-                  //         color: Colors.amber.withValues(alpha: 0.9),
-                  //         borderRadius: BorderRadius.circular(4),
-                  //       ),
-                  //       child: const Icon(Icons.star, size: 12, color: Colors.white),
-                  //     ),
-                  //   ),
                 ],
               ),
             ),
-            const SizedBox(height: 6),
+            SizedBox(height: HomeCardLayout.scaled(context, 6)),
             Text(
               drama?.title.split(' / ').first ?? 'Drama ${index + 1}',
               style: Theme.of(
@@ -476,12 +487,6 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            // if (drama != null)
-            //   Text(
-            //     drama.formattedViews,
-            //     style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white60, fontSize: 10),
-            //     maxLines: 1,
-            //   ),
           ],
         ),
       ),

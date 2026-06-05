@@ -73,27 +73,34 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
                         ? Image.asset(
                             'assets/images/banner_preload_bg.png',
                             key: const ValueKey('preload'),
-                            fit: BoxFit.cover,
+                            fit: BoxFit.contain,
                             width: double.infinity,
                             height: double.infinity,
+                            alignment: Alignment.center,
                           )
-                        :                           Image.network(
+                        : Image.network(
                             key: ValueKey(banner.id),
                             banner.imageUrl,
-                            fit: BoxFit.cover,
+                            fit: BoxFit.contain,
                             width: double.infinity,
                             height: double.infinity,
+                            alignment: Alignment.center,
                             loadingBuilder: (_, child, loadingProgress) {
                               if (loadingProgress == null) return child;
-                              // 真实图片加载中：叠在预加载图上面，淡入效果
                               return Stack(
                                 fit: StackFit.expand,
                                 children: [
-                                  Image.asset(
-                                    'assets/images/banner_preload_bg.png',
-                                    fit: BoxFit.cover,
-                                    width: double.infinity,
-                                    height: double.infinity,
+                                  ColoredBox(
+                                    color: const Color(0xFF1F2025),
+                                    child: Center(
+                                      child: Image.asset(
+                                        'assets/images/banner_preload_bg.png',
+                                        fit: BoxFit.contain,
+                                        width: double.infinity,
+                                        height: double.infinity,
+                                        alignment: Alignment.center,
+                                      ),
+                                    ),
                                   ),
                                   AnimatedOpacity(
                                     opacity: 1.0,

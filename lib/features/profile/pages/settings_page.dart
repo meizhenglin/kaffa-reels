@@ -9,9 +9,8 @@ import '../../../l10n/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
 import 'language_page.dart';
 import 'message_settings_page.dart';
-import 'recharge_agreement_page.dart';
 import 'delete_account_page.dart';
-import 'about_page.dart';
+import 'system_config_content_page.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -146,7 +145,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => AboutPage()),
+                          MaterialPageRoute(
+                            builder: (context) => const SystemConfigContentPage(
+                              configId: 5,
+                              title: 'User Agreement',
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -160,7 +164,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       onTap: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => AboutPage()),
+                          MaterialPageRoute(
+                            builder: (context) => const SystemConfigContentPage(
+                              configId: 6,
+                              title: 'Privacy Policy',
+                            ),
+                          ),
                         );
                       },
                     ),
@@ -175,7 +184,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const RechargeAgreementPage(),
+                            builder: (context) => const SystemConfigContentPage(
+                              configId: 9,
+                              title: 'User Recharge Agreement',
+                            ),
                           ),
                         );
                       },
@@ -214,21 +226,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
                     const SizedBox(height: 14),
 
-                    // Delete account
-                    _SettingsItem(
-                      title: 'Delete account',
-                      trailing: const _ArrowIcon(),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const DeleteAccountPage(),
-                          ),
-                        );
-                      },
-                    ),
+                    if (!(auth.user?.isTourist ?? true)) ...[
+                      // Delete account
+                      _SettingsItem(
+                        title: 'Delete account',
+                        trailing: const _ArrowIcon(),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const DeleteAccountPage(),
+                            ),
+                          );
+                        },
+                      ),
 
-                    const SizedBox(height: 32),
+                      const SizedBox(height: 32),
+                    ] else
+                      const SizedBox(height: 32),
 
                     // Log out / Login Now
                     GestureDetector(

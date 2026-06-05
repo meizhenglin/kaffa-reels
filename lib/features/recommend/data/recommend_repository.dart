@@ -147,11 +147,19 @@ class RecommendRepository {
   /// 获取热门精选列表
   /// 对应 /api/videoHotPicks/list
   /// [videoHotListType] 2=Top Recommend  5=New For This Month  6=VIP Zone
-  Future<List<Drama>> fetchVideoHotPicks({required int videoHotListType}) async {
+  Future<List<Drama>> fetchVideoHotPicks({
+    required int videoHotListType,
+    int pageNum = 1,
+    int pageSize = 10,
+  }) async {
     try {
       final response = await _dioClient.dio.post(
         ApiEndpoints.videoHotPicks,
-        data: {'videoHotListType': videoHotListType},
+        data: {
+          'videoHotListType': videoHotListType,
+          'pageNum': pageNum,
+          'pageSize': pageSize,
+        },
       );
       final data = response.data as Map<String, dynamic>;
       debugPrint('[VideoHotPicks] type=$videoHotListType code=${data['code']} data=${data['data']}');

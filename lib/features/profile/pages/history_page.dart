@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../recommend/utils/drama_navigation.dart';
 import '../providers/history_provider.dart';
 
@@ -33,6 +35,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
   Widget build(BuildContext context) {
     final history = ref.watch(historyProvider);
     final isEditMode = history.isEditMode;
+    final l10n = AppLocalizations.of(context);
 
     return GradientScaffold(
       body: SafeArea(
@@ -79,7 +82,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
             // 内容区
             Expanded(
               child: history.isEmpty
-                  ? _buildEmptyState()
+                  ? _buildEmptyState(l10n)
                   : _buildHistoryList(history.items),
             ),
           ],
@@ -88,27 +91,9 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset(
-            'assets/images/noData.png',
-            width: 200,
-            height: 200,
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'No data',
-            style: TextStyle(
-              color: Color(0xFFFFFFFF),
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-        ],
-      ),
+  Widget _buildEmptyState(AppLocalizations l10n) {
+    return AppEmptyState(
+      message: l10n.noDataAvailableAtTheMoment,
     );
   }
 

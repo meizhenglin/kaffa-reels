@@ -1,7 +1,13 @@
 /// 短剧列表类型
 enum DramaListType {
-  /// 热门短剧
-  hot,
+  /// Top Recommend
+  topRecommend,
+
+  /// New For This Month
+  newForThisMonth,
+
+  /// VIP Zone
+  vipZone,
 
   /// 全部推荐
   recommended,

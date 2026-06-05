@@ -331,6 +331,11 @@ class ApiService {
     return request('${ApiEndpoints.avatarList}?id=11', method: 'GET');
   }
 
+  /// 获取系统配置内容
+  Future<ApiResponse> getSystemConfigContent({required int id}) {
+    return request('${ApiEndpoints.avatarList}?id=$id', method: 'GET');
+  }
+
   // ==================== TheaterModel 剧场 Tab ====================
 
   /// 剧场 Banner 列表

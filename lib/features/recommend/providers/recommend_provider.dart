@@ -6,6 +6,7 @@ import '../../../core/network/api_service.dart';
 import '../data/recommend_repository.dart';
 import '../models/banner.dart';
 import '../models/drama.dart';
+import '../models/drama_list_type.dart';
 import '../models/video_info.dart';
 
 /// ============================================================================
@@ -47,6 +48,15 @@ class RecommendState {
     this.topRecommend = const [],
     this.newForThisMonth = const [],
     this.vipZone = const [],
+    this.isTopRecommendLoadingMore = false,
+    this.topRecommendHasMore = true,
+    this.topRecommendPage = 1,
+    this.isNewForThisMonthLoadingMore = false,
+    this.newForThisMonthHasMore = true,
+    this.newForThisMonthPage = 1,
+    this.isVipZoneLoadingMore = false,
+    this.vipZoneHasMore = true,
+    this.vipZonePage = 1,
     this.isRefreshing = false,
     this.isLoadingMore = false,
     this.hasMore = true,
@@ -78,6 +88,21 @@ class RecommendState {
 
   /// VIP Zone（videoHotListType=6）
   final List<Drama> vipZone;
+
+  /// Top Recommend 列表分页状态
+  final bool isTopRecommendLoadingMore;
+  final bool topRecommendHasMore;
+  final int topRecommendPage;
+
+  /// New For This Month 列表分页状态
+  final bool isNewForThisMonthLoadingMore;
+  final bool newForThisMonthHasMore;
+  final int newForThisMonthPage;
+
+  /// VIP Zone 列表分页状态
+  final bool isVipZoneLoadingMore;
+  final bool vipZoneHasMore;
+  final int vipZonePage;
 
   // ==================== 加载状态标志 ====================
   /// 是否正在下拉刷新
@@ -115,6 +140,15 @@ class RecommendState {
     List<Drama>? topRecommend,
     List<Drama>? newForThisMonth,
     List<Drama>? vipZone,
+    bool? isTopRecommendLoadingMore,
+    bool? topRecommendHasMore,
+    int? topRecommendPage,
+    bool? isNewForThisMonthLoadingMore,
+    bool? newForThisMonthHasMore,
+    int? newForThisMonthPage,
+    bool? isVipZoneLoadingMore,
+    bool? vipZoneHasMore,
+    int? vipZonePage,
     bool? isRefreshing,
     bool? isLoadingMore,
     bool? hasMore,
@@ -131,6 +165,18 @@ class RecommendState {
       topRecommend: topRecommend ?? this.topRecommend,
       newForThisMonth: newForThisMonth ?? this.newForThisMonth,
       vipZone: vipZone ?? this.vipZone,
+      isTopRecommendLoadingMore:
+          isTopRecommendLoadingMore ?? this.isTopRecommendLoadingMore,
+      topRecommendHasMore: topRecommendHasMore ?? this.topRecommendHasMore,
+      topRecommendPage: topRecommendPage ?? this.topRecommendPage,
+      isNewForThisMonthLoadingMore:
+          isNewForThisMonthLoadingMore ?? this.isNewForThisMonthLoadingMore,
+      newForThisMonthHasMore:
+          newForThisMonthHasMore ?? this.newForThisMonthHasMore,
+      newForThisMonthPage: newForThisMonthPage ?? this.newForThisMonthPage,
+      isVipZoneLoadingMore: isVipZoneLoadingMore ?? this.isVipZoneLoadingMore,
+      vipZoneHasMore: vipZoneHasMore ?? this.vipZoneHasMore,
+      vipZonePage: vipZonePage ?? this.vipZonePage,
       isRefreshing: isRefreshing ?? this.isRefreshing,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       hasMore: hasMore ?? this.hasMore,
@@ -166,14 +212,28 @@ final recommendProvider =
 class RecommendNotifier extends StateNotifier<RecommendState> {
   RecommendNotifier(this._repository) : super(const RecommendState());
 
+  static const int homeSectionPageSize = 10;
+
   final RecommendRepository _repository;
 
   Future<({List<Drama> topRecommend, List<Drama> newForThisMonth, List<Drama> vipZone})>
-  _fetchHomeHotSections() async {
+  _fetchHomeHotSections({int pageNum = 1, int pageSize = homeSectionPageSize}) async {
     final results = await Future.wait([
-      _repository.fetchVideoHotPicks(videoHotListType: 2),
-      _repository.fetchVideoHotPicks(videoHotListType: 5),
-      _repository.fetchVideoHotPicks(videoHotListType: 6),
+      _repository.fetchVideoHotPicks(
+        videoHotListType: 2,
+        pageNum: pageNum,
+        pageSize: pageSize,
+      ),
+      _repository.fetchVideoHotPicks(
+        videoHotListType: 5,
+        pageNum: pageNum,
+        pageSize: pageSize,
+      ),
+      _repository.fetchVideoHotPicks(
+        videoHotListType: 6,
+        pageNum: pageNum,
+        pageSize: pageSize,
+      ),
     ]);
 
     return (
@@ -213,6 +273,17 @@ class RecommendNotifier extends StateNotifier<RecommendState> {
         topRecommend: sections.topRecommend,
         newForThisMonth: sections.newForThisMonth,
         vipZone: sections.vipZone,
+        topRecommendPage: 1,
+        topRecommendHasMore:
+            sections.topRecommend.length >= homeSectionPageSize,
+        isTopRecommendLoadingMore: false,
+        newForThisMonthPage: 1,
+        newForThisMonthHasMore:
+            sections.newForThisMonth.length >= homeSectionPageSize,
+        isNewForThisMonthLoadingMore: false,
+        vipZonePage: 1,
+        vipZoneHasMore: sections.vipZone.length >= homeSectionPageSize,
+        isVipZoneLoadingMore: false,
         isRefreshing: false,
       );
     } catch (e) {
@@ -242,6 +313,17 @@ class RecommendNotifier extends StateNotifier<RecommendState> {
         topRecommend: sections.topRecommend,
         newForThisMonth: sections.newForThisMonth,
         vipZone: sections.vipZone,
+        topRecommendPage: 1,
+        topRecommendHasMore:
+            sections.topRecommend.length >= homeSectionPageSize,
+        isTopRecommendLoadingMore: false,
+        newForThisMonthPage: 1,
+        newForThisMonthHasMore:
+            sections.newForThisMonth.length >= homeSectionPageSize,
+        isNewForThisMonthLoadingMore: false,
+        vipZonePage: 1,
+        vipZoneHasMore: sections.vipZone.length >= homeSectionPageSize,
+        isVipZoneLoadingMore: false,
         hasMore: feed.hasMore,
         page: 1,
       );
@@ -257,6 +339,115 @@ class RecommendNotifier extends StateNotifier<RecommendState> {
   /// 刷新数据
   Future<void> refresh() async {
     await loadHomeSections(refresh: true);
+  }
+
+  Future<void> refreshDramaList(DramaListType type) async {
+    switch (type) {
+      case DramaListType.topRecommend:
+      case DramaListType.newForThisMonth:
+      case DramaListType.vipZone:
+        await loadHomeSections(refresh: true);
+        break;
+      case DramaListType.recommended:
+        await loadInitial();
+        break;
+    }
+  }
+
+  Future<void> loadMoreDramaList(DramaListType type) async {
+    switch (type) {
+      case DramaListType.topRecommend:
+      case DramaListType.newForThisMonth:
+      case DramaListType.vipZone:
+        await _loadMoreHomeSection(type);
+        break;
+      case DramaListType.recommended:
+        await loadMore();
+        break;
+    }
+  }
+
+  Future<void> _loadMoreHomeSection(DramaListType type) async {
+    final isLoadingMore = switch (type) {
+      DramaListType.topRecommend => state.isTopRecommendLoadingMore,
+      DramaListType.newForThisMonth => state.isNewForThisMonthLoadingMore,
+      DramaListType.vipZone => state.isVipZoneLoadingMore,
+      DramaListType.recommended => false,
+    };
+    final hasMore = switch (type) {
+      DramaListType.topRecommend => state.topRecommendHasMore,
+      DramaListType.newForThisMonth => state.newForThisMonthHasMore,
+      DramaListType.vipZone => state.vipZoneHasMore,
+      DramaListType.recommended => false,
+    };
+    final nextPage = switch (type) {
+      DramaListType.topRecommend => state.topRecommendPage + 1,
+      DramaListType.newForThisMonth => state.newForThisMonthPage + 1,
+      DramaListType.vipZone => state.vipZonePage + 1,
+      DramaListType.recommended => 1,
+    };
+
+    if (isLoadingMore || !hasMore || !state.hasData) return;
+
+    if (type == DramaListType.topRecommend) {
+      state = state.copyWith(isTopRecommendLoadingMore: true);
+    } else if (type == DramaListType.newForThisMonth) {
+      state = state.copyWith(isNewForThisMonthLoadingMore: true);
+    } else if (type == DramaListType.vipZone) {
+      state = state.copyWith(isVipZoneLoadingMore: true);
+    } else {
+      return;
+    }
+
+    try {
+      final items = await _repository.fetchVideoHotPicks(
+        videoHotListType: switch (type) {
+          DramaListType.topRecommend => 2,
+          DramaListType.newForThisMonth => 5,
+          DramaListType.vipZone => 6,
+          DramaListType.recommended => 2,
+        },
+        pageNum: nextPage,
+        pageSize: homeSectionPageSize,
+      );
+      final hasMoreItems = items.length >= homeSectionPageSize;
+
+      if (type == DramaListType.topRecommend) {
+        state = state.copyWith(
+          topRecommend: [...state.topRecommend, ...items],
+          isTopRecommendLoadingMore: false,
+          topRecommendHasMore: hasMoreItems,
+          topRecommendPage: nextPage,
+        );
+      } else if (type == DramaListType.newForThisMonth) {
+        state = state.copyWith(
+          newForThisMonth: [...state.newForThisMonth, ...items],
+          isNewForThisMonthLoadingMore: false,
+          newForThisMonthHasMore: hasMoreItems,
+          newForThisMonthPage: nextPage,
+        );
+      } else if (type == DramaListType.vipZone) {
+        state = state.copyWith(
+          vipZone: [...state.vipZone, ...items],
+          isVipZoneLoadingMore: false,
+          vipZoneHasMore: hasMoreItems,
+          vipZonePage: nextPage,
+        );
+      }
+    } catch (e) {
+      state = state.copyWith(
+        isTopRecommendLoadingMore: type == DramaListType.topRecommend
+            ? false
+            : state.isTopRecommendLoadingMore,
+        isNewForThisMonthLoadingMore: type == DramaListType.newForThisMonth
+            ? false
+            : state.isNewForThisMonthLoadingMore,
+        isVipZoneLoadingMore: type == DramaListType.vipZone
+            ? false
+            : state.isVipZoneLoadingMore,
+        errorMessage: e.toString(),
+      );
+    }
   }
 
   // ==================== 分页加载 ====================
@@ -422,10 +613,21 @@ class MembershipDramaNotifier extends StateNotifier<MembershipDramaState> {
   final RecommendRepository _repository;
 
   Future<({List<Drama> topRecommend, List<Drama> vipZone})>
-  _fetchMembershipSections() async {
+  _fetchMembershipSections({
+    int pageNum = 1,
+    int pageSize = RecommendNotifier.homeSectionPageSize,
+  }) async {
     final results = await Future.wait([
-      _repository.fetchVideoHotPicks(videoHotListType: 2),
-      _repository.fetchVideoHotPicks(videoHotListType: 6),
+      _repository.fetchVideoHotPicks(
+        videoHotListType: 2,
+        pageNum: pageNum,
+        pageSize: pageSize,
+      ),
+      _repository.fetchVideoHotPicks(
+        videoHotListType: 6,
+        pageNum: pageNum,
+        pageSize: pageSize,
+      ),
     ]);
 
     return (
