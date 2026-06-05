@@ -80,7 +80,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsetsDirectional.symmetric(
+                horizontal: 14,
+                vertical: 8,
+              ),
               child: Row(
                 children: [
                   RtlBackButton(
@@ -111,7 +114,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+                padding: const EdgeInsetsDirectional.symmetric(horizontal: 14),
                 child: Column(
                   children: [
                     const SizedBox(height: 8),
@@ -140,15 +143,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
                     // User Agreement
                     _SettingsItem(
-                      title: 'User Agreement',
+                      title: l10n.userAgreement,
                       trailing: const _ArrowIcon(),
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const SystemConfigContentPage(
+                            builder: (context) => SystemConfigContentPage(
                               configId: 5,
-                              title: 'User Agreement',
+                              title: l10n.userAgreement,
                             ),
                           ),
                         );
@@ -159,15 +162,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
                     // Privacy Policy
                     _SettingsItem(
-                      title: 'Privacy Policy',
+                      title: l10n.privacyPolicy,
                       trailing: const _ArrowIcon(),
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const SystemConfigContentPage(
+                            builder: (context) => SystemConfigContentPage(
                               configId: 6,
-                              title: 'Privacy Policy',
+                              title: l10n.privacyPolicy,
                             ),
                           ),
                         );
@@ -178,15 +181,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
                     // User Recharge Agreement
                     _SettingsItem(
-                      title: 'User Recharge Agreement',
+                      title: l10n.userRechargeAgreement,
                       trailing: const _ArrowIcon(),
                       onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const SystemConfigContentPage(
+                            builder: (context) => SystemConfigContentPage(
                               configId: 9,
-                              title: 'User Recharge Agreement',
+                              title: l10n.userRechargeAgreement,
                             ),
                           ),
                         );
@@ -197,7 +200,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
                     // Message Settings
                     _SettingsItem(
-                      title: 'Message Settings',
+                      title: l10n.messageSettings,
                       trailing: const _ArrowIcon(),
                       onTap: () {
                         Navigator.push(
@@ -213,7 +216,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
                     // Version Number
                     _SettingsItem(
-                      title: 'Version Number',
+                      title: l10n.versionNumber,
                       trailing: const Text(
                         '1.0.0',
                         style: TextStyle(
@@ -276,19 +279,44 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       ),
                     ),
 
-                    const SizedBox(height: 20),
-                    // const Spacer(),
-
-                    // Copyright
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(14, 0, 14, 20),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     Text(
-                      '© 2024 QahwaTV. All rights reserved.',
+                      l10n.copyrightLabel,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.3),
-                        fontSize: 11,
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
-
-                    const SizedBox(height: 32),
+                    Text(
+                      l10n.copyrightLicense,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    Text(
+                      l10n.copyrightNotice,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                        height: 1.4,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -316,7 +344,10 @@ class _SettingsItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        padding: const EdgeInsetsDirectional.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
         decoration: BoxDecoration(
           color: const Color(0xFF464950),
           borderRadius: BorderRadius.circular(12),

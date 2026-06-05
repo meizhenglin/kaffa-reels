@@ -507,7 +507,7 @@ class _RankingListItem extends StatelessWidget {
               bottom: HomeCardLayout.bannerScaled(context, 12),
             ),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 SizedBox(
                   width: rankWidth,
@@ -596,7 +596,7 @@ class _RankingListItem extends StatelessWidget {
                 Row(
                   textDirection: TextDirection.ltr,
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Image.asset(
                       'assets/images/search_hot_icon.png',

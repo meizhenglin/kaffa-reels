@@ -309,25 +309,54 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get appDescription =>
-      'Your premium destination for short dramas. Watch the best series and exclusive content anytime, anywhere.';
+      'وجهتك المميزة للمسلسلات القصيرة. شاهد أفضل السلاسل والمحتوى الحصري في أي وقت ومن أي مكان.';
 
   @override
-  String get privacyPolicy => 'Privacy Policy';
+  String get privacyPolicy => 'سياسة الخصوصية';
 
   @override
-  String get termsOfService => 'Terms of Service';
+  String get termsOfService => 'شروط الخدمة';
 
   @override
-  String get contactUs => 'Contact Us';
+  String get contactUs => 'اتصل بنا';
 
   @override
   String get rateApp => 'Rate Our App';
 
   @override
-  String get followUs => 'Follow Us';
+  String get followUs => 'تابعنا';
 
   @override
   String get openVip => 'Open VIP';
+
+  @override
+  String get userAgreement => 'اتفاقية المستخدم';
+
+  @override
+  String get userRechargeAgreement => 'اتفاقية شحن المستخدم';
+
+  @override
+  String get messageSettings => 'إعدادات الرسائل';
+
+  @override
+  String get versionNumber => 'رقم الإصدار';
+
+  @override
+  String get copyrightLabel =>
+      'حقوق النشر: النص مرخص بموجب ترخيص مكتب الكحول والتبغ';
+
+  @override
+  String get copyrightLicense => 'والأسلحة النارية والمتفجرات.';
+
+  @override
+  String get copyrightNotice =>
+      'جميع الصور ومقاطع الفيديو مرخصة ولا تنتهك حقوق الأطراف الثالثة.';
+
+  @override
+  String get noContentAvailable => 'لا يوجد محتوى متاح';
+
+  @override
+  String get failedToLoadContent => 'فشل تحميل المحتوى';
 
   @override
   String get login_title => 'مرحباً بعودتك';

@@ -89,8 +89,8 @@ class ApiEndpoints {
   static const String updateNickname = '/api/user/updateNickname';
   /// 用户设置（修改昵称/头像/语言）
   static const String userSettings = '/api/user/settings';
-  /// 头像列表（系统配置 id=11）
-  static const String avatarList = '/api/systemConfig/selectConfig';
+  /// 系统配置查询（头像列表/协议内容等）
+  static const String systemConfigSelect = '/api/systemConfig/selectConfigNew';
 }
 
 /// PassportType 登录类型标识

@@ -40,6 +40,7 @@ class _LanguagePageState extends ConsumerState<LanguagePage> {
       await ref.read(localeProvider.notifier).setLocale(_selectedLocale);
 
       if (!mounted) return;
+      context.go('/profile');
       unawaited(AppRestart.restart());
     } catch (error) {
       if (!mounted) return;

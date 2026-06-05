@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../../profile/pages/system_config_content_page.dart';
 
 class PrivacyPolicyPage extends StatelessWidget {
@@ -7,9 +8,9 @@ class PrivacyPolicyPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SystemConfigContentPage(
+    return SystemConfigContentPage(
       configId: 6,
-      title: 'Privacy Policy',
+      title: AppLocalizations.of(context).privacyPolicy,
     );
   }
 }

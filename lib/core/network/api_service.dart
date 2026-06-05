@@ -328,12 +328,20 @@ class ApiService {
 
   /// 获取头像列表
   Future<ApiResponse> getAvatarList() {
-    return request('${ApiEndpoints.avatarList}?id=11', method: 'GET');
+    return request(
+      ApiEndpoints.systemConfigSelect,
+      data: {'id': 11},
+      method: 'POST',
+    );
   }
 
   /// 获取系统配置内容
   Future<ApiResponse> getSystemConfigContent({required int id}) {
-    return request('${ApiEndpoints.avatarList}?id=$id', method: 'GET');
+    return request(
+      ApiEndpoints.systemConfigSelect,
+      data: {'id': id},
+      method: 'POST',
+    );
   }
 
   // ==================== TheaterModel 剧场 Tab ====================

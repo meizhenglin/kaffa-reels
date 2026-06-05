@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../../core/network/api_service.dart';
+import '../../../l10n/app_localizations.dart';
 
 class SystemConfigContentPage extends ConsumerStatefulWidget {
   const SystemConfigContentPage({
@@ -26,12 +28,13 @@ class _SystemConfigContentPageState
   late final Future<String> _contentFuture = _loadContent();
 
   Future<String> _loadContent() async {
+    final l10n = AppLocalizations.of(context);
     final response = await apiServiceProvider.getSystemConfigContent(
       id: widget.configId,
     );
 
     if (!response.isSuccess) {
-      throw Exception(response.error ?? 'Failed to load content');
+      throw Exception(response.error ?? l10n.failedToLoadContent);
     }
 
     final data = response.data;
@@ -88,8 +91,26 @@ class _SystemConfigContentPageState
     return '';
   }
 
+  bool _looksLikeHtml(String content) {
+    final trimmed = content.trim();
+    if (trimmed.isEmpty) return false;
+
+    return RegExp(r'<[^>]+>').hasMatch(trimmed) ||
+        trimmed.contains('&nbsp;') ||
+        trimmed.contains('&lt;') ||
+        trimmed.contains('&gt;');
+  }
+
+  TextStyle get _contentTextStyle => const TextStyle(
+        fontWeight: FontWeight.w400,
+        fontSize: 12,
+        color: Colors.white,
+        height: 20 / 12,
+      );
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isRtl = Directionality.of(context) == TextDirection.rtl;
 
     return GradientScaffold(
@@ -154,10 +175,10 @@ class _SystemConfigContentPageState
 
                   final content = snapshot.data?.trim() ?? '';
                   if (content.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Text(
-                        'No content available',
-                        style: TextStyle(
+                        l10n.noContentAvailable,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 14,
                         ),
@@ -172,16 +193,59 @@ class _SystemConfigContentPageState
                       child: Align(
                         alignment:
                             isRtl ? Alignment.centerRight : Alignment.centerLeft,
-                        child: SelectableText(
-                          content,
-                          textAlign: TextAlign.left,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w400,
-                            fontSize: 12,
-                            color: Colors.white,
-                            height: 20 / 12,
-                          ),
-                        ),
+                        child: _looksLikeHtml(content)
+                            ? Html(
+                                data: content,
+                                style: {
+                                  'html': Style(
+                                    margin: Margins.zero,
+                                    padding: HtmlPaddings.zero,
+                                    color: Colors.white,
+                                    fontSize: FontSize(_contentTextStyle.fontSize!),
+                                    fontWeight: _contentTextStyle.fontWeight,
+                                    lineHeight: LineHeight(_contentTextStyle.height!),
+                                    textAlign: TextAlign.start,
+                                  ),
+                                  'body': Style(
+                                    margin: Margins.zero,
+                                    padding: HtmlPaddings.zero,
+                                    color: Colors.white,
+                                    fontSize: FontSize(_contentTextStyle.fontSize!),
+                                    fontWeight: _contentTextStyle.fontWeight,
+                                    lineHeight: LineHeight(_contentTextStyle.height!),
+                                  ),
+                                  'p': Style(
+                                    margin: Margins.only(bottom: 12),
+                                    color: Colors.white,
+                                  ),
+                                  'span': Style(color: Colors.white),
+                                  'div': Style(color: Colors.white),
+                                  'li': Style(color: Colors.white),
+                                  'a': Style(
+                                    color: const Color(0xFF8CC8FF),
+                                    textDecoration: TextDecoration.underline,
+                                  ),
+                                  'strong': Style(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  'b': Style(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  'h1': Style(color: Colors.white),
+                                  'h2': Style(color: Colors.white),
+                                  'h3': Style(color: Colors.white),
+                                  'h4': Style(color: Colors.white),
+                                  'h5': Style(color: Colors.white),
+                                  'h6': Style(color: Colors.white),
+                                },
+                              )
+                            : SelectableText(
+                                content,
+                                textAlign: TextAlign.left,
+                                style: _contentTextStyle,
+                              ),
                       ),
                     ),
                   );

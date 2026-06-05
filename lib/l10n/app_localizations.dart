@@ -728,6 +728,60 @@ abstract class AppLocalizations {
   /// **'Open VIP'**
   String get openVip;
 
+  /// No description provided for @userAgreement.
+  ///
+  /// In en, this message translates to:
+  /// **'User Agreement'**
+  String get userAgreement;
+
+  /// No description provided for @userRechargeAgreement.
+  ///
+  /// In en, this message translates to:
+  /// **'User Recharge Agreement'**
+  String get userRechargeAgreement;
+
+  /// No description provided for @messageSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Message Settings'**
+  String get messageSettings;
+
+  /// No description provided for @versionNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Version Number'**
+  String get versionNumber;
+
+  /// No description provided for @copyrightLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Copyright:'**
+  String get copyrightLabel;
+
+  /// No description provided for @copyrightLicense.
+  ///
+  /// In en, this message translates to:
+  /// **'Text licensed under OFL.'**
+  String get copyrightLicense;
+
+  /// No description provided for @copyrightNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'All images and videos are licensed and do not infringe on third-party rights.'**
+  String get copyrightNotice;
+
+  /// No description provided for @noContentAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No content available'**
+  String get noContentAvailable;
+
+  /// No description provided for @failedToLoadContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load content'**
+  String get failedToLoadContent;
+
   /// No description provided for @login_title.
   ///
   /// In en, this message translates to:

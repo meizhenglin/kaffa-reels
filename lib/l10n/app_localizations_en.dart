@@ -329,6 +329,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openVip => 'Open VIP';
 
   @override
+  String get userAgreement => 'User Agreement';
+
+  @override
+  String get userRechargeAgreement => 'User Recharge Agreement';
+
+  @override
+  String get messageSettings => 'Message Settings';
+
+  @override
+  String get versionNumber => 'Version Number';
+
+  @override
+  String get copyrightLabel => 'Copyright:';
+
+  @override
+  String get copyrightLicense => 'Text licensed under OFL.';
+
+  @override
+  String get copyrightNotice =>
+      'All images and videos are licensed and do not infringe on third-party rights.';
+
+  @override
+  String get noContentAvailable => 'No content available';
+
+  @override
+  String get failedToLoadContent => 'Failed to load content';
+
+  @override
   String get login_title => 'Welcome Back';
 
   @override
