@@ -224,7 +224,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> _onFirebaseAuthChanged(dynamic user) async {
     debugPrint('[AuthNotifier] _onFirebaseAuthChanged user: $user, current status: ${state.status}');
     if (user == null) {
-      // Firebase 用户登出时，清本地状态（邮箱登录退出由 signOut() 处理）
+      final storedToken = await _ref.read(storageServiceProvider).getToken();
+      final storedUserData = await _ref.read(authServiceProvider).getUserData();
+      final restoredStoredUser = await _restoreStoredAuthenticatedUser(
+        storedToken: storedToken,
+        storedUserData: storedUserData,
+      );
+      if (restoredStoredUser) {
+        debugPrint('[AuthNotifier] Firebase user is null but backend-authenticated email user was restored from storage');
+        return;
+      }
+      // Firebase 用户登出时，清本地状态（邮箱登录/注册若仍有后端 token，会在上面被恢复）
       state = state.copyWith(status: AuthStatus.unauthenticated, clearUser: true, isLoading: false, clearError: true);
       return;
     }
@@ -237,10 +247,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// 检查认证状态
-  Future<void> checkAuthState() async {
+  Future<bool> checkAuthState() async {
     state = state.copyWith(status: AuthStatus.authenticating, isLoading: true, clearError: true);
     try {
-      final user = await _repository.resolveCurrentUser();
+      final user = await _repository.resolveCurrentUser() ?? await _repository.resolveStoredUser();
       if (user != null) {
         state = state.copyWith(
           status: AuthStatus.authenticated,
@@ -248,8 +258,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           isLoading: false,
         );
       } else {
-        // 不再从缓存恢复用户——邮箱登录不走 Firebase Auth，
-        // 退出后 token 已清，直接标记未登录，由 initAsGuest 创建游客
+        // 不再从缓存恢复游客；未命中正式登录态时交给后续游客初始化流程处理
         state = state.copyWith(status: AuthStatus.unauthenticated, isLoading: false);
       }
     } catch (e) {
@@ -259,6 +268,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         errorMessage: _mapError(e),
       );
     }
+    return state.user != null && !state.user!.isTourist;
   }
 
   /// 邮箱登录
@@ -345,21 +355,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// 更新头像（本地 + 后端）
   Future<void> updateAvatar(String avatarUrl) async {
-    if (state.user != null) {
-      state = state.copyWith(user: state.user!.copyWith(avatar: avatarUrl));
-      _repository.saveUserData(state.user!.toJson());
-        await apiServiceProvider.updateUserSettings(setId: 2, avatarUrl: avatarUrl);
+    final currentUser = state.user;
+    if (currentUser != null) {
+      state = state.copyWith(
+        user: currentUser.copyWith(avatar: avatarUrl, photoURL: avatarUrl, isGuest: false),
+      );
+      await _repository.saveUserData(state.user!.toJson());
     }
+    await apiServiceProvider.updateUserSettings(setId: 2, avatarUrl: avatarUrl);
   }
 
   /// 从后端 /api/user/userPersonalCenter 返回的数据更新用户信息
   Future<void> updateUserFromData(Map<String, dynamic> data) async {
     final currentUser = state.user;
+    final rawPassportType = data['passportType'];
+    final nextPassportType = rawPassportType is int
+        ? rawPassportType
+        : int.tryParse(rawPassportType?.toString() ?? '');
     final hasExplicitLoggedInIdentity =
-        data['userId'] != null ||
-        data['id'] != null ||
-        data['email'] != null ||
-        data['passportType'] != null;
+        (data['email']?.toString().trim().isNotEmpty ?? false) ||
+        (nextPassportType != null && nextPassportType != 0);
     final shouldDiscardGuestBase =
         currentUser != null && currentUser.isTourist && hasExplicitLoggedInIdentity;
 
@@ -368,12 +383,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
       ...data,
     };
 
+    if (hasExplicitLoggedInIdentity) {
+      mergedData['isGuest'] = false;
+    } else if (currentUser?.isTourist ?? false) {
+      mergedData['isGuest'] = true;
+    }
+
     final currentPassportType = shouldDiscardGuestBase ? null : currentUser?.passportType;
-    final nextPassportType = mergedData['passportType'];
     final shouldPreserveLoggedInPassportType =
         currentPassportType != null &&
         currentPassportType != 0 &&
-        (nextPassportType == null || nextPassportType == 0 || nextPassportType == '0');
+        (nextPassportType == null || nextPassportType == 0);
 
     if (shouldPreserveLoggedInPassportType) {
       mergedData['passportType'] = currentPassportType;
@@ -400,8 +420,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// 更新昵称（本地 + 后端）
   Future<void> updateNickname(String nickname) async {
     if (state.user != null) {
-      state = state.copyWith(user: state.user!.copyWith(nickname: nickname));
-      _repository.saveUserData(state.user!.toJson());
+      state = state.copyWith(
+        user: state.user!.copyWith(nickname: nickname, displayName: nickname, isGuest: false),
+      );
+      await _repository.saveUserData(state.user!.toJson());
       await apiServiceProvider.updateUserSettings(setId: 1, nickName: nickname);
     }
   }

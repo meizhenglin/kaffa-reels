@@ -146,6 +146,8 @@ class AuthRepository {
       ...userData,
       'userId': userId,
       'email': email.trim(),
+      'passportType': userData['passportType'] ?? 1,
+      'isGuest': false,
     });
     await cacheUser(user);
     return user;
@@ -181,6 +183,8 @@ class AuthRepository {
       'userId': userId,
       'email': email.trim(),
       'nickName': data?['nickName'] ?? username.trim(),
+      'passportType': data?['passportType'] ?? 1,
+      'isGuest': false,
     });
     await _storage.saveUserData(user.toJson());
     await cacheUser(user);
@@ -322,6 +326,26 @@ class AuthRepository {
     final model = await _userModelFromFirebaseUser(user);
     await cacheUser(model);
     return model;
+  }
+
+  Future<UserModel?> resolveStoredUser() async {
+    final cached = await getCachedUser();
+    if (cached != null && !cached.isTourist) {
+      return cached;
+    }
+
+    final userData = await _storage.getUserData();
+    if (userData == null) {
+      return null;
+    }
+
+    final user = UserModel.fromJson(userData);
+    if (user.isTourist) {
+      return null;
+    }
+
+    await cacheUser(user);
+    return user;
   }
 
   Future<void> saveLanguage(String languageCode) async {

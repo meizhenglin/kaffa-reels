@@ -71,7 +71,20 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
       try {
         final resp = await apiServiceProvider.getUserCenter();
         if (resp.isSuccess && resp.data != null) {
-          ref.read(authProvider.notifier).updateUserFromData(resp.data as Map<String, dynamic>);
+          final currentUser = ref.read(authProvider).user;
+          final userCenterData = resp.data as Map<String, dynamic>;
+          final mergedUserData = <String, dynamic>{
+            ...?currentUser?.toJson(),
+            ...userCenterData,
+            if (userCenterData['userId'] == null && currentUser?.id != null)
+              'userId': currentUser!.id,
+            if (userCenterData['email'] == null && currentUser?.email != null)
+              'email': currentUser!.email,
+            if (userCenterData['passportType'] == null && currentUser?.passportType != null)
+              'passportType': currentUser!.passportType,
+            'isGuest': false,
+          };
+          await ref.read(authProvider.notifier).updateUserFromData(mergedUserData);
         }
       } catch (_) {}
       if (!mounted) return;

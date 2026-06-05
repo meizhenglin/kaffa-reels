@@ -998,6 +998,18 @@ abstract class AppLocalizations {
   /// **'Language'**
   String get profile_language;
 
+  /// No description provided for @changeLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Language'**
+  String get changeLanguage;
+
+  /// No description provided for @chooseLanguage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Language'**
+  String get chooseLanguage;
+
   /// No description provided for @profile_feedback.
   ///
   /// In en, this message translates to:

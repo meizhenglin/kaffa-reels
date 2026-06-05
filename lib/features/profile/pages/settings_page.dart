@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/router/router_config.dart';
+import '../../../app/providers/app_providers.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../../core/utils/app_restart.dart';
@@ -71,6 +72,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final currentLocale = ref.watch(localeProvider);
+    final currentLanguageLabel =
+        currentLocale.languageCode.toLowerCase() == 'ar' ? 'العربية' : 'English';
     // 监听 authProvider，游客状态变化时自动刷新 UI
     final auth = ref.watch(authProvider);
 
@@ -121,10 +125,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
                     // Change Language
                     _SettingsItem(
-                      title: 'Change Language',
-                      trailing: const Text(
-                        'English',
-                        style: TextStyle(
+                      title: l10n.changeLanguage,
+                      trailing: Text(
+                        currentLanguageLabel,
+                        style: const TextStyle(
                           color: Color(0xFF999999),
                           fontSize: 15,
                         ),
@@ -259,7 +263,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       },
                       child: Container(
                         width: double.infinity,
-                        height: 50,
+                        height: 40,
                         decoration: BoxDecoration(
                           color: const Color(0xFF464950),
                           borderRadius: BorderRadius.circular(10),
@@ -349,7 +353,7 @@ class _SettingsItem extends StatelessWidget {
           vertical: 14,
         ),
         decoration: BoxDecoration(
-          color: const Color(0xFF464950),
+          color: const Color(0xFF3B3C45),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(

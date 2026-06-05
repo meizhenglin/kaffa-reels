@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../../core/network/api_service.dart';
 import '../providers/auth_provider.dart';
 import '../../../components/rtl_back_button.dart';
 
@@ -59,7 +60,30 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     setState(() => _isLoading = false);
 
     if (success) {
-      context.go('/');
+      try {
+        final resp = await apiServiceProvider.getUserCenter();
+        if (resp.isSuccess && resp.data != null) {
+          final currentUser = ref.read(authProvider).user;
+          final userCenterData = resp.data as Map<String, dynamic>;
+          final mergedUserData = <String, dynamic>{
+            ...?currentUser?.toJson(),
+            ...userCenterData,
+            if (userCenterData['userId'] == null && currentUser?.id != null)
+              'userId': currentUser!.id,
+            if (userCenterData['email'] == null && currentUser?.email != null)
+              'email': currentUser!.email,
+            if (userCenterData['passportType'] == null && currentUser?.passportType != null)
+              'passportType': currentUser!.passportType,
+            'isGuest': false,
+          };
+          await ref
+              .read(authProvider.notifier)
+              .updateUserFromData(mergedUserData);
+        }
+      } catch (_) {}
+
+      if (!mounted) return;
+      context.push('/auth/photo-setting', extra: true);
     } else {
       final errorMsg = ref.read(authProvider).errorMessage;
       ScaffoldMessenger.of(context).showSnackBar(

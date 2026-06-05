@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../components/common_video_player.dart';
 import '../../features/detail/pages/detail_page.dart';
 import '../../features/commonAliPlayer/short_video_page.dart';
 import '../../features/recommend/models/video_info.dart';
@@ -10,7 +9,6 @@ import '../../features/auth/pages/forgot_password_page.dart';
 import '../../features/auth/pages/login_email_page.dart';
 import '../../features/auth/pages/login_page.dart';
 import '../../features/auth/pages/register_email_page.dart';
-import '../../features/auth/pages/register_page.dart';
 import '../../features/auth/pages/user_agreement_page.dart';
 import '../../features/auth/pages/photo_setting_page.dart';
 import '../../features/auth/pages/privacy_policy_page.dart';
@@ -28,6 +26,7 @@ import '../../features/payment/pages/membership_page.dart';
 import '../../features/profile/pages/profile_tab.dart';
 import '../../features/profile/pages/settings_page.dart';
 import '../../features/profile/pages/change_name_page.dart';
+import '../../features/profile/pages/personal_info_page.dart';
 import '../../features/profile/pages/history_page.dart';
 import '../../features/recommend/models/drama_list_type.dart';
 import '../../features/recommend/pages/recommend_tab.dart';
@@ -333,6 +332,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/personal-info',
+        name: 'personal-info',
+        builder: (context, state) => const PersonalInfoPage(),
+      ),
+
       /// 搜索页面
       /// 【路径】/search
       /// 【参数】
@@ -510,16 +516,12 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       /// 注册页面
       /// 【路径】/auth/register
-      /// 【参数】
-      /// - redirect：注册成功后重定向的路径（可选）
+      /// 【使用场景】统一注册入口
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
         path: '/auth/register',
         name: 'register',
-        builder: (context, state) {
-          final redirect = state.uri.queryParameters['redirect'];
-          return RegisterPage(redirect: redirect);
-        },
+        builder: (context, state) => const RegisterEmailPage(),
       ),
 
       /// 邮箱注册页面

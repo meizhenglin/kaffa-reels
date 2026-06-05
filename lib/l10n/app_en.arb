@@ -157,6 +157,8 @@
   "profile_history": "Watch History",
   "profile_favorites": "Favorites",
   "profile_language": "Language",
+  "changeLanguage": "Change Language",
+  "chooseLanguage": "Choose Language",
   "profile_feedback": "Feedback",
   "profile_about": "About",
   "profile_logout": "Log Out",

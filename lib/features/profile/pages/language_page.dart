@@ -9,6 +9,7 @@ import '../../../app/providers/app_providers.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../../core/utils/app_restart.dart';
+import '../../../l10n/app_localizations.dart';
 
 class LanguagePage extends ConsumerStatefulWidget {
   const LanguagePage({super.key});
@@ -59,6 +60,7 @@ class _LanguagePageState extends ConsumerState<LanguagePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return GradientScaffold(
       body: SafeArea(
         child: Column(
@@ -71,11 +73,11 @@ class _LanguagePageState extends ConsumerState<LanguagePage> {
                     onPressed: () => context.pop(),
                     color: Colors.white,
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
-                        'Choose Language',
-                        style: TextStyle(
+                        l10n.chooseLanguage,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 18,
                           // fontWeight: FontWeight.bold,
@@ -137,9 +139,9 @@ class _LanguagePageState extends ConsumerState<LanguagePage> {
                                 ),
                               ),
                             )
-                          : const Text(
-                              'Confirm',
-                              style: TextStyle(
+                          : Text(
+                              l10n.common_confirm,
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
@@ -176,7 +178,7 @@ class _LanguageItem extends StatelessWidget {
         height: 65,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFF464950),
+          color: const Color(0xFF3B3C45),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(

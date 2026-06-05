@@ -45,8 +45,19 @@ class UserModel extends Equatable {
 
   String? get userNickname => nickname ?? displayName;
 
-  /// 同时考虑本地 isGuest 字段和后端返回的 passportType == 0
-  bool get isTourist => isGuest || (passportType != null && passportType == 0);
+  /// 游客判定以显式游客标记和后端登录类型为准，避免把游客 UUID 误判成正式账号
+  bool get isTourist {
+    if (isGuest) {
+      return true;
+    }
+
+    final normalizedPassportType = passportType;
+    if (normalizedPassportType != null) {
+      return normalizedPassportType == 0;
+    }
+
+    return (email == null || email!.trim().isEmpty);
+  }
 
   bool get isPremium =>
       membershipType == MembershipType.premium &&

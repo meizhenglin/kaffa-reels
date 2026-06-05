@@ -465,6 +465,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get profile_language => 'Language';
 
   @override
+  String get changeLanguage => 'Change Language';
+
+  @override
+  String get chooseLanguage => 'Choose Language';
+
+  @override
   String get profile_feedback => 'Feedback';
 
   @override

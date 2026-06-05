@@ -19,6 +19,13 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
   List<String> _avatars = [];
   String? _selectedAvatar;
   bool _isLoading = true;
+  bool _isSubmitting = false;
+
+  void _showErrorMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
 
   @override
   void initState() {
@@ -29,6 +36,10 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
   Future<void> _loadAvatars() async {
     setState(() => _isLoading = true);
     final resp = await apiServiceProvider.getAvatarList();
+    if (!mounted) {
+      return;
+    }
+
     if (resp.isSuccess && resp.data != null) {
       final list = resp.data as List;
       setState(() {
@@ -37,37 +48,58 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
       });
     } else {
       setState(() => _isLoading = false);
+      _showErrorMessage(resp.error ?? 'Failed to load avatars');
     }
   }
 
   void _onSkip() {
     if (widget.fromRegister) {
-      context.push('/change-name', extra: true);
+      context.go('/change-name', extra: true);
     } else {
       context.go('/profile');
     }
   }
 
-  void _onContinue() async {
-    if (_selectedAvatar != null) {
-      await ref.read(authProvider.notifier).updateAvatar(_selectedAvatar!);
-    }
-
-    try {
-      final resp = await apiServiceProvider.getUserCenter();
-      if (resp.isSuccess && resp.data != null && mounted) {
-        ref.read(authProvider.notifier).updateUserFromData(resp.data as Map<String, dynamic>);
-      }
-    } catch (_) {}
-
-    if (!mounted) {
+  Future<void> _onContinue() async {
+    if (_selectedAvatar == null || _isSubmitting) {
       return;
     }
 
-    if (widget.fromRegister) {
-      context.push('/change-name', extra: true);
-    } else {
-      context.go('/profile');
+    setState(() => _isSubmitting = true);
+
+    try {
+      await ref.read(authProvider.notifier).updateAvatar(_selectedAvatar!);
+
+      final resp = await apiServiceProvider.getUserCenter();
+      if (!resp.isSuccess) {
+        throw Exception(resp.error ?? 'Failed to update avatar');
+      }
+
+      if (resp.data != null && mounted) {
+        await ref.read(authProvider.notifier).updateUserFromData(resp.data as Map<String, dynamic>);
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      if (widget.fromRegister) {
+        context.go('/change-name', extra: true);
+      } else {
+        context.go('/profile');
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      final message = error is Exception
+          ? error.toString().replaceFirst('Exception: ', '')
+          : 'Failed to update avatar';
+      _showErrorMessage(message);
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -75,8 +107,8 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
 
-    // 游客直接跳转登录
-    if (auth.user == null || auth.user!.isTourist) {
+    // 游客直接跳转登录；注册补全流程允许临时放行
+    if ((auth.user == null || auth.user!.isTourist) && !widget.fromRegister) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.go('/auth/login');
       });
@@ -213,27 +245,27 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
             ],
             // Continue 按钮
             GestureDetector(
-              onTap: _selectedAvatar != null ? _onContinue : null,
+              onTap: _selectedAvatar != null && !_isSubmitting ? _onContinue : null,
               child: Container(
                 width: double.infinity,
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  gradient: _selectedAvatar != null
+                  gradient: _selectedAvatar != null && !_isSubmitting
                       ? const LinearGradient(
                           colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
                         )
                       : null,
-                  color: _selectedAvatar == null
+                  color: _selectedAvatar == null || _isSubmitting
                       ? const Color(0xFF3B3C45)
                       : null,
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Text(
-                  'Continue',
+                  'confirm',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: _selectedAvatar != null
+                    color: _selectedAvatar != null && !_isSubmitting
                         ? Colors.white
                         : Colors.white38,
                     fontSize: 15,

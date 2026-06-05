@@ -49,6 +49,8 @@
   "continueWatching": "مواصلة المشاهدة",
   "profile_favorites": "المفضلة",
   "profile_language": "اللغة",
+  "changeLanguage": "تغيير اللغة",
+  "chooseLanguage": "اختر اللغة",
   "profile_feedback": "ملاحظات",
   "profile_about": "حول التطبيق",
   "profile_logout": "تسجيل الخروج",

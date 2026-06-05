@@ -467,6 +467,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get profile_language => 'اللغة';
 
   @override
+  String get changeLanguage => 'تغيير اللغة';
+
+  @override
+  String get chooseLanguage => 'اختر اللغة';
+
+  @override
   String get profile_feedback => 'ملاحظات';
 
   @override

@@ -14,11 +14,14 @@ class AppConfig {
 
   // ==================== API 配置 ====================
   /// API 基础地址
-  /// 测试环境 ngork
-  static const String apiBaseUrl = 'https://scolding-unbaked-refrain.ngrok-free.dev/';
+  /// 正式环境
+  static const String apiBaseUrl = 'https://tvapi.qahwatv.com/';
+
+  /// 如需切回联调环境，可临时使用：
+  /// https://scolding-unbaked-refrain.ngrok-free.dev/
 
   /// 图片 CDN 地址
-  static const String picRootPath = 'https://image.qahwatv.com/';
+  // static const String picRootPath = 'https://image.qahwatv.com/';
 
   // ==================== 平台标识 ====================
   /// platformId=3;platformAppId=3001  抖音

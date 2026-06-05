@@ -184,7 +184,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   ),
                   const Spacer(),
                   GestureDetector(
-                    onTap: () => context.push('/auth/register/email'),
+                    onTap: () => context.push('/auth/register'),
                     child: Center(
                       child: RichText(
                         text: TextSpan(

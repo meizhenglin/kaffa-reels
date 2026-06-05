@@ -225,12 +225,9 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              GestureDetector(
-                onTap: () => _goToChangeName(context),
-                child: Text(
-                  user?.userNickname ?? 'Guest',
-                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                ),
+              Text(
+                user?.userNickname ?? 'Guest',
+                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               if (isLoggedIn)
@@ -261,7 +258,15 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
         ),
         // 最右侧：游客显示登录按钮，邮箱账号显示右箭头
         if (!shouldShowLoginButton)
-          Image.asset('assets/images/to.png', width: 20, height: 20)
+          GestureDetector(
+            onTap: () => _goToPersonalInfo(context),
+            child: Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..scale(Directionality.of(context) == TextDirection.rtl ? -1.0 : 1.0, 1.0),
+              child: Image.asset('assets/images/to.png', width: 20, height: 20),
+            ),
+          )
         else
           GestureDetector(
             onTap: () => context.push('/auth/login?redirect=/profile'),
@@ -295,7 +300,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
     context.push('/auth/photo-setting');
   }
 
-  Future<void> _goToChangeName(BuildContext context) async {
+  Future<void> _goToPersonalInfo(BuildContext context) async {
     final auth = ref.read(authProvider);
     if (auth.user == null || auth.user!.isTourist) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -306,7 +311,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
       );
       return;
     }
-    context.push('/change-name');
+    context.push('/personal-info');
   }
 
   Widget _buildAvatarPlaceholder() {
@@ -373,8 +378,8 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  user == null || !user.isTourist
-                      ? 'Validity Period：${_formatDate(user?.membershipExpiryDate)}'
+                  user != null && !user.isTourist
+                      ? 'Validity Period：${_formatDate(user.membershipExpiryDate)}'
                       : AppLocalizations.of(context).vipSubtitle,
                   style: const TextStyle(color: Color(0xFF3A1D00), fontSize: 12),
                 ),
