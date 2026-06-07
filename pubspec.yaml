@@ -58,10 +58,9 @@ dependencies:
   path_provider: ^2.1.0
 
   # 阿里云播放器（6.15.x 要求 SDK<=3.5.3，当前使用兼容版本）
-  flutter_aliplayer: ^7.0.0
-  aliplayer_widget: ^7.0.0
+  flutter_aliplayer: 7.14.0
+  aliplayer_widget: 7.14.0
   preload_page_view: ^0.2.0
-  screen_brightness: ^2.0.2
 
   # Payment & Subscription
   in_app_purchase: ^3.2.0
@@ -74,6 +73,14 @@ dev_dependencies:
   retrofit_generator: ^9.1.5
   build_runner: ^2.4.0
   json_serializable: ^6.8.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/app_logo.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/app_logo.png"
 
 flutter:
   uses-material-design: true
@@ -84,4 +91,3 @@ flutter:
     - assets/animations/
     - assets/cert/
     - assets/data/
-    - assets/videos/

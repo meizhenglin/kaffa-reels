@@ -95,5 +95,10 @@
   "copyrightNotice": "جميع الصور ومقاطع الفيديو مرخصة ولا تنتهك حقوق الأطراف الثالثة.",
   "noContentAvailable": "لا يوجد محتوى متاح",
   "failedToLoadContent": "فشل تحميل المحتوى",
-  "noDataAvailableAtTheMoment": "لا توجد بيانات متاحة في الوقت الراهن"
+  "noDataAvailableAtTheMoment": "لا توجد بيانات متاحة في الوقت الراهن",
+  "like": "إعجاب",
+  "comment": "تعليق",
+  "watch": "مشاهدة",
+  "episode": "حلقة",
+  "episodes": "الحلقات"
 }

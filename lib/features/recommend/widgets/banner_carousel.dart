@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../home/models/home_card_layout.dart';
+import '../../home/providers/last_watched_provider.dart';
 import '../models/banner.dart';
 
 /// ============================================================================
@@ -43,10 +44,12 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
   int _currentIndex = 0;
 
   /// 跳转到播放器，只需传 videoId，播放器自己请求数据
-  void _onPlayTap(BannerItem banner) {
+  Future<void> _onPlayTap(BannerItem banner) async {
     final videoId = banner.videoId ?? banner.dramaId;
     if (videoId.isEmpty) return;
-    context.push('/short-video', extra: {'videoId': videoId});
+    await context.push('/short-video', extra: {'videoId': videoId});
+    if (!mounted) return;
+    await ref.read(lastWatchedProvider.notifier).load();
   }
 
   @override

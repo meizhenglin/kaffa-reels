@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/detail/pages/detail_page.dart';
 import '../../features/commonAliPlayer/short_video_page.dart';
 import '../../features/recommend/models/video_info.dart';
 import '../../features/auth/pages/forgot_password_page.dart';
@@ -14,14 +13,9 @@ import '../../features/auth/pages/photo_setting_page.dart';
 import '../../features/auth/pages/privacy_policy_page.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/explore/pages/explore_tab.dart';
-import '../../features/games/pages/games_tab.dart';
 import '../../features/home/pages/home_tab.dart';
 import '../../features/home/pages/main_page.dart';
 import '../../features/home/models/navigation_item.dart';
-import '../../features/player/domain/player_state.dart';
-import '../../features/player/presentation/player_page.dart';
-import '../../features/player/presentation/player_controller.dart';
-import '../../features/player/presentation/test_player_page.dart';
 import '../../features/payment/pages/membership_page.dart';
 import '../../features/profile/pages/profile_tab.dart';
 import '../../features/profile/pages/settings_page.dart';
@@ -272,20 +266,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
 
-          // ----- 游戏 Tab -----
-          StatefulShellBranch(
-            navigatorKey: shellNavigatorGamesKey,
-            routes: [
-              GoRoute(
-                path: '/games',
-                name: 'games',
-                pageBuilder: (context, state) => const NoTransitionPage(
-                  child: GamesTab(),
-                ),
-              ),
-            ],
-          ),
-
           // ----- 我的 Tab -----
           StatefulShellBranch(
             navigatorKey: shellNavigatorProfileKey,
@@ -353,138 +333,29 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      /// 视频播放器页面
-      /// 【路径】/player
-      /// 【参数】
-      /// - url：视频地址（通过 extra 或 query 参数传入）
-      /// - title：视频标题
-      /// - dramaId：短剧ID
-      /// - episodes：剧集列表
-      /// - currentIndex：当前集数索引
-      /// - coverUrl：封面URL
-      /// - isUnlocked：是否已解锁
-      /// - videoUrlOne：高清地址
-      /// - videoUrlTwo：超清地址
-      /// 【使用场景】点击短剧卡片时跳转
-      GoRoute(
-        parentNavigatorKey: rootNavigatorKey,
-        path: '/player',
-        name: 'player',
-        pageBuilder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>?;
-          final query = state.uri.queryParameters;
-          final url = extra?['url'] as String? ?? query['url'] ?? '';
-          final title = extra?['title'] as String? ?? query['title'] ?? 'Video';
-          final dramaId = extra?['dramaId'] as String?;
-          final episodes = extra?['episodes'] as List<dynamic>?;
-          final currentIndex = extra?['currentIndex'] as int? ?? 0;
-          final coverUrl = extra?['coverUrl'] as String?;
-          final isVipOnly = extra?['isVipOnly'] as bool? ?? false;
-          final videoUrlOne = extra?['videoUrlOne'] as String?;
-          final videoUrlTwo = extra?['videoUrlTwo'] as String?;
-
-          return MaterialPage(
-            key: state.pageKey,
-            child: PlayerPage(
-              videoUrl: url,
-              title: title,
-              dramaId: dramaId,
-              allEpisodes: episodes?.cast() ?? const [],
-              currentIndex: currentIndex,
-              coverUrl: coverUrl,
-              isVipOnly: isVipOnly,
-              videoUrlOne: videoUrlOne,
-              videoUrlTwo: videoUrlTwo,
-            ),
-          );
-        },
-      ),
-
       /// 阿里云沉浸式播放器
       /// 【路径】/short-video
-      /// 【参数】二选一：
-      /// - videoId（extra）：视频 ID，播放器自己请求 directory + playVideo（推荐）
-      /// - episodes（extra）：VideoInfo 列表，向后兼容老调用方
+      /// 【参数】
+      /// - videoId（extra）：视频 ID，播放器自己请求 directory + playVideo
       GoRoute(
         parentNavigatorKey: rootNavigatorKey,
         path: '/short-video',
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
-          final videoId = extra?['videoId'] as String?;
-          final rawList = extra?['episodes'] as List<dynamic>?;
-          final episodes = rawList
-              ?.map((e) => VideoInfo.fromJson(e as Map<String, dynamic>))
-              .toList();
+          final videoId = extra?['videoId'] as String? ?? '';
+          final initialIndex = extra?['initialIndex'] as int? ?? 0;
+          final seedVideoJson = extra?['seedVideo'] as Map<String, dynamic>?;
+          final seedVideo = seedVideoJson == null
+              ? null
+              : VideoInfo.fromJson(seedVideoJson);
 
-          debugPrint('[router] /short-video videoId=$videoId episodes=${episodes?.length}');
+          debugPrint('[router] /short-video videoId=$videoId initialIndex=$initialIndex');
           return ShortVideoPage(
             videoId: videoId,
-            episodes: episodes,
+            initialIndex: initialIndex,
+            seedVideo: seedVideo,
           );
         },
-      ),
-
-      /// 详情页（短视频点击 Watch 跳转）
-      /// 【路径】/detail
-      /// 【参数】
-      /// - videoUrl：视频地址
-      /// - videoId：视频唯一标识
-      /// - title：标题
-      /// - coverUrl：封面
-      /// - allEpisodes：剧集列表
-      /// - currentIndex：当前集数索引
-      /// - videoUrlOne：高清地址
-      /// - videoUrlTwo：超清地址
-      /// - isVipOnly：是否VIP专属
-      /// - initialProgress：初始播放进度
-      /// - autoPlay：是否自动播放
-      GoRoute(
-        parentNavigatorKey: rootNavigatorKey,
-        path: '/detail',
-        name: 'detail',
-        builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>?;
-          final rawEpisodes = extra?['allEpisodes'] as List<dynamic>?;
-          final episodes = rawEpisodes
-              ?.map((e) {
-                if (e is EpisodeData) {
-                  return CommonEpisode(
-                    id: e.id,
-                    title: e.title,
-                    videoUrl: e.videoUrl,
-                    coverUrl: e.coverUrl,
-                    isUnlocked: e.isUnlocked,
-                  );
-                }
-                if (e is CommonEpisode) {
-                  return e;
-                }
-                return null;
-              })
-              .whereType<CommonEpisode>()
-              .toList() ??
-          const [];
-          return DetailPage(
-            videoUrl: extra?['url'] as String? ?? '',
-            videoId: extra?['videoId'] as String? ?? extra?['dramaId'] as String? ?? '',
-            title: extra?['title'] as String?,
-            coverUrl: extra?['coverUrl'] as String?,
-            allEpisodes: episodes,
-            currentIndex: extra?['currentIndex'] as int? ?? 0,
-            videoUrlOne: extra?['videoUrlOne'] as String?,
-            videoUrlTwo: extra?['videoUrlTwo'] as String?,
-            isVipOnly: extra?['isVipOnly'] as bool? ?? false,
-            initialProgress: extra?['initialProgress'] as Duration?,
-            autoPlay: extra?['autoPlay'] as bool? ?? false,
-          );
-        },
-      ),
-
-      /// 测试播放器页面
-      GoRoute(
-        parentNavigatorKey: rootNavigatorKey,
-        path: '/test-player',
-        builder: (context, state) => const TestPlayerPage(),
       ),
 
       /// 登录页面

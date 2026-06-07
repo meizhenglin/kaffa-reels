@@ -5,99 +5,150 @@
 // Brief: AliPlayer Preload
 
 import 'package:flutter/material.dart';
-
 import 'package:flutter_aliplayer/flutter_aliplayer_medialoader.dart';
+
 import '../recommend/models/video_info.dart';
 
 import 'ali_sliding_window.dart';
+import 'short_video_preload_tuning.dart';
 
-/// A class that manages video and cover preloading logic using the sliding window concept.
-/// By using the idea of sliding windows, handle the logic of MediaLoader preloading to ensure the effect of full screen second opening
-///
-/// 使用滑动窗口概念管理视频和封面预加载逻辑的类。
+enum AliPreloadDebugStatus {
+  neverStarted,
+  loading,
+  completed,
+  canceled,
+  error,
+}
+
+class AliPreloadDebugEntry {
+  const AliPreloadDebugEntry({
+    required this.normalizedUrlKey,
+    required this.originalUrl,
+    required this.status,
+    required this.requestCount,
+    required this.lastRequestedBufferDurationMs,
+    required this.lastTier,
+    required this.lastUpdatedAt,
+    this.lastErrorCode,
+    this.lastErrorMessage,
+  });
+
+  final String normalizedUrlKey;
+  final String originalUrl;
+  final AliPreloadDebugStatus status;
+  final int requestCount;
+  final int lastRequestedBufferDurationMs;
+  final String lastTier;
+  final DateTime lastUpdatedAt;
+  final int? lastErrorCode;
+  final String? lastErrorMessage;
+
+  AliPreloadDebugEntry copyWith({
+    String? normalizedUrlKey,
+    String? originalUrl,
+    AliPreloadDebugStatus? status,
+    int? requestCount,
+    int? lastRequestedBufferDurationMs,
+    String? lastTier,
+    DateTime? lastUpdatedAt,
+    int? lastErrorCode,
+    String? lastErrorMessage,
+  }) {
+    return AliPreloadDebugEntry(
+      normalizedUrlKey: normalizedUrlKey ?? this.normalizedUrlKey,
+      originalUrl: originalUrl ?? this.originalUrl,
+      status: status ?? this.status,
+      requestCount: requestCount ?? this.requestCount,
+      lastRequestedBufferDurationMs:
+          lastRequestedBufferDurationMs ?? this.lastRequestedBufferDurationMs,
+      lastTier: lastTier ?? this.lastTier,
+      lastUpdatedAt: lastUpdatedAt ?? this.lastUpdatedAt,
+      lastErrorCode: lastErrorCode ?? this.lastErrorCode,
+      lastErrorMessage: lastErrorMessage ?? this.lastErrorMessage,
+    );
+  }
+
+  String toDebugLabel() {
+    final errorPart = lastErrorCode != null ||
+            (lastErrorMessage != null && lastErrorMessage!.isNotEmpty)
+        ? ' error=${lastErrorCode ?? '-'}:${lastErrorMessage ?? '-'}'
+        : '';
+    return 'status=${status.name} tier=$lastTier requests=$requestCount bufferMs=$lastRequestedBufferDurationMs$errorPart';
+  }
+}
+
+/// A class that manages cover preloading logic using the sliding window concept.
 class AliPlayerPreload {
-  /// The tag for logging purposes.
-  ///
-  /// 日志标签
   static const String _logTag = 'AliPlayerPreload';
 
-  /// Preload buffer duration in milliseconds.
-  ///
-  /// 预加载缓冲时长（毫秒）- 15s 确保播完时下一段已准备好
-  static const int _preloadBufferDuration = 15 * 1000;
-
-  /// Media preload window configuration.
-  ///
-  /// 媒体预加载窗口配置：当前视频及后续 3 个 + 前面 2 个
-  static const List<int> _mediaPreloadWindows = [-2, -1, 0, 1, 2, 3];
-
-  /// Cover preload left window size.
-  ///
-  /// 封面预加载左侧窗口大小
-  static const int _coverPreloadLeftWindowSize = 5;
-
-  /// Cover preload right window size.
-  ///
-  /// 封面预加载右侧窗口大小
-  static const int _coverPreloadRightWindowSize = 15;
-
-  /// Video preloader instance.
-  ///
-  /// 视频预加载器实例
-  late final AliSlidingWindow<String> _videoPreloader;
-
-  /// Cover preloader instance.
-  ///
-  /// 封面预加载器实例
   late final AliSlidingWindow<String>? _coverPreloader;
+  final bool _enableVideoPreload;
+  late final AliSlidingWindow<String>? _videoPreloader;
+  AliSlidingWindow<String>? _nearVideoPreloader;
+  AliSlidingWindow<String>? _farVideoPreloader;
 
-  /// Build context.
-  ///
-  /// Flutter 的 BuildContext 上下文
   final BuildContext _context;
-
-  /// Whether to enable cover URL strategy.
-  ///
-  /// 是否启用封面 URL 策略
   final bool _isCoverUrlStrategyEnabled;
+  final bool _usePrioritizedVideoPreload;
+  final FlutterAliPlayerMediaLoader _mediaLoader = FlutterAliPlayerMediaLoader();
+  final Map<String, AliPreloadDebugEntry> _debugEntriesByUrlKey = {};
 
-  /// Media loader instance.
-  ///
-  /// 媒体加载器实例
-  final FlutterAliPlayerMediaLoader _mediaLoader =
-      FlutterAliPlayerMediaLoader();
-
-  /// Constructor for AliPlayerPreload.
-  ///
-  /// 构造函数，初始化 AliPlayerPreload 实例
   AliPlayerPreload({
     required BuildContext context,
     required bool enableCoverUrlStrategy,
+    bool usePrioritizedVideoPreload = false,
+    bool enableVideoPreload = true,
   })  : _context = context,
-        _isCoverUrlStrategyEnabled = enableCoverUrlStrategy {
-    _log("[init]");
+        _isCoverUrlStrategyEnabled = enableCoverUrlStrategy,
+        _usePrioritizedVideoPreload = usePrioritizedVideoPreload,
+        _enableVideoPreload = enableVideoPreload {
+    _log('[init]');
     _initializeSlidingWindows();
     _initMediaLoader();
   }
 
-  /// Initialize sliding windows after the instance is created.
-  ///
-  /// 初始化滑动窗口实例
   void _initializeSlidingWindows() {
-    // Initialize the video preloader.
-    _videoPreloader = AliSlidingWindow.withCustomItems(
-      _mediaPreloadWindows,
-      _preloadMedia,
-      _cancelPreloadMedia,
-      isValid: _isValidUrl,
-      extra: 'VIDEO',
-    );
+    _videoPreloader = _enableVideoPreload
+        ? AliSlidingWindow.withCustomItems(
+            ShortVideoPreloadTuning.mediaPreloadWindowOffsets,
+            _preloadMedia,
+            _cancelPreloadMedia,
+            isValid: _isValidUrl,
+            extra: 'VIDEO',
+          )
+        : null;
 
-    // Initialize the cover preloader if enabled.
+    _nearVideoPreloader = _enableVideoPreload && _usePrioritizedVideoPreload
+        ? AliSlidingWindow.withCustomItems(
+            ShortVideoPreloadTuning.watchMediaPreloadNearOffsets,
+            (url) => _preloadMedia(
+              url,
+              bufferDurationMs: ShortVideoPreloadTuning.watchMediaPreloadNearBufferDurationMs,
+              tier: 'near',
+            ),
+            _cancelPreloadMedia,
+            isValid: _isValidUrl,
+            extra: 'VIDEO_NEAR',
+          )
+        : null;
+    _farVideoPreloader = _enableVideoPreload && _usePrioritizedVideoPreload
+        ? AliSlidingWindow.withCustomItems(
+            ShortVideoPreloadTuning.watchMediaPreloadFarOffsets,
+            (url) => _preloadMedia(
+              url,
+              bufferDurationMs: ShortVideoPreloadTuning.watchMediaPreloadFarBufferDurationMs,
+              tier: 'far',
+            ),
+            _cancelPreloadMedia,
+            isValid: _isValidUrl,
+            extra: 'VIDEO_FAR',
+          )
+        : null;
+
     _coverPreloader = _isCoverUrlStrategyEnabled
         ? AliSlidingWindow.withWindowSize(
-            _coverPreloadLeftWindowSize,
-            _coverPreloadRightWindowSize,
+            ShortVideoPreloadTuning.commonCoverPreloadLeftWindowSize,
+            ShortVideoPreloadTuning.commonCoverPreloadRightWindowSize,
             _preloadImage,
             null,
             isValid: _isValidUrl,
@@ -106,153 +157,235 @@ class AliPlayerPreload {
         : null;
   }
 
-  /// Initialize media loader.
-  ///
-  /// 初始化媒体加载器
-  Future<void> _initMediaLoader() async {
-    // Set the listener for media loader events.
+  void destroy() {
+    _log('[api][destroy]');
+    _videoPreloader?.release();
+    _nearVideoPreloader?.release();
+    _farVideoPreloader?.release();
+    _coverPreloader?.release();
+    _releaseMediaLoader();
+  }
+
+  void _initMediaLoader() {
     _mediaLoader.setOnLoadStatusListener(
-      (String url) {
-        // OnCompletion block
-        _log("[cbk][video][completion], $url", isError: false);
-      },
-      (String url) {
-        // OnCancel block
-        _log("[cbk][video][cancel], $url", isError: false);
-      },
+      (String url) => _handleLoadCompletion(url),
+      (String url) => _handleLoadCancel(url),
       (String url, int code, String msg) {
-        // OnError block
+        _handleLoadError(url, code, msg);
       },
       (String url, String code, String msg) {
-        // OnErrorV2 block
-        _log("[cbk][video][errorV2], $url, $code, $msg", isError: true);
+        _handleLoadError(url, null, '$code:$msg');
       },
     );
   }
 
-  /// Release resources and clean up.
-  ///
-  /// 释放资源并清理
-  void destroy() {
-    _log("[api][destroy]");
-    _videoPreloader.release();
-    _coverPreloader?.release();
-
-    _releaseMediaLoader();
-  }
-
-  /// Release media loader resources.
-  ///
-  /// 释放媒体加载器资源
   void _releaseMediaLoader() {
-    // Clear the listener to avoid unnecessary callbacks.
     _mediaLoader.setOnLoadStatusListener(null, null, null, null);
   }
 
-  /// Set video items (replace existing items).
-  ///
-  /// 设置视频项（替换现有项）
   void setItems(List<VideoInfo> items) {
-    _log("[api][set], ${items.length}");
+    _log('[api][set], ${items.length}');
     _updateItems(items, overwrite: true);
   }
 
-  /// Add video items (append to existing items).
-  ///
-  /// 添加视频项（追加到现有项）
   void addItems(List<VideoInfo> items) {
-    _log("[api][add], ${items.length}");
+    _log('[api][add], ${items.length}');
     _updateItems(items, overwrite: false);
   }
 
-  /// Move to a specific position in the item list.
-  ///
-  /// 移动到指定位置
   void moveTo(int position) {
-    _log("[api][moveTo], $position");
-    _videoPreloader.moveTo(position);
+    _log('[api][moveTo], $position');
+    if (_usePrioritizedVideoPreload) {
+      _nearVideoPreloader?.moveTo(position, preserveExecutedItems: true);
+      _farVideoPreloader?.moveTo(position, preserveExecutedItems: true);
+    } else {
+      _videoPreloader?.moveTo(position, preserveExecutedItems: true);
+    }
     _coverPreloader?.moveTo(position);
   }
 
-  /// Update video and cover items.
-  ///
-  /// 更新视频和封面项
   void _updateItems(
     List<VideoInfo> items, {
     required bool overwrite,
   }) {
     if (items.isEmpty) return;
 
-    final videoUrls = <String>{};
-    final coverUrls = <String>{};
-
-    for (final item in items) {
-      if (_isValidUrl(item.videoUrl)) videoUrls.add(item.videoUrl);
-      if (_isValidUrl(item.coverUrl)) coverUrls.add(item.coverUrl!);
-    }
+    final videoUrls = items.map((item) => item.videoUrl).toList(growable: false);
+    final coverUrls = items.map((item) => item.coverUrl ?? '').toList(growable: false);
 
     if (overwrite) {
-      _videoPreloader.setItems(videoUrls.toList());
-      _coverPreloader?.setItems(coverUrls.toList());
+      if (_usePrioritizedVideoPreload) {
+        _nearVideoPreloader?.setItems(videoUrls);
+        _farVideoPreloader?.setItems(videoUrls);
+      } else {
+        _videoPreloader?.setItems(videoUrls);
+      }
+      _coverPreloader?.setItems(coverUrls);
     } else {
-      _videoPreloader.addItems(videoUrls.toList());
-      _coverPreloader?.addItems(coverUrls.toList());
+      if (_usePrioritizedVideoPreload) {
+        _nearVideoPreloader?.addItems(videoUrls);
+        _farVideoPreloader?.addItems(videoUrls);
+      } else {
+        _videoPreloader?.addItems(videoUrls);
+      }
+      _coverPreloader?.addItems(coverUrls);
     }
   }
 
-  /// Validate if a URL is valid.
-  ///
-  /// 验证 URL 是否有效
   static bool _isValidUrl(String? url) {
     if (url == null || url.isEmpty) return false;
     final uri = Uri.tryParse(url);
     return uri != null && uri.isAbsolute;
   }
 
-  /// Preload media using MediaLoader.
-  ///
-  /// 使用 MediaLoader 预加载媒体资源
-  void _preloadMedia(String url) {
-    Future.microtask(() async {
+  void _preloadMedia(
+    String url, {
+    int? bufferDurationMs,
+    String tier = 'default',
+  }) {
+    Future.microtask(() {
       try {
-        _log("[preload][video][load], $url");
-        _mediaLoader.load(url, _preloadBufferDuration);
+        final durationMs =
+            bufferDurationMs ?? ShortVideoPreloadTuning.mediaPreloadBufferDurationMs;
+        _recordPreloadRequest(
+          url,
+          bufferDurationMs: durationMs,
+          tier: tier,
+        );
+        _log(
+          '[preload][video][load], key=${_normalizeUrlKey(url)} tier=$tier durationMs=$durationMs, $url',
+        );
+        _mediaLoader.load(url, durationMs);
       } catch (e) {
-        _log("[preload][video][load][error], $e", isError: true);
+        _log('[preload][video][load][error], $e', isError: true);
       }
     });
   }
 
-  /// Cancel media preloading.
-  ///
-  /// 取消媒体预加载
   void _cancelPreloadMedia(String url) {
-    Future.microtask(() async {
+    Future.microtask(() {
       try {
-        _log("[preload][video][cancel], $url");
+        _log('[preload][video][cancel], key=${_normalizeUrlKey(url)}, $url');
         _mediaLoader.cancel(url);
       } catch (e) {
-        _log("[preload][video][cancel][error], $e", isError: true);
+        _log('[preload][video][cancel][error], $e', isError: true);
       }
     });
   }
 
-  /// Preload image using precacheImage.
-  ///
-  /// 使用 precacheImage 预加载图片
+  AliPreloadDebugEntry? getDebugEntry(String? url) {
+    if (url == null || url.isEmpty) return null;
+    return _debugEntriesByUrlKey[_normalizeUrlKey(url)];
+  }
+
+  Map<String, AliPreloadDebugEntry> getDebugEntriesSnapshot() =>
+      Map.unmodifiable(_debugEntriesByUrlKey);
+
+  void _recordPreloadRequest(
+    String url, {
+    required int bufferDurationMs,
+    required String tier,
+  }) {
+    final key = _normalizeUrlKey(url);
+    final now = DateTime.now();
+    final existing = _debugEntriesByUrlKey[key];
+    _debugEntriesByUrlKey[key] = (existing ??
+            AliPreloadDebugEntry(
+              normalizedUrlKey: key,
+              originalUrl: url,
+              status: AliPreloadDebugStatus.neverStarted,
+              requestCount: 0,
+              lastRequestedBufferDurationMs: 0,
+              lastTier: 'unknown',
+              lastUpdatedAt: now,
+            ))
+        .copyWith(
+          originalUrl: url,
+          status: AliPreloadDebugStatus.loading,
+          requestCount: (existing?.requestCount ?? 0) + 1,
+          lastRequestedBufferDurationMs: bufferDurationMs,
+          lastTier: tier,
+          lastUpdatedAt: now,
+          lastErrorCode: null,
+          lastErrorMessage: null,
+        );
+  }
+
+  void _handleLoadCompletion(String url) {
+    _updateDebugStatus(url, AliPreloadDebugStatus.completed);
+    _log('[cbk][video][completion], key=${_normalizeUrlKey(url)}, $url');
+  }
+
+  void _handleLoadCancel(String url) {
+    _updateDebugStatus(url, AliPreloadDebugStatus.canceled);
+    _log('[cbk][video][cancel], key=${_normalizeUrlKey(url)}, $url');
+  }
+
+  void _handleLoadError(String url, int? code, String msg) {
+    _updateDebugStatus(
+      url,
+      AliPreloadDebugStatus.error,
+      errorCode: code,
+      errorMessage: msg,
+    );
+    _log(
+      '[cbk][video][error], key=${_normalizeUrlKey(url)}, $url, ${code ?? '-'}, $msg',
+      isError: true,
+    );
+  }
+
+  void _updateDebugStatus(
+    String url,
+    AliPreloadDebugStatus status, {
+    int? errorCode,
+    String? errorMessage,
+  }) {
+    final key = _normalizeUrlKey(url);
+    final now = DateTime.now();
+    final existing = _debugEntriesByUrlKey[key];
+    _debugEntriesByUrlKey[key] = (existing ??
+            AliPreloadDebugEntry(
+              normalizedUrlKey: key,
+              originalUrl: url,
+              status: status,
+              requestCount: 0,
+              lastRequestedBufferDurationMs: 0,
+              lastTier: 'unknown',
+              lastUpdatedAt: now,
+            ))
+        .copyWith(
+          originalUrl: url,
+          status: status,
+          lastUpdatedAt: now,
+          lastErrorCode: errorCode,
+          lastErrorMessage: errorMessage,
+        );
+  }
+
+  String _normalizeUrlKey(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return url;
+    final queryKeys = uri.queryParametersAll.keys.toList()..sort();
+    final normalizedQuery = <String>[];
+    for (final key in queryKeys) {
+      final values = [...?uri.queryParametersAll[key]]..sort();
+      for (final value in values) {
+        normalizedQuery.add('$key=$value');
+      }
+    }
+    return '${uri.scheme}://${uri.host}${uri.path}?${normalizedQuery.join('&')}';
+  }
+
   void _preloadImage(String url) {
     Future.microtask(() async {
-      _log("[preload][image], $url");
+      _log('[preload][image], $url');
       await precacheImage(NetworkImage(url), _context, onError: (_, __) {
-        _log("[cbk][image][error], $url", isError: true);
+        _log('[cbk][image][error], $url', isError: true);
       });
     });
   }
 
-  /// Log information with a consistent format.
-  ///
-  /// 使用统一格式记录日志信息。
   static void _log(String message, {bool isError = false}) {
-    debugPrint("[$_logTag][${isError ? 'E' : 'I'}] $message");
+    debugPrint('[$_logTag][${isError ? 'E' : 'I'}] $message');
   }
 }

@@ -114,6 +114,9 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
               ),
             ),
           ),
+          SliverToBoxAdapter(
+            child: SizedBox(height: HomeCardLayout.scaled(context, 18)),
+          ),
         ],
       ),
     );

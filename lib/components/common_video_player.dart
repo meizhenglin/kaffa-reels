@@ -8,12 +8,28 @@ import 'package:go_router/go_router.dart';
 
 import '../core/constants/api_error_code.dart';
 import '../features/payment/widgets/vip_paywall_overlay.dart';
-import '../features/player/domain/player_state.dart';
-import '../features/player/presentation/episode_sheet.dart';
-import '../features/player/presentation/player_controller.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/payment/providers/membership_provider.dart';
 import 'rtl_back_button.dart';
+
+/// Common video player component.
+enum VideoQuality { sd, hd, fhd }
+
+class CommonEpisode {
+  const CommonEpisode({
+    required this.id,
+    required this.title,
+    required this.videoUrl,
+    this.coverUrl,
+    this.isUnlocked = true,
+  });
+
+  final String id;
+  final String title;
+  final String videoUrl;
+  final String? coverUrl;
+  final bool isUnlocked;
+}
 
 /// Common video player component.
 ///
@@ -681,32 +697,202 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
     final authState = ref.read(authProvider);
     final memberState = ref.read(memberStateProvider);
 
-    // Convert CommonEpisode to EpisodeData for the existing showEpisodeSheet
-    final episodes = widget.allEpisodes
-        .map((e) => EpisodeData(
-              id: e.id,
-              title: e.title,
-              videoUrl: e.videoUrl,
-              coverUrl: e.coverUrl,
-              isUnlocked: e.isUnlocked,
-            ))
-        .toList();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => _CommonEpisodeSheet(
+        episodes: widget.allEpisodes,
+        currentIndex: widget.currentIndex,
+        isVipOnly: widget.isVipOnly,
+        authState: authState,
+        memberState: memberState,
+        onEpisodeTap: (index) {
+          Navigator.pop(sheetContext);
+          widget.onEpisodeChanged?.call(index);
+        },
+        onUnlock: () {
+          Navigator.pop(sheetContext);
+          context.push('/membership');
+        },
+      ),
+    );
+  }
+}
 
-    showEpisodeSheet(
-      context,
-      episodes: episodes,
-      currentIndex: widget.currentIndex,
-      isVipOnly: widget.isVipOnly,
-      authState: authState,
-      memberState: memberState,
-      onEpisodeTap: (index) {
-        Navigator.pop(context);
-        widget.onEpisodeChanged?.call(index);
-      },
-      onUnlock: (index) {
-        Navigator.pop(context);
-        // TODO: navigate to membership
-      },
+class _CommonEpisodeSheet extends StatelessWidget {
+  const _CommonEpisodeSheet({
+    required this.episodes,
+    required this.currentIndex,
+    required this.onEpisodeTap,
+    required this.isVipOnly,
+    this.authState,
+    this.memberState,
+    this.onUnlock,
+  });
+
+  final List<CommonEpisode> episodes;
+  final int currentIndex;
+  final void Function(int index) onEpisodeTap;
+  final bool isVipOnly;
+  final AuthState? authState;
+  final MemberState? memberState;
+  final VoidCallback? onUnlock;
+
+  bool _isLockedForCurrentUser(CommonEpisode episode) {
+    if (episode.isUnlocked) return false;
+    if (!isVipOnly) return false;
+
+    final isGuest =
+        authState == null || !authState!.isAuthenticated || authState!.user?.isGuest == true;
+    if (isGuest) return true;
+
+    final needsVip = memberState == null || !memberState!.isVip || memberState!.isExpired;
+    return needsVip;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            margin: const EdgeInsetsDirectional.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade400,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Text(
+                  'Episodes',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${episodes.length} Episodes',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.5,
+            ),
+            child: GridView.builder(
+              shrinkWrap: true,
+              padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 32),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 5,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 1.0,
+              ),
+              itemCount: episodes.length,
+              itemBuilder: (context, index) {
+                final episode = episodes[index];
+                final isCurrent = index == currentIndex;
+                final isLocked = _isLockedForCurrentUser(episode);
+
+                return GestureDetector(
+                  onTap: () {
+                    if (isLocked) {
+                      _showLockedDialog(context, index);
+                    } else {
+                      onEpisodeTap(index);
+                    }
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isCurrent
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                      border: isCurrent
+                          ? Border.all(
+                              color: Theme.of(context).colorScheme.primary,
+                              width: 2,
+                            )
+                          : null,
+                    ),
+                    child: Center(
+                      child: isLocked
+                          ? Icon(
+                              Icons.lock_rounded,
+                              color: Colors.grey.shade600,
+                              size: 24,
+                            )
+                          : Text(
+                              '${index + 1}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: isCurrent
+                                    ? Colors.white
+                                    : Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLockedDialog(BuildContext context, int episodeIndex) {
+    final isGuest =
+        authState == null || !authState!.isAuthenticated || authState!.user?.isGuest == true;
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(isGuest ? 'Login Required' : 'VIP Required'),
+        content: Text(
+          isGuest
+              ? 'Episode ${episodeIndex + 1} is locked. Please login to continue.'
+              : 'Episode ${episodeIndex + 1} requires VIP membership.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              onUnlock?.call();
+            },
+            child: Text(isGuest ? 'Login' : 'Subscribe'),
+          ),
+        ],
+      ),
     );
   }
 }

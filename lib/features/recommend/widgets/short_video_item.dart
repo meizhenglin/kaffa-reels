@@ -5,6 +5,7 @@
 // and preloading via AliPlayerPreload.
 
 import 'package:aliplayer_widget/aliplayer_widget_lib.dart';
+import 'package:aliplayer_widget/slot/slot_elements.dart';
 import 'package:flutter/material.dart';
 
 import '../models/video_info.dart';
@@ -36,26 +37,24 @@ class ShortVideoItem extends StatefulWidget {
 class ShortVideoItemState extends State<ShortVideoItem> {
   static const String _tag = 'ShortVideoItem';
 
-  /// Player widget controller
-  /// AliPlayerWidget internally uses AliListPlayer when SceneType.listPlayer is set
   late final AliPlayerWidgetController _controller;
+
+  AliPlayerWidgetController get controller => _controller;
 
   @override
   void initState() {
     super.initState();
     debugPrint('[$_tag][initState] id=${widget.videoInfo.id} autoPlay=${widget.autoPlay}');
 
-    // Initialize player controller
     _controller = AliPlayerWidgetController(context);
 
-    // Configure with list player scene
-    // Mirrors Java: AliListPlayer with list episode management
     final videoSource = VideoSourceFactory.createUrlSource(widget.videoInfo.videoUrl);
     final data = AliPlayerWidgetData(
       sceneType: SceneType.listPlayer,
       videoSource: videoSource,
       coverUrl: widget.videoInfo.coverUrl ?? '',
       autoPlay: widget.autoPlay,
+      onPlayerConfig: (_) {},
     );
     _controller.configure(data);
   }
@@ -93,13 +92,47 @@ class ShortVideoItemState extends State<ShortVideoItem> {
     return Container(
       color: Colors.black,
       alignment: Alignment.center,
-      child: AliPlayerWidget(
-        _controller,
-        slotBuilders: {
-          // Right-side action buttons overlay
-          // Mirrors Java: right action bar (like, comment, share)
-          SlotType.overlays: (context) => _buildRightSideActionsOverlay(context),
-        },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          AliPlayerWidget(
+            _controller,
+            slotBuilders: {
+              SlotType.overlays: (context) => _buildRightSideActionsOverlay(context),
+            },
+            hiddenSlotElements: {
+              SlotType.topBar: {
+                TopBarElements.back,
+                TopBarElements.title,
+                TopBarElements.download,
+                TopBarElements.snapshot,
+                TopBarElements.pip,
+                TopBarElements.settings,
+              },
+              SlotType.bottomBar: {
+                BottomBarElements.progress,
+                BottomBarElements.fullscreen,
+                BottomBarElements.speed,
+                BottomBarElements.quality,
+                BottomBarElements.subtitle,
+                BottomBarElements.refresh,
+              },
+              SlotType.playControl: {
+                PlayControlElements.doubleTap,
+                PlayControlElements.longPress,
+                PlayControlElements.leftVerticalDrag,
+                PlayControlElements.rightVerticalDrag,
+                PlayControlElements.horizontalDrag,
+              },
+            },
+          ),
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 16,
+            child: _ShortVideoProgressBar(controller: _controller),
+          ),
+        ],
       ),
     );
   }
@@ -169,5 +202,121 @@ class ShortVideoItemState extends State<ShortVideoItem> {
         ],
       ),
     );
+  }
+}
+
+class _ShortVideoProgressBar extends StatefulWidget {
+  final AliPlayerWidgetController controller;
+
+  const _ShortVideoProgressBar({required this.controller});
+
+  @override
+  State<_ShortVideoProgressBar> createState() => _ShortVideoProgressBarState();
+}
+
+class _ShortVideoProgressBarState extends State<_ShortVideoProgressBar> {
+  double? _dragValue;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Duration>(
+      valueListenable: widget.controller.totalDurationNotifier,
+      builder: (context, totalDuration, _) {
+        return ValueListenableBuilder<Duration>(
+          valueListenable: widget.controller.currentPositionNotifier,
+          builder: (context, currentPosition, __) {
+            return ValueListenableBuilder<Duration>(
+              valueListenable: widget.controller.bufferedPositionNotifier,
+              builder: (context, bufferedPosition, ___) {
+                final totalMs = totalDuration.inMilliseconds;
+                final currentMs = currentPosition.inMilliseconds.clamp(
+                  0,
+                  totalMs > 0 ? totalMs : 0,
+                );
+                final bufferedMs = bufferedPosition.inMilliseconds.clamp(
+                  0,
+                  totalMs > 0 ? totalMs : 0,
+                );
+                final progressValue = totalMs > 0 ? currentMs / totalMs : 0.0;
+                final bufferValue = totalMs > 0 ? bufferedMs / totalMs : 0.0;
+
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 3,
+                            thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 5,
+                            ),
+                            overlayShape: const RoundSliderOverlayShape(
+                              overlayRadius: 10,
+                            ),
+                            secondaryActiveTrackColor: Colors.white38,
+                            inactiveTrackColor: Colors.white24,
+                            activeTrackColor: Colors.white,
+                            thumbColor: Colors.white,
+                            overlayColor: Colors.white24,
+                          ),
+                          child: Slider(
+                            value: _dragValue ?? progressValue,
+                            secondaryTrackValue: bufferValue,
+                            min: 0,
+                            max: 1,
+                            onChanged: totalMs > 0
+                                ? (value) {
+                                    setState(() {
+                                      _dragValue = value;
+                                    });
+                                  }
+                                : null,
+                            onChangeEnd: totalMs > 0
+                                ? (value) {
+                                    final seekMs = (value * totalMs).round();
+                                    widget.controller.seek(
+                                      Duration(milliseconds: seekMs),
+                                    );
+                                    setState(() {
+                                      _dragValue = null;
+                                    });
+                                  }
+                                : null,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${_formatDuration(Duration(milliseconds: currentMs))} / ${_formatDuration(totalDuration)}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:$minutes:$seconds';
+    }
+    return '$minutes:$seconds';
   }
 }

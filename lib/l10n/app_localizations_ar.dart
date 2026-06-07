@@ -99,10 +99,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get drama => 'Drama';
 
   @override
-  String get episode => 'Episode';
+  String get episode => 'حلقة';
 
   @override
-  String get episodes => 'Episodes';
+  String get episodes => 'الحلقات';
 
   @override
   String get play => 'Play';
@@ -226,6 +226,15 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get share => 'Share';
+
+  @override
+  String get like => 'إعجاب';
+
+  @override
+  String get comment => 'تعليق';
+
+  @override
+  String get watch => 'مشاهدة';
 
   @override
   String get noResults => 'No results found';

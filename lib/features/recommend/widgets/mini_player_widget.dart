@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_aliplayer/flutter_aliplayer.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../player/presentation/player_controller.dart';
 import 'mini_player_controller.dart';
 import 'episode_selection_sheet.dart';
 
@@ -13,7 +12,7 @@ import 'episode_selection_sheet.dart';
 /// - Vertical action buttons (like, favorite, share, Episode) bottom-right overlay
 /// - Progress bar below player
 /// - Tap Episode → show episode selection sheet (2/3 screen)
-/// - Tap Watch button → navigate to full player page
+/// - Tap Watch button → navigate to shared short-video page
 class MiniPlayerWidget extends ConsumerStatefulWidget {
   const MiniPlayerWidget({super.key});
 
@@ -371,7 +370,7 @@ class _MiniProgressBar extends StatelessWidget {
   }
 }
 
-/// Watch button → full player page.
+/// Watch button → shared short-video player page.
 class _WatchButton extends StatelessWidget {
   const _WatchButton({
     required this.dramaId,
@@ -393,29 +392,11 @@ class _WatchButton extends StatelessWidget {
       padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 16, 8),
       child: GestureDetector(
         onTap: () {
-          if (dramaId == null) return;
-          final episodeList = episodes
-              .map((e) => EpisodeData(
-                    id: e.id,
-                    title: e.title,
-                    videoUrl: e.videoUrl,
-                    coverUrl: e.coverUrl,
-                    isUnlocked: e.isUnlocked,
-                  ))
-              .toList();
+          final videoId = dramaId;
+          if (videoId == null || videoId.isEmpty) return;
           context.push(
-            '/detail',
-            extra: {
-              'url': videoUrl,
-              'videoId': dramaId,
-              'title': title,
-              'dramaId': dramaId,
-              'allEpisodes': episodeList,
-              'currentIndex': 0,
-              'coverUrl': coverUrl,
-              'isVipOnly': episodes.isEmpty ? false : !episodes.first.isUnlocked,
-              'autoPlay': true,
-            },
+            '/short-video',
+            extra: {'videoId': videoId},
           );
         },
         child: Container(

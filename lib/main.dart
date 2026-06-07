@@ -1,6 +1,10 @@
+import 'dart:io';
+
+import 'package:aliplayer_widget/aliplayer_widget_lib.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:qahwa_tv/l10n/app_localizations.dart';
 
 import '_aliplayer_log_stub.dart'
@@ -21,6 +25,46 @@ Future<void> _withTimeout(Future<void> future, Duration timeout) async {
   } catch (_) {}
 }
 
+Future<void> _initializeAliPlayerWidgetGlobalSettings() async {
+  try {
+    await AliPlayerWidgetGlobalSetting.setupConfig();
+
+    String? cachePath;
+    String? filesPath;
+
+    if (Platform.isAndroid) {
+      final externalCacheDirs = await getExternalCacheDirectories();
+      cachePath = externalCacheDirs?.isNotEmpty == true
+          ? externalCacheDirs!.first.path
+          : null;
+
+      final externalStorageDir = await getExternalStorageDirectory();
+      filesPath = externalStorageDir?.path;
+
+      if (cachePath == null || filesPath == null) {
+        final internalCache = await getApplicationCacheDirectory();
+        final internalDocs = await getApplicationDocumentsDirectory();
+        cachePath ??= internalCache.path;
+        filesPath ??= internalDocs.path;
+      }
+    } else {
+      final cacheDir = await getApplicationCacheDirectory();
+      final docsDir = await getApplicationDocumentsDirectory();
+      cachePath = cacheDir.path;
+      filesPath = docsDir.path;
+    }
+
+    AliPlayerWidgetGlobalSetting.setStoragePaths(
+      cachePath: cachePath,
+      filesPath: filesPath,
+    );
+
+    debugPrint('[MAIN] AliPlayerWidget global settings initialized');
+  } catch (e) {
+    debugPrint('[MAIN] AliPlayerWidget global settings init failed: $e');
+  }
+}
+
 Future<void> main() async {
   debugPrint('[MAIN] === main() started ===');
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +76,7 @@ Future<void> main() async {
 
   // 关闭阿里云播放器日志（仅非 Web 平台）
   await aliplayer_impl.AliPlayerLog.init();
+  await _initializeAliPlayerWidgetGlobalSettings();
 
   // Firebase 初始化
   await _withTimeout(

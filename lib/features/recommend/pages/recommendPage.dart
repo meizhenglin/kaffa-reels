@@ -7,14 +7,22 @@
 // 数据流向：Riverpod(VideoFeedNotifier) → Repository → AuthService → DioClient → API
 // UI 只负责：展示 loading/视频列表/错误状态，不处理任何业务逻辑
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:preload_page_view/preload_page_view.dart';
+import 'package:qahwa_tv/l10n/app_localizations.dart';
 
+import '../../home/pages/main_page.dart';
+import '../../commonAliPlayer/short_video_item.dart';
+import '../../commonAliPlayer/short_video_preload_tuning.dart';
 import '../models/video_info.dart';
 import '../providers/recommend_provider.dart';
-import 'ali_player_preload.dart';
-import 'short_video_item.dart';
+import '../../commonAliPlayer/ali_player_preload.dart';
+
+const bool _showRecommendPlaybackDebug = false;
 
 /// 沉浸式列表播放页面
 class ShortVideoPage extends ConsumerStatefulWidget {
@@ -42,8 +50,7 @@ class _ShortVideoPageState extends ConsumerState<ShortVideoPage> {
       return const _LoadingView();
     }
 
-    if (state.status == VideoFeedStatus.error ||
-        state.videos.isEmpty) {
+    if (state.status == VideoFeedStatus.error || state.videos.isEmpty) {
       return _ErrorView(
         message: state.errorMessage,
         onRetry: () => ref.read(videoFeedProvider.notifier).loadVideos(),
@@ -99,61 +106,278 @@ class _ErrorView extends StatelessWidget {
 }
 
 /// 沉浸式列表组件
-class ShortVideoListPage extends StatefulWidget {
+class ShortVideoListPage extends ConsumerStatefulWidget {
   final List videos;
 
   const ShortVideoListPage({super.key, required this.videos});
 
   @override
-  State<ShortVideoListPage> createState() => _ShortVideoListPageState();
+  ConsumerState<ShortVideoListPage> createState() => _ShortVideoListPageState();
 }
 
-class _ShortVideoListPageState extends State<ShortVideoListPage> {
+class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
+    with WidgetsBindingObserver {
   late PreloadPageController _preloadPageController;
-  late AliPlayerPreload _aliPlayerPreload;
-  late List _itemKeys;
+  AliPlayerPreload? _aliPlayerPreload;
+  late List<GlobalKey<ShortVideoItemState>> _itemKeys;
   int _currentIndex = 0;
+  bool _isCurrentTabActive = false;
+  bool _isCoveredByFullscreenRoute = false;
+  late final ProviderSubscription<int> _tabIndexSubscription;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _preloadPageController = PreloadPageController();
     _preloadPageController.addListener(_onPageChanged);
-    _aliPlayerPreload = AliPlayerPreload(
-      context: context,
-      enableCoverUrlStrategy: true,
-    );
-    _aliPlayerPreload.setItems(widget.videos.cast<VideoInfo>());
-    _aliPlayerPreload.moveTo(0);
     _itemKeys = List.generate(
       widget.videos.length,
       (_) => GlobalKey<ShortVideoItemState>(),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _prefetchAround(0);
+    });
+    _isCurrentTabActive = ref.read(currentTabIndexProvider) == 2;
+    _tabIndexSubscription = ref.listenManual<int>(
+      currentTabIndexProvider,
+      (previous, next) {
+        if (!mounted) return;
+        _isCurrentTabActive = next == 2;
+        if (_isCurrentTabActive && !_isCoveredByFullscreenRoute) {
+          _resumeCurrent();
+        } else {
+          _pauseCurrent();
+        }
+      },
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_aliPlayerPreload != null) return;
+    _aliPlayerPreload = AliPlayerPreload(
+      context: context,
+      enableCoverUrlStrategy: true,
+    );
+    _aliPlayerPreload!.setItems(widget.videos.cast<VideoInfo>());
+    _aliPlayerPreload!.moveTo(_currentIndex);
   }
 
   @override
   void dispose() {
-    _aliPlayerPreload.destroy();
+    _tabIndexSubscription.close();
+    WidgetsBinding.instance.removeObserver(this);
+    _aliPlayerPreload?.destroy();
     _preloadPageController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!mounted) return;
+    switch (state) {
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        _pauseCurrent();
+        break;
+      case AppLifecycleState.resumed:
+        if (_isCurrentTabActive && !_isCoveredByFullscreenRoute) {
+          _resumeCurrent();
+        }
+        break;
+    }
   }
 
   void _onPageChanged() {
     final newIndex = _preloadPageController.page?.round() ?? 0;
     if (_currentIndex == newIndex) return;
     _currentIndex = newIndex;
-    _aliPlayerPreload.moveTo(newIndex);
+    _aliPlayerPreload?.moveTo(newIndex);
     _pauseAllExceptCurrent(newIndex);
+    _prefetchAround(newIndex);
+  }
+
+  void _prefetchAround(int centerIndex) {
+    final indices = ShortVideoPreloadTuning.pagePlayablePrefetchOffsets
+        .map((offset) => centerIndex + offset)
+        .toSet();
+    for (final index in indices) {
+      if (index < 0 || index >= _itemKeys.length) continue;
+      _itemKeys[index].currentState?.prefetchPlayableUrl(
+        playIfReady: index == centerIndex && _isCurrentTabActive,
+      );
+    }
+  }
+
+  void _pauseCurrent() {
+    if (_itemKeys.isEmpty) return;
+    _itemKeys[_currentIndex].currentState?.pause();
+  }
+
+  void _resumeCurrent() {
+    if (_itemKeys.isEmpty) return;
+    _itemKeys[_currentIndex].currentState?.resume();
+  }
+
+  Future<void> _openFullscreen() async {
+    if (_itemKeys.isEmpty || widget.videos.isEmpty) return;
+    final current = widget.videos[_currentIndex] as VideoInfo;
+    final videoId = current.videoId.toString();
+    if (videoId.isEmpty || videoId == '0') return;
+
+    _isCoveredByFullscreenRoute = true;
+    _pauseAllExceptCurrent(-1);
+
+    try {
+      await context.push('/short-video', extra: {
+        'videoId': videoId,
+        'initialIndex': _currentIndex,
+        'seedVideo': current.toJson(),
+      });
+    } finally {
+      _isCoveredByFullscreenRoute = false;
+      if (mounted && _isCurrentTabActive) {
+        _resumeCurrent();
+      }
+    }
   }
 
   void _pauseAllExceptCurrent(int currentIndex) {
     for (int i = 0; i < _itemKeys.length; i++) {
       if (i != currentIndex) {
         _itemKeys[i].currentState?.pause();
-      } else {
+      } else if (_isCurrentTabActive) {
         _itemKeys[i].currentState?.resume();
       }
     }
+  }
+
+  Widget _buildWatchButton(AppLocalizations l10n) {
+    final watchLabel = _watchLabel(l10n);
+    return GestureDetector(
+      onTap: _openFullscreen,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.3),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.play_circle_outline,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            watchLabel,
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _watchLabel(AppLocalizations l10n) {
+    final locale = Localizations.localeOf(context).languageCode;
+    return locale == 'ar' ? 'مشاهدة' : 'Watch';
+  }
+
+  String _likeLabel(AppLocalizations l10n) {
+    final locale = Localizations.localeOf(context).languageCode;
+    return locale == 'ar' ? 'إعجاب' : 'Like';
+  }
+
+  String _commentLabel(AppLocalizations l10n) {
+    final locale = Localizations.localeOf(context).languageCode;
+    return locale == 'ar' ? 'تعليق' : 'Comment';
+  }
+
+  Widget _buildSideActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.3),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.white, size: 24),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  double _recommendSideOverlayBottomInset(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final safeBottom = mediaQuery.padding.bottom;
+    final screenHeight = mediaQuery.size.height;
+    return math.max(safeBottom + screenHeight * 0.12, safeBottom + 24);
+  }
+
+  Widget _buildRecommendOverlay(BuildContext context, VideoInfo videoInfo) {
+    final l10n = AppLocalizations.of(context);
+    return PositionedDirectional(
+      end: 12,
+      bottom: _recommendSideOverlayBottomInset(context),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildSideActionButton(
+              icon: Icons.favorite_border,
+              label: _likeLabel(l10n),
+              onTap: () {},
+            ),
+            const SizedBox(height: 16),
+            _buildSideActionButton(
+              icon: Icons.comment_outlined,
+              label: _commentLabel(l10n),
+              onTap: () {},
+            ),
+            const SizedBox(height: 16),
+            _buildSideActionButton(
+              icon: Icons.share_outlined,
+              label: l10n.share,
+              onTap: () {},
+            ),
+            const SizedBox(height: 16),
+            _buildWatchButton(l10n),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _buildDebugInfo(VideoInfo videoInfo, bool autoPlay) {
+    final initialUrl = videoInfo.videoUrl;
+    final initialUrlState = initialUrl.isEmpty ? 'empty' : 'present';
+    return 'recommend debug\n'
+        'videoId=${videoInfo.videoId} episodesId=${videoInfo.id} ep=${videoInfo.serialNum}\n'
+        'initialUrl=$initialUrlState autoPlay=$autoPlay canPlay=${videoInfo.isCanPlay}';
   }
 
   @override
@@ -163,13 +387,20 @@ class _ShortVideoListPageState extends State<ShortVideoListPage> {
       scrollDirection: Axis.vertical,
       itemCount: widget.videos.length,
       itemBuilder: (context, index) {
+        final video = widget.videos[index] as VideoInfo;
+        final autoPlay = index == _currentIndex;
         return ShortVideoItem(
           key: _itemKeys[index],
-          videoInfo: widget.videos[index],
-          autoPlay: index == _currentIndex,
+          videoInfo: video,
+          autoPlay: autoPlay,
+          resolvePlayableUrl: true,
+          overlayBuilder: _buildRecommendOverlay,
+          debugInfo: _showRecommendPlaybackDebug
+              ? _buildDebugInfo(video, autoPlay)
+              : null,
         );
       },
-      preloadPagesCount: 1,
+      preloadPagesCount: 2,
     );
   }
 }

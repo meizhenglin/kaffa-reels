@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'recommendPage.dart';
+import 'recommendPage.dart' as recommend_feed;
 
 /// 推荐 Tab
 class RecommendTab extends StatelessWidget {
@@ -9,6 +8,6 @@ class RecommendTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const ShortVideoPage();
+    return const recommend_feed.ShortVideoPage();
   }
 }

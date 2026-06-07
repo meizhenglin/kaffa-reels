@@ -34,8 +34,20 @@ class _MainPageState extends ConsumerState<MainPage> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(lastWatchedProvider.notifier).load();
+      ref.read(currentTabIndexProvider.notifier).state =
+          widget.navigationShell.currentIndex;
       debugPrint('=== MainPage initState: load() called ===');
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant MainPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.navigationShell.currentIndex !=
+        widget.navigationShell.currentIndex) {
+      ref.read(currentTabIndexProvider.notifier).state =
+          widget.navigationShell.currentIndex;
+    }
   }
 
   void _onTabTapped(int index, List<NavigationItem> items) {

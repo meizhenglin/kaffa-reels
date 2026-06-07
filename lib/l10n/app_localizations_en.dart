@@ -228,6 +228,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get share => 'Share';
 
   @override
+  String get like => 'Like';
+
+  @override
+  String get comment => 'Comment';
+
+  @override
+  String get watch => 'Watch';
+
+  @override
   String get noResults => 'No results found';
 
   @override

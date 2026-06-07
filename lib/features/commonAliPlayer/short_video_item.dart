@@ -4,26 +4,35 @@
 // Date: 2025/2/19
 // Brief: 单个播放项组件
 
+import 'dart:async';
+
 import 'package:aliplayer_widget/aliplayer_widget_lib.dart';
+import 'package:aliplayer_widget/slot/slot_elements.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../recommend/models/video_info.dart';
+import '../recommend/providers/recommend_provider.dart';
 
 /// 单个播放项组件
 class ShortVideoItem extends StatefulWidget {
-  /// 视频数据源
   final VideoInfo videoInfo;
-
-  /// 是否自动播放
   final bool autoPlay;
-
-  /// 叠加层 builder，传入后替换默认右侧操作按钮
+  final bool resolvePlayableUrl;
   final Widget Function(BuildContext context, VideoInfo videoInfo)? overlayBuilder;
+  final Widget Function(BuildContext context, VideoInfo videoInfo)? topOverlayBuilder;
+  final String? debugInfo;
+  final VoidCallback? onCompleted;
 
   const ShortVideoItem({
     super.key,
     required this.videoInfo,
     this.autoPlay = false,
+    this.resolvePlayableUrl = true,
     this.overlayBuilder,
+    this.topOverlayBuilder,
+    this.debugInfo,
+    this.onCompleted,
   });
 
   @override
@@ -31,227 +40,509 @@ class ShortVideoItem extends StatefulWidget {
 }
 
 class ShortVideoItemState extends State<ShortVideoItem> {
-  static const String _tag = "ShortVideoItem";
+  static const String _tag = 'ShortVideoItem';
 
-  late AliPlayerWidgetController _controller;
-
-  /// 当前是否处于 loading 状态（用于自定义 loading 遮罩）
-  bool _isLoading = false;
-
-  /// loading 状态监听器引用，用于移除
-  VoidCallback? _loadingListener;
-
-  /// 当前正在使用的视频 URL
+  AliPlayerWidgetController? _controller;
+  int? _lastPrepareCostMs;
+  int? _lastFirstFrameCostMs;
+  StutterInfo? _lastStutterInfo;
   String _currentUrl = '';
+  bool _hasResolvedPlayableUrl = false;
+  bool _isForegroundActive = false;
+  bool _isLoading = false;
+  bool _hasPlayer = false;
+  bool _isFetchingPlayableUrl = false;
+  bool _isPlaying = false;
+  bool _showCenterPlayPause = false;
+  Timer? _centerPlayPauseTimer;
+
+  AliPlayerWidgetController? get controller => _controller;
 
   @override
   void initState() {
     super.initState();
-
     _currentUrl = widget.videoInfo.videoUrl;
+    _hasResolvedPlayableUrl = !widget.resolvePlayableUrl || _currentUrl.isNotEmpty;
+    _isForegroundActive = widget.autoPlay;
+    _isLoading = widget.autoPlay && _currentUrl.isNotEmpty;
+
     debugPrint(
-        "[$_tag][initState] id=${widget.videoInfo.id} autoPlay=${widget.autoPlay}");
+      '[$_tag][initState] id=${widget.videoInfo.id} autoPlay=${widget.autoPlay} resolve=${widget.resolvePlayableUrl}',
+    );
 
-    _controller = AliPlayerWidgetController(context);
-
-    if (_currentUrl.isEmpty) {
-      debugPrint("[$_tag] url empty, skip configure");
-      return;
+    if (_currentUrl.isNotEmpty && widget.autoPlay) {
+      _configurePlayer(_currentUrl, autoPlay: true);
     }
 
-    final data = AliPlayerWidgetData(
-      sceneType: SceneType.listPlayer,
-      videoSource: VideoSourceFactory.createUrlSource(_currentUrl),
-      coverUrl: widget.videoInfo.coverUrl ?? '',
-      autoPlay: widget.autoPlay,
-      onPlayerConfig: (player) async {
-        _loadingListener = () {
-          if (mounted) {
-            setState(() {
-              _isLoading = _controller.isLoadingStateNotifier.value;
-            });
-          }
-        };
-        _controller.isLoadingStateNotifier.addListener(_loadingListener!);
-        debugPrint("[$_tag] onPlayerConfig: listening to isLoadingState");
-      },
-    );
-    _controller.configure(data);
-    debugPrint("[$_tag] configured with url=$_currentUrl");
+    if (widget.resolvePlayableUrl && _currentUrl.isEmpty) {
+      scheduleMicrotask(() => prefetchPlayableUrl(playIfReady: widget.autoPlay));
+    }
   }
 
-  /// 切换到指定集：直接替换当前播放器内容并播放（不重建 widget）
-  void switchTo(VideoInfo newInfo) {
-    if (!mounted) return;
-    debugPrint(
-        "[$_tag][switchTo] ${widget.videoInfo.id} → ${newInfo.id} url=${newInfo.videoUrl}");
+  void _configurePlayer(String url, {required bool autoPlay}) {
+    final hadController = _controller != null;
+    if (!hadController) {
+      _controller = AliPlayerWidgetController(context);
+      _controller!.strategyManager
+        ..register(FirstFrameStrategy(
+          onPrepared: (cost) {
+            _lastPrepareCostMs = cost.inMilliseconds;
+            debugPrint(
+              '[$_tag][strategy][prepared] id=${widget.videoInfo.id} costMs=$_lastPrepareCostMs url=$url',
+            );
+          },
+          onFirstFrame: (cost) {
+            _lastFirstFrameCostMs = cost.inMilliseconds;
+            debugPrint(
+              '[$_tag][strategy][firstFrame] id=${widget.videoInfo.id} costMs=$_lastFirstFrameCostMs url=$url',
+            );
+            if (!mounted || !_hasPlayer) return;
+            setState(() {
+              _isLoading = false;
+            });
+          },
+        ))
+        ..register(StutterDetectStrategy(
+          onStutterDetected: (info) {
+            _lastStutterInfo = info;
+            debugPrint(
+              '[$_tag][strategy][stutter] id=${widget.videoInfo.id} count=${info.stutterCount} totalMs=${info.totalStutterDuration.inMilliseconds} rate=${info.stutterRate.toStringAsFixed(4)} url=$url',
+            );
+          },
+        ));
+    }
+    _hasPlayer = true;
+    _isLoading = autoPlay && url.isNotEmpty;
 
-    _controller.stop();
-    _controller.destroy();
-    _currentUrl = newInfo.videoUrl;
-
-    _controller = AliPlayerWidgetController(context);
-
-    if (newInfo.videoUrl.isEmpty) return;
-    final videoSource = VideoSourceFactory.createUrlSource(newInfo.videoUrl);
+    final videoSource = VideoSourceFactory.createUrlSource(url);
     final data = AliPlayerWidgetData(
       sceneType: SceneType.listPlayer,
       videoSource: videoSource,
-      coverUrl: newInfo.coverUrl ?? '',
-      autoPlay: true,
+      androidViewType: AndroidViewType.textureView,
+      coverUrl: widget.videoInfo.coverUrl ?? '',
+      autoPlay: autoPlay,
+      onPlayerConfig: (_) async {
+        await _controller?.setScaleMode(ScaleMode.SCALE_ASPECT_FILL);
+      },
     );
-    _controller.configure(data);
+    _controller!.configure(data);
+  }
+
+  @override
+  void didUpdateWidget(covariant ShortVideoItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.autoPlay != oldWidget.autoPlay) {
+      if (widget.autoPlay) {
+        resume();
+      } else {
+        pause();
+      }
+    }
+
+    if (widget.videoInfo.videoUrl != oldWidget.videoInfo.videoUrl &&
+        widget.videoInfo.videoUrl.isNotEmpty &&
+        widget.videoInfo.videoUrl != _currentUrl) {
+      _currentUrl = widget.videoInfo.videoUrl;
+      _hasResolvedPlayableUrl = true;
+      if (widget.autoPlay) {
+        _configurePlayer(_currentUrl, autoPlay: true);
+      } else {
+        if (_controller != null) {
+          _controller!.pause();
+        }
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+      if (mounted) {
+        setState(() {});
+      }
+    }
+
+    if (widget.resolvePlayableUrl &&
+        widget.autoPlay &&
+        !_hasResolvedPlayableUrl &&
+        _currentUrl.isEmpty) {
+      scheduleMicrotask(() => prefetchPlayableUrl(playIfReady: true));
+    }
+  }
+
+  Future<void> refreshUrl() async {
+    await prefetchPlayableUrl(playIfReady: mounted && widget.autoPlay);
+  }
+
+  Future<void> prefetchPlayableUrl({bool playIfReady = false}) async {
+    if (!mounted || _isFetchingPlayableUrl) return;
+
+    if (!widget.resolvePlayableUrl) {
+      _hasResolvedPlayableUrl = true;
+      if (playIfReady && _isForegroundActive) {
+        resume();
+      }
+      return;
+    }
+
+    if (_hasResolvedPlayableUrl && _currentUrl.isNotEmpty) {
+      if (playIfReady && _isForegroundActive) {
+        resume();
+      }
+      return;
+    }
+
+    if (widget.videoInfo.videoId <= 0 || widget.videoInfo.id <= 0) {
+      _hasResolvedPlayableUrl = true;
+      return;
+    }
+
+    _isFetchingPlayableUrl = true;
+    try {
+      final container = ProviderScope.containerOf(context);
+      final repo = container.read(recommendRepositoryProvider);
+      final result = await repo.fetchEpisodeUrl(
+        videoId: widget.videoInfo.videoId,
+        episodesId: widget.videoInfo.id,
+      );
+
+      if (!mounted) return;
+
+      if (result != null && result.videoUrl.isNotEmpty) {
+        _currentUrl = result.videoUrl;
+        _hasResolvedPlayableUrl = true;
+        if (playIfReady || (widget.autoPlay && _isForegroundActive)) {
+          _configurePlayer(_currentUrl, autoPlay: true);
+        } else if (_controller != null) {
+          _controller!.pause();
+        }
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+    } finally {
+      _isFetchingPlayableUrl = false;
+    }
+  }
+
+  void _disposeController() {
+    if (_controller != null) {
+      _controller!.pause();
+      _controller!.stop();
+      _controller!.destroy();
+      _controller = null;
+    }
+    _hasPlayer = false;
+    _isPlaying = false;
+  }
+
+  void _showCenterPlayPauseOverlay() {
+    _centerPlayPauseTimer?.cancel();
+    if (mounted) {
+      setState(() {
+        _showCenterPlayPause = true;
+      });
+    }
+    _centerPlayPauseTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      setState(() {
+        _showCenterPlayPause = false;
+      });
+    });
+  }
+
+  void _handleScreenTap() {
+    final shouldShow = !_showCenterPlayPause;
+    _centerPlayPauseTimer?.cancel();
+    if (mounted) {
+      setState(() {
+        _showCenterPlayPause = shouldShow;
+      });
+    }
+    if (shouldShow) {
+      _showCenterPlayPauseOverlay();
+    }
+  }
+
+  Widget _buildAnimatedCenterPlayPauseButton() {
+    return IgnorePointer(
+      ignoring: !_showCenterPlayPause,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        opacity: _showCenterPlayPause ? 1 : 0,
+        child: AnimatedScale(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutBack,
+          scale: _showCenterPlayPause ? 1 : 0.9,
+          child: Center(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _togglePlaybackFromCenter,
+              child: Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.36),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: 38,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _togglePlaybackFromCenter() {
+    if (_isPlaying) {
+      pause();
+    } else {
+      resume();
+    }
+    _showCenterPlayPauseOverlay();
+  }
+
+  void pause() {
+    _isForegroundActive = false;
+    _isPlaying = false;
+    _controller?.pause();
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void resume() {
+    _isForegroundActive = true;
+    _isPlaying = true;
+    if (_currentUrl.isEmpty) {
+      scheduleMicrotask(() => prefetchPlayableUrl(playIfReady: true));
+      return;
+    }
+
+    if (_controller == null) {
+      _configurePlayer(_currentUrl, autoPlay: true);
+      if (mounted) {
+        setState(() {});
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+    _controller?.play();
+  }
+
+  String getPlaybackDebugInfo() {
+    final stutterCount = _lastStutterInfo?.stutterCount ?? 0;
+    final stutterTotalMs =
+        _lastStutterInfo?.totalStutterDuration.inMilliseconds ?? 0;
+    return 'loading=$_isLoading resolved=$_hasResolvedPlayableUrl prepareMs=${_lastPrepareCostMs ?? -1} firstFrameMs=${_lastFirstFrameCostMs ?? -1} stutterCount=$stutterCount stutterMs=$stutterTotalMs';
   }
 
   @override
   void dispose() {
-    debugPrint("[$_tag][lifecycle][dispose]: ${widget.videoInfo.id}");
-    if (_loadingListener != null) {
-      _controller.isLoadingStateNotifier.removeListener(_loadingListener!);
-    }
-    _controller.stop();
-    _controller.destroy();
+    debugPrint('[$_tag][dispose] id=${widget.videoInfo.id}');
+    _centerPlayPauseTimer?.cancel();
+    _disposeController();
     super.dispose();
-  }
-
-  /// 暂停播放
-  void pause() {
-    debugPrint("[$_tag][paused]: ${widget.videoInfo.id}");
-    _controller.pause();
-  }
-
-  /// 恢复播放
-  void resume() {
-    debugPrint("[$_tag][resumed]: ${widget.videoInfo.id}");
-    _controller.play();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        AliPlayerWidget(
-          _controller,
-          slotBuilders: {
-            SlotType.topBar: (context) => _buildTopBar(context),
-            SlotType.overlays: widget.overlayBuilder != null
-                ? (context) => const SizedBox.shrink()
-                : (context) => _buildRightSideActionsOverlay(context),
-          },
-          hiddenSlotElements: {
-            SlotType.topBar: {'back', 'snapshot', 'settings'},
-          },
-        ),
-        if (widget.overlayBuilder != null)
-          widget.overlayBuilder!(context, widget.videoInfo),
-        if (_isLoading)
+    return Container(
+      color: Colors.black,
+      alignment: Alignment.center,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (_controller != null)
+            Positioned.fill(
+              child: AliPlayerWidget(
+                _controller!,
+                slotBuilders: const {},
+                hiddenSlotElements: {
+                  SlotType.topBar: {
+                    TopBarElements.back,
+                    TopBarElements.title,
+                    TopBarElements.download,
+                    TopBarElements.snapshot,
+                    TopBarElements.pip,
+                    TopBarElements.settings,
+                  },
+                  SlotType.bottomBar: {
+                    BottomBarElements.progress,
+                    BottomBarElements.fullscreen,
+                    BottomBarElements.speed,
+                    BottomBarElements.quality,
+                    BottomBarElements.subtitle,
+                    BottomBarElements.refresh,
+                  },
+                    SlotType.playControl: {
+                      PlayControlElements.doubleTap,
+                      PlayControlElements.longPress,
+                      PlayControlElements.leftVerticalDrag,
+                      PlayControlElements.rightVerticalDrag,
+                      PlayControlElements.horizontalDrag,
+                    },
+                  SlotType.overlays: const <String>{},
+                },
+              ),
+            ),
           Positioned.fill(
-            child: Container(
-              color: Colors.black38,
-              child: const Center(
-                child: CircularProgressIndicator(color: Colors.white),
-              ),
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _handleScreenTap,
             ),
           ),
-      ],
-    );
-  }
-
-  Widget _buildTopBar(BuildContext context) {
-    return PositionedDirectional(
-      top: 0,
-      start: 0,
-      end: 0,
-      child: Container(
-        padding: EdgeInsetsDirectional.only(
-          top: MediaQuery.paddingOf(context).top + 8,
-          start: 8,
-          end: 8,
-          bottom: 12,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                widget.videoInfo.title,
-                style: const TextStyle(
+          if (_isLoading)
+            const Center(
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
                   color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRightSideActionsOverlay(BuildContext context) {
-    return PositionedDirectional(
-      end: 12,
-      bottom: 100,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildActionButton(
-            icon: Icons.favorite_border,
-            label: '点赞',
-            onTap: () {},
-          ),
-          const SizedBox(height: 16),
-          _buildActionButton(
-            icon: Icons.comment_outlined,
-            label: '评论',
-            onTap: () {},
-          ),
-          const SizedBox(height: 16),
-          _buildActionButton(
-            icon: Icons.share_outlined,
-            label: '分享',
-            onTap: () {},
-          ),
+          if (_controller != null)
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 16,
+              child: _ShortVideoProgressBar(controller: _controller!),
+            ),
+          if (widget.topOverlayBuilder != null)
+            widget.topOverlayBuilder!(context, widget.videoInfo),
+          if (widget.overlayBuilder != null)
+            widget.overlayBuilder!(context, widget.videoInfo),
+          _buildAnimatedCenterPlayPauseButton(),
         ],
       ),
     );
   }
+}
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.3),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
+class _ShortVideoProgressBar extends StatefulWidget {
+  final AliPlayerWidgetController controller;
+
+  const _ShortVideoProgressBar({required this.controller});
+
+  @override
+  State<_ShortVideoProgressBar> createState() => _ShortVideoProgressBarState();
+}
+
+class _ShortVideoProgressBarState extends State<_ShortVideoProgressBar> {
+  double? _dragValue;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Duration>(
+      valueListenable: widget.controller.totalDurationNotifier,
+      builder: (context, totalDuration, _) {
+        return ValueListenableBuilder<Duration>(
+          valueListenable: widget.controller.currentPositionNotifier,
+          builder: (context, currentPosition, __) {
+            return ValueListenableBuilder<Duration>(
+              valueListenable: widget.controller.bufferedPositionNotifier,
+              builder: (context, bufferedPosition, ___) {
+                final totalMs = totalDuration.inMilliseconds;
+                final currentMs = currentPosition.inMilliseconds.clamp(
+                  0,
+                  totalMs > 0 ? totalMs : 0,
+                );
+                final bufferedMs = bufferedPosition.inMilliseconds.clamp(
+                  0,
+                  totalMs > 0 ? totalMs : 0,
+                );
+                final progressValue = totalMs > 0 ? currentMs / totalMs : 0.0;
+                final bufferValue = totalMs > 0 ? bufferedMs / totalMs : 0.0;
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 3,
+                            thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 5,
+                            ),
+                            overlayShape: const RoundSliderOverlayShape(
+                              overlayRadius: 10,
+                            ),
+                            secondaryActiveTrackColor: Colors.white38,
+                            inactiveTrackColor: Colors.white24,
+                            activeTrackColor: Colors.white,
+                            thumbColor: Colors.white,
+                            overlayColor: Colors.white24,
+                          ),
+                          child: Slider(
+                            value: _dragValue ?? progressValue,
+                            secondaryTrackValue: bufferValue,
+                            min: 0,
+                            max: 1,
+                            onChanged: totalMs > 0
+                                ? (value) {
+                                    setState(() {
+                                      _dragValue = value;
+                                    });
+                                  }
+                                : null,
+                            onChangeEnd: totalMs > 0
+                                ? (value) {
+                                    final seekMs = (value * totalMs).round();
+                                    widget.controller.seek(
+                                      Duration(milliseconds: seekMs),
+                                    );
+                                    setState(() {
+                                      _dragValue = null;
+                                    });
+                                  }
+                                : null,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${_formatDuration(Duration(milliseconds: currentMs))} / ${_formatDuration(totalDuration)}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
     );
+  }
+
+  String _formatDuration(Duration duration) {
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:$minutes:$seconds';
+    }
+    return '$minutes:$seconds';
   }
 }

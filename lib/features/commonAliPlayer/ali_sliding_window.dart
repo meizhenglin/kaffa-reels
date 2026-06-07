@@ -12,7 +12,7 @@ class AliSlidingWindow<T> {
   final String extra;
   final List<int> _windowItems;
   final List<T> _itemList = [];
-  final Set<T> _executedItemSets = {};
+  final Set<int> _executedIndices = {};
   int _currentIndex = -1;
 
   AliSlidingWindow.withWindowSize(
@@ -40,19 +40,16 @@ class AliSlidingWindow<T> {
 
   void setItems(List<T> items) {
     cancelAll();
-    _itemList.clear();
-    for (var item in items) {
-      if (isValid(item)) _itemList.add(item);
-    }
+    _itemList
+      ..clear()
+      ..addAll(items);
   }
 
   void addItems(List<T> items) {
-    for (var item in items) {
-      if (isValid(item)) _itemList.add(item);
-    }
+    _itemList.addAll(items);
   }
 
-  void moveTo(int position) {
+  void moveTo(int position, {bool preserveExecutedItems = false}) {
     if (position < 0 || position >= _itemList.length) return;
     if (_currentIndex == position) return;
 
@@ -61,7 +58,9 @@ class AliSlidingWindow<T> {
 
     final previousWindow = getWindowIndices(_currentIndex);
     final toLoad = _difference(currentWindow, previousWindow);
-    final toCancel = _difference(previousWindow, currentWindow);
+    final toCancel = preserveExecutedItems
+        ? <int>[]
+        : _difference(previousWindow, currentWindow);
 
     _processItems(toCancel, _cancelItem);
     _processItems(toLoad, _executeItem);
@@ -69,33 +68,39 @@ class AliSlidingWindow<T> {
     _currentIndex = position;
   }
 
-  void _processItems(List<T> items, void Function(T item) processor) {
-    for (var item in items) {
-      if (item != null) processor(item);
+  void _processItems(List<int> indices, void Function(int index) processor) {
+    for (final index in indices) {
+      processor(index);
     }
   }
 
-  void _cancelItem(T item) {
-    if (_executedItemSets.contains(item)) {
-      _executedItemSets.remove(item);
+  void _cancelItem(int index) {
+    if (!_executedIndices.contains(index)) return;
+    _executedIndices.remove(index);
+
+    final item = _itemList[index];
+    if (isValid(item)) {
       cancel?.call(item);
     }
   }
 
-  void _executeItem(T item) {
-    if (!_executedItemSets.contains(item)) {
-      _executedItemSets.add(item);
-      execute(item);
-    }
+  void _executeItem(int index) {
+    if (_executedIndices.contains(index)) return;
+
+    final item = _itemList[index];
+    if (!isValid(item)) return;
+
+    _executedIndices.add(index);
+    execute(item);
   }
 
-  List<T> getWindowIndices(int position) {
+  List<int> getWindowIndices(int position) {
     if (position < 0 || position >= _itemList.length) return [];
-    final windowIndices = <T>[];
+    final windowIndices = <int>[];
     for (var offset in _windowItems) {
       final index = position + offset;
       if (index >= 0 && index < _itemList.length) {
-        windowIndices.add(_itemList[index]);
+        windowIndices.add(index);
       }
     }
     return windowIndices;
@@ -107,10 +112,13 @@ class AliSlidingWindow<T> {
   }
 
   void cancelAll() {
-    for (var item in _executedItemSets) {
-      cancel?.call(item);
+    for (final index in _executedIndices.toList()) {
+      final item = _itemList[index];
+      if (isValid(item)) {
+        cancel?.call(item);
+      }
     }
-    _executedItemSets.clear();
+    _executedIndices.clear();
     _itemList.clear();
   }
 
@@ -121,7 +129,7 @@ class AliSlidingWindow<T> {
     return List.generate(totalSize, (i) => i - leftWindowSize);
   }
 
-  List<T> _difference(List<T> list1, List<T> list2) {
+  List<int> _difference(List<int> list1, List<int> list2) {
     final set2 = Set.from(list2);
     return list1.where((item) => !set2.contains(item)).toList();
   }

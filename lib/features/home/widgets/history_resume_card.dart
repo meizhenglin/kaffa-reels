@@ -9,14 +9,14 @@ import '../providers/last_watched_provider.dart';
 /// 首页底部 Tab 栏上方悬浮的"继续观看"卡片
 ///
 /// LTR（中文/英文）：
-///   右滑卡片 → 卡片右滑+淡出，封面图从右侧淡入
-///   左滑封面图 → 封面图左滑+淡出，卡片从右滑入
-///   关闭按钮在封面图左侧
+///   右滑卡片 → 卡片右滑+淡出，封面图在右侧显示
+///   左滑封面图 → 封面图左滑+淡出，卡片重新显示
+///   关闭按钮在封面图左上角
 ///
 /// RTL（阿拉伯文）：
-///   左滑卡片 → 卡片左滑+淡出，封面图从左侧淡入
-///   右滑封面图 → 封面图右滑+淡出，卡片从左滑入
-///   关闭按钮在封面图右侧
+///   左滑卡片 → 卡片左滑+淡出，封面图在左侧显示
+///   右滑封面图 → 封面图右滑+淡出，卡片重新显示
+///   关闭按钮在封面图右上角
 class HistoryResumeCard extends ConsumerStatefulWidget {
   const HistoryResumeCard({super.key});
 
@@ -54,14 +54,16 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
     super.dispose();
   }
 
-  void _onTap() {
+  Future<void> _onTap() async {
     final info = ref.read(lastWatchedProvider).info;
     if (info == null) return;
 
-    context.push(
+    await context.push(
       '/short-video',
       extra: {'videoId': info.videoId},
     );
+    if (!mounted) return;
+    await ref.read(lastWatchedProvider.notifier).load();
   }
 
   @override
@@ -77,9 +79,9 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
     final continueWatchingText =
         AppLocalizations.of(context).continueWatching;
 
-    // 卡片展开方向：LTR 右滑展开，RTL 左滑展开
-    // 封面图始终出现在卡片原位（卡片的右边缘 / 左边缘）
+    // 交互规则：LTR 右滑展开/左滑收起；RTL 左滑展开/右滑收起
     final slideDir = isRtl ? -1.0 : 1.0;
+    final cardSideAlignment = isRtl ? Alignment.centerLeft : Alignment.centerRight;
     final slideAnimation = Tween<Offset>(
       begin: Offset.zero,
       end: Offset(slideDir * 1.5, 0.0),
@@ -89,7 +91,7 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
     final coverOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(_controller);
     // 封面图滑入方向和卡片滑出方向相反，但都从屏幕外开始
     final coverSlideAnimation = Tween<Offset>(
-      begin: Offset(slideDir * 2.0, 0.0), // 从屏幕外滑入
+      begin: Offset(slideDir, 0.0),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
@@ -120,17 +122,22 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            PositionedDirectional(
-              start: 0,
-              bottom: 20,
-              child: FadeTransition(
-                opacity: coverOpacity,
-                child: SlideTransition(
-                  position: coverSlideAnimation,
-                  child: _buildCoverCard(info, isRtl),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 20),
+                  child: Align(
+                    alignment: cardSideAlignment,
+                    child: GestureDetector(
+                      onHorizontalDragEnd: handleDragEnd,
+                      child: FadeTransition(
+                        opacity: coverOpacity,
+                        child: SlideTransition(
+                          position: coverSlideAnimation,
+                          child: _buildCoverCard(info, isRtl),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
             PositionedDirectional(
               bottom: 20,
               start: 0,
@@ -166,9 +173,11 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                       child: Row(
                         textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
                         children: [
-                          const SizedBox(width: 4),
-                          _buildThumbnail(info.coverUrl),
-                          const SizedBox(width: 11),
+                          if (!isRtl) ...[
+                            const SizedBox(width: 4),
+                            _buildThumbnail(info.coverUrl),
+                            const SizedBox(width: 11),
+                          ],
                           Expanded(
                             child: _buildContent(info, continueWatchingText),
                           ),
@@ -186,6 +195,11 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                               ),
                             ),
                           ),
+                          if (isRtl) ...[
+                            const SizedBox(width: 11),
+                            _buildThumbnail(info.coverUrl),
+                            const SizedBox(width: 4),
+                          ],
                         ],
                       ),
                     ),
@@ -230,7 +244,8 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
           ),
           PositionedDirectional(
             top: -4,
-            end: -4,
+            start: isRtl ? null : -4,
+            end: isRtl ? -4 : null,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () {

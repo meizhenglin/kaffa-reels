@@ -6,6 +6,7 @@ import '../models/drama.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../payment/providers/membership_provider.dart';
 import '../../profile/providers/history_provider.dart';
+import '../../home/providers/last_watched_provider.dart';
 
 /// VIP 访问结果
 enum VipAccessResult {
@@ -82,7 +83,7 @@ Future<void> openDramaPlayerWithVipCheck({
   required AuthState authState,
   required MemberState memberState,
 }) async {
-  openDramaPlayer(context, drama);
+  await openDramaPlayer(context, drama);
 }
 
 /// ============================================================================
@@ -91,11 +92,11 @@ Future<void> openDramaPlayerWithVipCheck({
 /// 【功能】封装跳转到播放器的逻辑
 /// 【使用】在其他页面点击短剧时调用 openDramaPlayer(context, drama)
 /// 【说明】只传 videoId，ShortVideoPage 内部请求真实数据
-void openDramaPlayer(BuildContext context, Drama drama) {
+Future<void> openDramaPlayer(BuildContext context, Drama drama) async {
   try {
     final container = ProviderScope.containerOf(context);
     container.read(historyProvider.notifier).addHistory(drama);
+    await context.push('/short-video', extra: {'videoId': drama.id});
+    container.read(lastWatchedProvider.notifier).load();
   } catch (_) {}
-
-  context.push('/short-video', extra: {'videoId': drama.id});
 }

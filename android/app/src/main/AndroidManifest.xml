@@ -21,7 +21,7 @@
             android:value="hPro64fDG4w5gTPmb58e1ab9918694ce6b449351127ba5ae3"/>
         <meta-data
             android:name="com.aliyun.alivc_license.licensefile_SEA"
-            android:value="assets/license.crt"/> -->
+            android:value="assets/global.crt"/> -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
