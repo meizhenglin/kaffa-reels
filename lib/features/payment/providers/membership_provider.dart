@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
+import '../../../app/providers/app_providers.dart';
+import '../../../core/network/api_service.dart';
+import '../../../core/network/dio_client.dart';
+import '../../../core/storage/storage_service.dart';
 import '../models/subscription_product.dart';
 import '../services/payment_service.dart';
 import '../services/receipt_verification.dart';
@@ -55,10 +59,44 @@ class MemberState {
   }
 }
 
+class MembershipProductsState {
+  const MembershipProductsState({
+    this.products = const [],
+    this.isLoading = false,
+    this.errorMessage,
+    this.hasLoaded = false,
+  });
+
+  final List<SubscriptionProduct> products;
+  final bool isLoading;
+  final String? errorMessage;
+  final bool hasLoaded;
+
+  MembershipProductsState copyWith({
+    List<SubscriptionProduct>? products,
+    bool? isLoading,
+    String? errorMessage,
+    bool? hasLoaded,
+    bool clearError = false,
+  }) {
+    return MembershipProductsState(
+      products: products ?? this.products,
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      hasLoaded: hasLoaded ?? this.hasLoaded,
+    );
+  }
+}
+
 /// Member state provider
 final memberStateProvider =
     StateNotifierProvider<MemberStateNotifier, MemberState>((ref) {
   return MemberStateNotifier();
+});
+
+final membershipProductsProvider = StateNotifierProvider<MembershipProductsNotifier,
+    MembershipProductsState>((ref) {
+  return MembershipProductsNotifier(ref.read(dioClientProvider), ref.read(storageServiceProvider));
 });
 
 class MemberStateNotifier extends StateNotifier<MemberState> {
@@ -73,24 +111,17 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
   Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
 
-    // Initialize receipt verification service
-    // TODO: Replace with your actual backend URL
     _receiptService.initialize(baseUrl: 'https://api.your-domain.com');
 
-    // Initialize payment service
     await _paymentService.initialize(
       onPurchaseComplete: _handlePurchaseComplete,
       onPurchaseError: _handlePurchaseError,
     );
 
-    // Load cached state
     await _loadCachedState();
-
-    // Check backend for actual subscription status
     await _syncWithBackend();
   }
 
-  /// Load cached subscription state from local storage
   Future<void> _loadCachedState() async {
     if (_prefs == null) return;
 
@@ -104,15 +135,12 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
       subscriptionType: type,
     );
 
-    // Check if expired
     if (state.isExpired) {
       await _clearVipStatus();
     }
   }
 
-  /// Sync with backend to get actual subscription status
   Future<void> _syncWithBackend() async {
-    // TODO: Get user ID from auth provider
     final userId = _prefs?.getString('user_id');
     if (userId == null) return;
 
@@ -127,19 +155,15 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         type: status.type,
       );
     } else if (state.isVip && !state.isExpired) {
-      // Local cache is valid, keep it
     } else {
-      // Not a subscriber or expired
       await _clearVipStatus();
     }
   }
 
-  /// Handle successful purchase
   Future<void> _handlePurchaseComplete(PurchaseDetails purchase) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      // Prepare receipt data for verification
       final receiptData = {
         'purchase_id': purchase.purchaseID,
         'product_id': purchase.productID,
@@ -149,7 +173,6 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         'server_verification_data': purchase.verificationData.serverVerificationData,
       };
 
-      // Verify with backend
       final result = await _receiptService.verifyReceipt(
         receiptData: receiptData,
         platform: _paymentService.currentPlatform == TargetPlatform.android
@@ -158,7 +181,7 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         userId: _prefs?.getString('user_id'),
       );
 
-      if (result.isValid) {
+      if (result.success) {
         await _updateVipStatus(
           isVip: true,
           expireDate: result.expireDate ?? _calculateExpireDate(purchase),
@@ -167,11 +190,11 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
       } else {
         state = state.copyWith(
           isLoading: false,
-          errorMessage: result.message ?? 'Verification failed',
+          errorMessage: result.message ?? 'Purchase verification failed',
         );
       }
     } catch (e) {
-      debugPrint('Error handling purchase: $e');
+      debugPrint('Error handling purchase completion: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Failed to process purchase',
@@ -179,7 +202,6 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     }
   }
 
-  /// Handle purchase error
   void _handlePurchaseError(String error) {
     state = state.copyWith(
       isLoading: false,
@@ -187,22 +209,11 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     );
   }
 
-  /// Update VIP status locally and on backend
   Future<void> _updateVipStatus({
     required bool isVip,
     DateTime? expireDate,
     String? type,
   }) async {
-    // Update local cache
-    await _prefs?.setBool('is_vip', isVip);
-    if (expireDate != null) {
-      await _prefs?.setString('vip_expire_date', expireDate.toIso8601String());
-    }
-    if (type != null) {
-      await _prefs?.setString('subscription_type', type);
-    }
-
-    // Update state
     state = state.copyWith(
       isVip: isVip,
       expireDate: expireDate,
@@ -211,42 +222,46 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
       errorMessage: null,
     );
 
-    // Report to backend
-    final userId = _prefs?.getString('user_id');
-    if (userId != null && isVip) {
-      await _receiptService.reportEvent(
-        userId: userId,
-        event: 'subscription_activated',
-        data: {
-          'type': type,
-          'expire_date': expireDate?.toIso8601String(),
-        },
-      );
+    if (_prefs != null) {
+      await _prefs!.setBool('is_vip', isVip);
+      if (expireDate != null) {
+        await _prefs!.setString('vip_expire_date', expireDate.toIso8601String());
+      }
+      if (type != null) {
+        await _prefs!.setString('subscription_type', type);
+      }
     }
   }
 
-  /// Clear VIP status
   Future<void> _clearVipStatus() async {
-    await _prefs?.remove('is_vip');
-    await _prefs?.remove('vip_expire_date');
-    await _prefs?.remove('subscription_type');
+    state = state.copyWith(
+      isVip: false,
+      expireDate: null,
+      subscriptionType: null,
+      isLoading: false,
+    );
 
-    state = const MemberState();
+    if (_prefs != null) {
+      await _prefs!.remove('is_vip');
+      await _prefs!.remove('vip_expire_date');
+      await _prefs!.remove('subscription_type');
+    }
   }
 
-  /// Restore purchases (for when user reinstalls app)
   Future<bool> restorePurchases() async {
     state = state.copyWith(isRestoring: true, errorMessage: null);
 
     try {
       final success = await _paymentService.restorePurchases();
-
-      if (success) {
-        // Wait a bit for the restore to process
-        await Future.delayed(const Duration(seconds: 2));
-        await _syncWithBackend();
+      if (!success) {
+        state = state.copyWith(
+          isRestoring: false,
+          errorMessage: 'Failed to restore purchases',
+        );
+        return false;
       }
 
+      await Future.delayed(const Duration(seconds: 2));
       state = state.copyWith(isRestoring: false);
       return success;
     } catch (e) {
@@ -259,7 +274,6 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     }
   }
 
-  /// Check if user can access a feature
   bool canAccess(Feature feature) {
     switch (feature) {
       case Feature.premiumContent:
@@ -269,35 +283,30 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
       case Feature.earlyAccess:
         return state.isVip && !state.isExpired;
       case Feature.trialContent:
-        return true; // Everyone can access trial content
+        return true;
     }
   }
 
-  /// Get available products
-  Future<List<ProductDetails>> getProducts() async {
-    final productIds = SubscriptionProducts.products
+  Future<List<ProductDetails>> getProducts(List<SubscriptionProduct> products) async {
+    final productIds = products
         .map((p) => p.getProductId(_paymentService.currentPlatform))
+        .where((id) => id.isNotEmpty)
         .toList();
 
     return await _paymentService.getProducts(productIds: productIds);
   }
 
-  /// Make a purchase
   Future<bool> purchase(ProductDetails product) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
     return await _paymentService.purchase(product: product);
   }
 
-  /// Calculate expiration date from purchase
   DateTime _calculateExpireDate(PurchaseDetails purchase) {
-    // TODO: Parse actual expiration from purchase data
-    // For now, estimate based on product ID
     final type = _inferTypeFromProductId(purchase.productID);
     final days = _getDaysForType(type);
     return DateTime.now().add(Duration(days: days));
   }
 
-  /// Infer subscription type from product ID
   String _inferTypeFromProductId(String productId) {
     if (productId.contains('yearly') || productId.contains('year')) {
       return 'yearly';
@@ -319,6 +328,64 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
   }
 }
 
+class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> {
+  MembershipProductsNotifier(DioClient dioClient, StorageService storage)
+      : _apiService = ApiService(dioClient: dioClient, storage: storage),
+        super(const MembershipProductsState());
+
+  final ApiService _apiService;
+
+  Future<void> loadVipProducts() async {
+    if (state.isLoading) return;
+
+    state = state.copyWith(isLoading: true, hasLoaded: true, clearError: true);
+
+    try {
+      final response = await _apiService.getRechargeGoodsConfig(rechargeGoodsType: 0);
+      if (!response.isSuccess) {
+        state = state.copyWith(
+          isLoading: false,
+          products: SubscriptionProducts.fallbackProducts,
+          errorMessage: response.error,
+        );
+        return;
+      }
+
+      final items = _parseRechargeGoods(response.data);
+      final products = SubscriptionProducts.fromRechargeGoods(items);
+      state = state.copyWith(
+        isLoading: false,
+        products: products,
+        clearError: true,
+      );
+    } catch (e) {
+      debugPrint('Failed to load vip products: $e');
+      state = state.copyWith(
+        isLoading: false,
+        products: SubscriptionProducts.fallbackProducts,
+        errorMessage: 'Failed to load products',
+      );
+    }
+  }
+
+  List<RechargeGoodsConfigItem> _parseRechargeGoods(dynamic data) {
+    final rawList = switch (data) {
+      {'list': final list} => list,
+      {'rows': final rows} => rows,
+      {'data': final nested} => nested,
+      List<dynamic> list => list,
+      _ => const <dynamic>[],
+    };
+
+    if (rawList is! List) return const [];
+
+    return rawList
+        .whereType<Map>()
+        .map((item) => RechargeGoodsConfigItem.fromJson(Map<String, dynamic>.from(item)))
+        .toList();
+  }
+}
+
 /// Features that require membership
 enum Feature {
   premiumContent,
@@ -329,7 +396,6 @@ enum Feature {
   trialContent,
 }
 
-/// Extension for feature descriptions
 extension FeatureExt on Feature {
   String get displayName {
     switch (this) {
@@ -349,7 +415,6 @@ extension FeatureExt on Feature {
   }
 }
 
-/// Provider for checking feature access
 final featureAccessProvider = Provider.family<bool, Feature>((ref, feature) {
   final memberState = ref.watch(memberStateProvider);
   return memberState.isVip && !memberState.isExpired ||

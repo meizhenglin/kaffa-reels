@@ -905,19 +905,19 @@ abstract class AppLocalizations {
   /// No description provided for @membership_monthly.
   ///
   /// In en, this message translates to:
-  /// **'Monthly'**
+  /// **'VIP Monthly Card'**
   String get membership_monthly;
 
   /// No description provided for @membership_quarterly.
   ///
   /// In en, this message translates to:
-  /// **'Quarterly'**
+  /// **'VIP Season Pass'**
   String get membership_quarterly;
 
   /// No description provided for @membership_yearly.
   ///
   /// In en, this message translates to:
-  /// **'Yearly'**
+  /// **'VIP Annual'**
   String get membership_yearly;
 
   /// No description provided for @membership_subscribe.

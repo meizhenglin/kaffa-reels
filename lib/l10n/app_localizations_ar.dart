@@ -419,13 +419,13 @@ class AppLocalizationsAr extends AppLocalizations {
   String get membership_title => 'احصل على العضوية المميزة';
 
   @override
-  String get membership_monthly => 'شهري';
+  String get membership_monthly => 'بطاقة VIP الشهرية';
 
   @override
-  String get membership_quarterly => 'ربع سنوي';
+  String get membership_quarterly => 'VIP مرور الموسم';
 
   @override
-  String get membership_yearly => 'سنوي';
+  String get membership_yearly => 'VIP السنوي';
 
   @override
   String get membership_subscribe => 'اشترك الآن';

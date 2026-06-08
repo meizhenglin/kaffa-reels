@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import '../../../core/utils/localized_badge_assets.dart';
 import '../../../components/preload_network_image.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../l10n/app_localizations.dart';
@@ -28,6 +29,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     super.initState();
     Future.microtask(() {
       ref.read(membershipDramaProvider.notifier).load();
+      ref.read(membershipProductsProvider.notifier).loadVipProducts();
     });
   }
 
@@ -76,7 +78,12 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     if (confirmed != true) return;
 
     final memberNotifier = ref.read(memberStateProvider.notifier);
-    final products = await memberNotifier.getProducts();
+    final membershipProducts = ref.read(membershipProductsProvider).products;
+    final products = await memberNotifier.getProducts(
+      membershipProducts.isNotEmpty
+          ? membershipProducts
+          : SubscriptionProducts.fallbackProducts,
+    );
 
     ProductDetails? details;
     try {
@@ -107,9 +114,17 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     final l10n = AppLocalizations.of(context);
     final recommendState = ref.watch(membershipDramaProvider);
     final memberState = ref.watch(memberStateProvider);
+    final membershipProductsState = ref.watch(membershipProductsProvider);
+    final products = membershipProductsState.products.isNotEmpty
+        ? membershipProductsState.products
+        : SubscriptionProducts.fallbackProducts;
+
+    if (_selectedIndex >= products.length && products.isNotEmpty) {
+      _selectedIndex = 0;
+    }
 
     if (memberState.isVip && !memberState.isExpired) {
-      return _buildActiveView(l10n, memberState);
+      return _buildActiveView(l10n, memberState, products);
     }
 
     return GradientScaffold(
@@ -124,7 +139,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
                     _buildTopImage(),
 
                     // 2. VIP 选项区 231
-                    _buildVipOptions(l10n),
+                    _buildVipOptions(l10n, products),
 
                     // 3. 剧卡片横向滚动 137
                     _buildDramaSection(recommendState),
@@ -137,7 +152,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
             ),
 
             // 5. 底部支付按钮 42 + 安全区
-            _buildBottomPayButton(l10n, memberState),
+            _buildBottomPayButton(l10n, memberState, products),
           ],
         ),
       ),
@@ -180,98 +195,82 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   }
 
   /// 2. VIP 选项区：高 231，三个选项上下排列
-  Widget _buildVipOptions(AppLocalizations l10n) {
+  Widget _buildVipOptions(AppLocalizations l10n, List<SubscriptionProduct> products) {
     return Container(
-      height: 231,
       color: const Color(0xFF121212),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       child: Column(
-        children: [
-          // 三个选项
-          Expanded(
-            child: Column(
-              children: List.generate(SubscriptionProducts.products.length, (i) {
-                final product = SubscriptionProducts.products[i];
-                final isSelected = _selectedIndex == i;
-                return _VipOptionItem(
-                  product: product,
-                  isSelected: isSelected,
-                  onTap: () => setState(() => _selectedIndex = i),
-                );
-              }),
-            ),
-          ),
-        ],
+        children: List.generate(products.length, (i) {
+          final product = products[i];
+          final isSelected = _selectedIndex == i;
+          return _VipOptionItem(
+            product: product,
+            title: _localizedProductTitle(l10n, product),
+            isSelected: isSelected,
+            onTap: () => setState(() => _selectedIndex = i),
+          );
+        }),
       ),
     );
+  }
+
+  String _localizedProductTitle(
+    AppLocalizations l10n,
+    SubscriptionProduct product,
+  ) {
+    final name = product.id.toLowerCase();
+    if (name.contains('year')) {
+      return l10n.membership_yearly;
+    }
+    if (name.contains('quarter')) {
+      return l10n.membership_quarterly;
+    }
+    if (name.contains('month')) {
+      return l10n.membership_monthly;
+    }
+
+    switch (product.type) {
+      case SubscriptionPeriod.monthly:
+        return l10n.membership_monthly;
+      case SubscriptionPeriod.quarterly:
+        return l10n.membership_quarterly;
+      case SubscriptionPeriod.yearly:
+        return l10n.membership_yearly;
+    }
   }
 
   /// 3. 剧卡片横向滚动区：高 137
   Widget _buildDramaSection(MembershipDramaState recommendState) {
     final dramas = recommendState.vipZone.isNotEmpty
         ? recommendState.vipZone
-        : (recommendState.topRecommend.isNotEmpty
-            ? recommendState.topRecommend
-            : _mockDramas.cast<dynamic>());
+        : recommendState.topRecommend;
+    final displayDramas = dramas.take(3).toList();
+    final showSkeletonCards = displayDramas.isEmpty;
 
     return Container(
       height: 137,
       color: const Color(0xFF121212),
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-                  padding: const EdgeInsetsDirectional.only(start: 16, end: 16, bottom: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Popular Dramas',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {},
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(
-                    'View All >',
-                    style: TextStyle(
-                      color: Colors.white.withAlpha(128),
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: List.generate(3, (index) {
+          final drama = index < displayDramas.length ? displayDramas[index] : null;
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsetsDirectional.only(end: index == 2 ? 0 : 12),
+              child: drama != null
+                  ? _DramaCard(
+                      drama: drama,
+                      onTap: () => openDramaPlayerWithVipCheck(
+                        context: context,
+                        drama: drama,
+                        authState: ref.watch(authProvider),
+                        memberState: ref.watch(memberStateProvider),
+                      ),
+                    )
+                  : _DramaCardPlaceholder(showImage: showSkeletonCards),
             ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: dramas.length,
-              itemBuilder: (context, index) {
-                final drama = dramas[index];
-                return _DramaCard(
-                  drama: drama,
-                  onTap: () => openDramaPlayerWithVipCheck(
-                    context: context,
-                    drama: drama,
-                    authState: ref.watch(authProvider),
-                    memberState: ref.watch(memberStateProvider),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
+          );
+        }),
       ),
     );
   }
@@ -336,43 +335,54 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   }
 
   /// 5. 底部支付按钮
-  Widget _buildBottomPayButton(AppLocalizations l10n, MemberState memberState) {
-    final product = _selectedIndex < SubscriptionProducts.products.length
-        ? SubscriptionProducts.products[_selectedIndex]
-        : null;
+  Widget _buildBottomPayButton(
+    AppLocalizations l10n,
+    MemberState memberState,
+    List<SubscriptionProduct> products,
+  ) {
+    final product = _selectedIndex < products.length ? products[_selectedIndex] : null;
+    final amount = product?.price.replaceFirst(RegExp(r'^[^0-9]+'), '') ?? '';
+    final buttonLabel = amount.isNotEmpty ? 'Pay \$$amount' : 'Pay';
 
-    return Container(
+    return Padding(
       padding: EdgeInsetsDirectional.fromSTEB(
         16,
         10,
         16,
         MediaQuery.of(context).padding.bottom + 10,
       ),
-      decoration: BoxDecoration(
-        color: const Color(0xFF121212),
-        border: Border(
-          top: BorderSide(color: Colors.white.withAlpha(13)),
-        ),
-      ),
       child: SizedBox(
+        width: double.infinity,
         height: 42,
-        child: FilledButton(
-          onPressed: product == null ? null : () => _handlePurchase(product),
-          style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFFFFD700),
-            foregroundColor: const Color(0xFF1F2025),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(21),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFFEE7A3), Color(0xFFDE962B)],
             ),
-            padding: EdgeInsets.zero,
+            borderRadius: BorderRadius.circular(21),
           ),
-          child: Text(
-            product != null
-                ? 'Subscribe Now  ${product.price}'
-                : 'Subscribe Now',
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
+          child: FilledButton(
+            onPressed: product == null ? null : () => _handlePurchase(product),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              disabledBackgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              foregroundColor: const Color(0xFF753900),
+              disabledForegroundColor: const Color(0xFF753900).withAlpha(153),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(21),
+              ),
+              padding: EdgeInsets.zero,
+            ),
+            child: Text(
+              buttonLabel,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF753900),
+              ),
             ),
           ),
         ),
@@ -381,7 +391,11 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   }
 
   /// 已订阅视图
-  Widget _buildActiveView(AppLocalizations l10n, MemberState memberState) {
+  Widget _buildActiveView(
+    AppLocalizations l10n,
+    MemberState memberState,
+    List<SubscriptionProduct> products,
+  ) {
     return GradientScaffold(
       body: SafeArea(
         child: Column(
@@ -391,7 +405,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
                 child: Column(
                   children: [
                     _buildTopImage(),
-                    _buildVipOptions(l10n),
+                    _buildVipOptions(l10n, products),
                     _buildBenefitsSection(l10n),
                     const SizedBox(height: 16),
                     _buildActiveInfo(memberState, l10n),
@@ -400,7 +414,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
                 ),
               ),
             ),
-            _buildBottomPayButton(l10n, memberState),
+            _buildBottomPayButton(l10n, memberState, products),
           ],
         ),
       ),
@@ -446,161 +460,101 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     if (date == null) return 'N/A';
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
-
-  List<_MockDrama> get _mockDramas {
-    return [
-      _MockDrama('drama_0', 'Desert Rose', 'https://picsum.photos/seed/d1/200/280'),
-      _MockDrama('drama_1', 'The Shadow', 'https://picsum.photos/seed/d2/200/280'),
-      _MockDrama('drama_2', 'Sand Storm', 'https://picsum.photos/seed/d3/200/280'),
-      _MockDrama('drama_3', 'Oasis', 'https://picsum.photos/seed/d4/200/280'),
-      _MockDrama('drama_4', 'Falcon', 'https://picsum.photos/seed/d5/200/280'),
-    ];
-  }
 }
 
 /// 单个 VIP 选项行
 class _VipOptionItem extends StatelessWidget {
   const _VipOptionItem({
     required this.product,
+    required this.title,
     required this.isSelected,
     required this.onTap,
   });
 
   final SubscriptionProduct product;
+  final String title;
   final bool isSelected;
   final VoidCallback onTap;
 
+  static const _priceGradient = LinearGradient(
+    begin: Alignment.centerRight,
+    end: Alignment.centerLeft,
+    colors: [Color(0xFFEABD81), Color(0xFFF5D1A2)],
+  );
+
   @override
   Widget build(BuildContext context) {
-    final isBestValue = product.isBestValue;
-    final isPopular = product.isPopular;
+    final price = product.price;
+    final symbol = price.isNotEmpty ? price.substring(0, 1) : '';
+    final amount = price.length > 1 ? price.substring(1) : price;
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFFFFD700).withAlpha(25)
-              : const Color(0xFF2A2A30),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? const Color(0xFFFFD700)
-                : Colors.white.withAlpha(13),
-            width: isSelected ? 2 : 1,
+        height: 60,
+        margin: const EdgeInsets.only(bottom: 15),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage('assets/images/vip_item_bg.png'),
+            fit: BoxFit.fill,
           ),
         ),
         child: Row(
           children: [
-            // 单选框
-            Container(
+            Image.asset(
+              isSelected
+                  ? 'assets/images/vip_selected.png'
+                  : 'assets/images/vip_notselected.png',
               width: 20,
               height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isSelected ? const Color(0xFFFFD700) : Colors.white38,
-                  width: 2,
-                ),
-              ),
-              child: isSelected
-                  ? Center(
-                      child: Container(
-                        width: 10,
-                        height: 10,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Color(0xFFFFD700),
-                        ),
-                      ),
-                    )
-                  : null,
             ),
-            const SizedBox(width: 12),
-            // 标题
+            const SizedBox(width: 15),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        product.type.displayNameCn,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        product.type.displayName,
-                        style: TextStyle(
-                          color: Colors.white.withAlpha(128),
-                          fontSize: 12,
-                        ),
-                      ),
-                      if (isBestValue || isPopular) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: isBestValue
-                                ? const Color(0xFFFFD700)
-                                : const Color(0xFF5D4391),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            isBestValue ? 'BEST' : 'HOT',
-                            style: TextStyle(
-                              color: isBestValue ? const Color(0xFF1F2025) : Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    product.benefits.take(2).join(' • '),
-                    style: TextStyle(
-                      color: Colors.white.withAlpha(102),
-                      fontSize: 10,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
               ),
             ),
-            const SizedBox(width: 8),
-            // 价格
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            const SizedBox(width: 15),
+            Row(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(
-                  product.price,
-                  style: const TextStyle(
-                    color: Color(0xFFFFD700),
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                ShaderMask(
+                  shaderCallback: (bounds) => _priceGradient.createShader(
+                    Rect.fromLTWH(0, 0, bounds.width, bounds.height),
                   ),
-                ),
-                if (product.originalPrice != product.price)
-                  Text(
-                    product.originalPrice,
-                    style: TextStyle(
-                      color: Colors.white.withAlpha(77),
-                      fontSize: 10,
-                      decoration: TextDecoration.lineThrough,
+                  blendMode: BlendMode.srcIn,
+                  child: Text(
+                    symbol,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
                     ),
                   ),
+                ),
+                ShaderMask(
+                  shaderCallback: (bounds) => _priceGradient.createShader(
+                    Rect.fromLTWH(0, 0, bounds.width, bounds.height),
+                  ),
+                  blendMode: BlendMode.srcIn,
+                  child: Text(
+                    amount,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ],
             ),
           ],
@@ -611,6 +565,28 @@ class _VipOptionItem extends StatelessWidget {
 }
 
 /// 剧卡片
+class _DramaCardPlaceholder extends StatelessWidget {
+  const _DramaCardPlaceholder({this.showImage = true});
+
+  final bool showImage;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        color: const Color(0xFF1A1A1A),
+        child: showImage
+            ? Image.asset(
+                'assets/images/small_preload_bg.png',
+                fit: BoxFit.cover,
+              )
+            : const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
 class _DramaCard extends StatelessWidget {
   const _DramaCard({required this.drama, required this.onTap});
 
@@ -618,68 +594,36 @@ class _DramaCard extends StatelessWidget {
   final VoidCallback onTap;
 
   String get _coverUrl => drama.coverUrl ?? '';
-  String get _title {
-    final t = drama.title ?? '';
-    return t.contains(' / ') ? t.split(' / ').first : t;
-  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: 106,
-        margin: const EdgeInsets.only(right: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+      child: LayoutBuilder(
+        builder: (context, constraints) => Stack(
+          clipBehavior: Clip.none,
           children: [
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) => Stack(
-                  children: [
-                    PreloadNetworkImage(
-                      imageUrl: _coverUrl,
-                      preloadAsset: 'assets/images/small_preload_bg.png',
-                      width: constraints.maxWidth,
-                      height: constraints.maxHeight,
-                      fit: BoxFit.cover,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    if (drama.isVipOnly == true)
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        child: Image.asset(
-                          'assets/images/home_vip_icon.png',
-                          width: 36,
-                          height: 15,
-                        ),
-                      ),
-                  ],
+            PreloadNetworkImage(
+              imageUrl: _coverUrl,
+              preloadAsset: 'assets/images/small_preload_bg.png',
+              width: constraints.maxWidth,
+              height: constraints.maxHeight,
+              fit: BoxFit.cover,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            if (drama.videoAccessType == 1)
+              PositionedDirectional(
+                top: 0,
+                start: 0,
+                child: Image.asset(
+                  localizedHomeVipBadgeAsset(context),
+                  width: 42,
+                  height: 18,
                 ),
               ),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              _title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
           ],
         ),
       ),
     );
   }
-}
-
-class _MockDrama {
-  final String id;
-  final String title;
-  final String coverUrl;
-  const _MockDrama(this.id, this.title, this.coverUrl);
 }

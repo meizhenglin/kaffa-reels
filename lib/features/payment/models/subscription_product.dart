@@ -82,6 +82,8 @@ class SubscriptionProduct extends Equatable {
     required this.benefits,
     this.isPopular = false,
     this.isBestValue = false,
+    this.goodsId,
+    this.sort,
   });
 
   /// Unique product identifier
@@ -117,6 +119,12 @@ class SubscriptionProduct extends Equatable {
   /// Whether this offers the best value
   final bool isBestValue;
 
+  /// Backend goods id
+  final int? goodsId;
+
+  /// Backend sort order
+  final int? sort;
+
   /// Get platform-specific product ID
   String getProductId(TargetPlatform platform) {
     switch (platform) {
@@ -127,6 +135,38 @@ class SubscriptionProduct extends Equatable {
       default:
         return googlePlayId;
     }
+  }
+
+  SubscriptionProduct copyWith({
+    String? id,
+    SubscriptionPeriod? type,
+    String? googlePlayId,
+    String? appStoreId,
+    String? price,
+    String? priceCn,
+    String? originalPrice,
+    String? originalPriceCn,
+    List<String>? benefits,
+    bool? isPopular,
+    bool? isBestValue,
+    int? goodsId,
+    int? sort,
+  }) {
+    return SubscriptionProduct(
+      id: id ?? this.id,
+      type: type ?? this.type,
+      googlePlayId: googlePlayId ?? this.googlePlayId,
+      appStoreId: appStoreId ?? this.appStoreId,
+      price: price ?? this.price,
+      priceCn: priceCn ?? this.priceCn,
+      originalPrice: originalPrice ?? this.originalPrice,
+      originalPriceCn: originalPriceCn ?? this.originalPriceCn,
+      benefits: benefits ?? this.benefits,
+      isPopular: isPopular ?? this.isPopular,
+      isBestValue: isBestValue ?? this.isBestValue,
+      goodsId: goodsId ?? this.goodsId,
+      sort: sort ?? this.sort,
+    );
   }
 
   @override
@@ -142,6 +182,93 @@ class SubscriptionProduct extends Equatable {
         benefits,
         isPopular,
         isBestValue,
+        goodsId,
+        sort,
+      ];
+}
+
+class RechargeGoodsConfigItem extends Equatable {
+  const RechargeGoodsConfigItem({
+    required this.goodsId,
+    required this.rechargeGoodsType,
+    required this.goodsName,
+    required this.goodsGoogleId,
+    required this.goodsIosId,
+    required this.price,
+    required this.originalPrice,
+    required this.sort,
+    required this.isEnable,
+    this.description,
+    this.goodsCode,
+  });
+
+  final int goodsId;
+  final int rechargeGoodsType;
+  final String goodsName;
+  final String goodsGoogleId;
+  final String goodsIosId;
+  final String price;
+  final String originalPrice;
+  final int sort;
+  final bool isEnable;
+  final String? description;
+  final String? goodsCode;
+
+  factory RechargeGoodsConfigItem.fromJson(Map<String, dynamic> json) {
+    int parseInt(dynamic value, [int fallback = 0]) {
+      if (value is int) return value;
+      return int.tryParse(value?.toString() ?? '') ?? fallback;
+    }
+
+    bool parseBool(dynamic value) {
+      if (value is bool) return value;
+      if (value is num) return value != 0;
+      final normalized = value?.toString().trim().toLowerCase();
+      return normalized == 'true' || normalized == '1';
+    }
+
+    String readString(List<String> keys) {
+      for (final key in keys) {
+        final value = json[key];
+        if (value != null && value.toString().trim().isNotEmpty) {
+          return value.toString().trim();
+        }
+      }
+      return '';
+    }
+
+    return RechargeGoodsConfigItem(
+      goodsId: parseInt(json['goodsId'] ?? json['id']),
+      rechargeGoodsType: parseInt(json['rechargeGoodsType']),
+      goodsName: readString(['goodsName', 'title', 'name']),
+      goodsGoogleId: readString(['goodsGoogleId', 'googlePlayId', 'googleProductId', 'productId']),
+      goodsIosId: readString(['goodsIosId', 'appStoreId', 'iosProductId']),
+      price: readString(['price', 'goodsPrice', 'amount']),
+      originalPrice: readString(['originalPrice', 'linePrice', 'goodsOriginalPrice']),
+      sort: parseInt(json['sort'], 999),
+      isEnable: parseBool(json['isEnable'] ?? json['status'] ?? 1),
+      description: readString(['description', 'desc', 'remark']).isEmpty
+          ? null
+          : readString(['description', 'desc', 'remark']),
+      goodsCode: readString(['goodsCode', 'code']).isEmpty
+          ? null
+          : readString(['goodsCode', 'code']),
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        goodsId,
+        rechargeGoodsType,
+        goodsName,
+        goodsGoogleId,
+        goodsIosId,
+        price,
+        originalPrice,
+        sort,
+        isEnable,
+        description,
+        goodsCode,
       ];
 }
 
@@ -186,19 +313,18 @@ class MemberBenefits {
 class SubscriptionProducts {
   SubscriptionProducts._();
 
-  // NOTE: Replace these IDs with your actual product IDs from Play Console/App Store Connect
   static const _googlePlayBase = 'com.qahwatv.vip.';
   static const _appStoreBase = 'com.qahwatv.vip.';
 
-  static final List<SubscriptionProduct> products = [
+  static final List<SubscriptionProduct> fallbackProducts = [
     SubscriptionProduct(
       id: 'monthly',
       type: SubscriptionPeriod.monthly,
       googlePlayId: '${_googlePlayBase}monthly',
       appStoreId: '${_appStoreBase}monthly',
-      price: '\$4.99',
+      price: ' 24.99',
       priceCn: '¥30',
-      originalPrice: '\$9.99',
+      originalPrice: ' 39.99',
       originalPriceCn: '¥60',
       benefits: const [
         'Ad-free for 1 month',
@@ -212,9 +338,9 @@ class SubscriptionProducts {
       type: SubscriptionPeriod.quarterly,
       googlePlayId: '${_googlePlayBase}quarterly',
       appStoreId: '${_appStoreBase}quarterly',
-      price: '\$12.99',
+      price: ' 32.99',
       priceCn: '¥78',
-      originalPrice: '\$24.99',
+      originalPrice: ' 59.99',
       originalPriceCn: '¥150',
       benefits: const [
         'Ad-free for 3 months',
@@ -229,9 +355,9 @@ class SubscriptionProducts {
       type: SubscriptionPeriod.yearly,
       googlePlayId: '${_googlePlayBase}yearly',
       appStoreId: '${_appStoreBase}yearly',
-      price: '\$39.99',
+      price: ' 99.99',
       priceCn: '¥258',
-      originalPrice: '\$99.99',
+      originalPrice: ' 159.99',
       originalPriceCn: '¥598',
       benefits: const [
         'Ad-free for 12 months',
@@ -242,19 +368,106 @@ class SubscriptionProducts {
     ),
   ];
 
-  static SubscriptionProduct? getById(String id) {
-    try {
-      return products.firstWhere((p) => p.id == id);
-    } catch (_) {
-      return null;
+  static List<SubscriptionProduct> fromRechargeGoods(
+    List<RechargeGoodsConfigItem> items,
+  ) {
+    if (items.isEmpty) return fallbackProducts;
+
+    final enabledItems = items.where((item) => item.isEnable).toList()
+      ..sort((a, b) => a.sort.compareTo(b.sort));
+
+    if (enabledItems.isEmpty) return fallbackProducts;
+
+    return List<SubscriptionProduct>.generate(enabledItems.length, (index) {
+      final item = enabledItems[index];
+      final type = _inferPeriod(item);
+      return SubscriptionProduct(
+        id: item.goodsCode?.isNotEmpty == true ? item.goodsCode! : _buildId(item, type, index),
+        type: type,
+        googlePlayId: item.goodsGoogleId,
+        appStoreId: item.goodsIosId.isNotEmpty ? item.goodsIosId : item.goodsGoogleId,
+        price: _formatPrice(item.price),
+        priceCn: _formatPrice(item.price),
+        originalPrice: item.originalPrice.isNotEmpty
+            ? _formatPrice(item.originalPrice)
+            : _formatPrice(item.price),
+        originalPriceCn: item.originalPrice.isNotEmpty
+            ? _formatPrice(item.originalPrice)
+            : _formatPrice(item.price),
+        benefits: _buildBenefits(type),
+        isPopular: index == 0,
+        isBestValue: index == 1 || type == SubscriptionPeriod.quarterly,
+        goodsId: item.goodsId,
+        sort: item.sort,
+      );
+    });
+  }
+
+  static SubscriptionPeriod _inferPeriod(RechargeGoodsConfigItem item) {
+    final source = [
+      item.goodsName,
+      item.goodsCode ?? '',
+      item.goodsGoogleId,
+      item.goodsIosId,
+      item.description ?? '',
+    ].join(' ').toLowerCase();
+
+    if (source.contains('year') || source.contains('annual') || source.contains('12')) {
+      return SubscriptionPeriod.yearly;
+    }
+    if (source.contains('quarter') || source.contains('season') || source.contains('3 month')) {
+      return SubscriptionPeriod.quarterly;
+    }
+    return SubscriptionPeriod.monthly;
+  }
+
+  static String _buildId(
+    RechargeGoodsConfigItem item,
+    SubscriptionPeriod type,
+    int index,
+  ) {
+    if (item.goodsId > 0) return 'goods_${item.goodsId}';
+    switch (type) {
+      case SubscriptionPeriod.monthly:
+        return 'monthly_$index';
+      case SubscriptionPeriod.quarterly:
+        return 'quarterly_$index';
+      case SubscriptionPeriod.yearly:
+        return 'yearly_$index';
     }
   }
 
-  static SubscriptionProduct? getBestValue() {
-    try {
-      return products.firstWhere((p) => p.isBestValue);
-    } catch (_) {
-      return products.isNotEmpty ? products.first : null;
+  static String _formatPrice(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return '';
+    if (trimmed.startsWith(' 24') || trimmed.startsWith('¥') || trimmed.startsWith('€') || trimmed.startsWith('£')) {
+      return trimmed;
+    }
+    return ' 24$trimmed';
+  }
+
+  static List<String> _buildBenefits(SubscriptionPeriod type) {
+    switch (type) {
+      case SubscriptionPeriod.monthly:
+        return const [
+          'Ad-free for 1 month',
+          'HD quality',
+          'Full library access',
+        ];
+      case SubscriptionPeriod.quarterly:
+        return const [
+          'Ad-free for 3 months',
+          'HD quality',
+          'Full library access',
+          'Save more',
+        ];
+      case SubscriptionPeriod.yearly:
+        return const [
+          'Ad-free for 12 months',
+          '4K quality',
+          'Full library access',
+          'Best annual price',
+        ];
     }
   }
 }

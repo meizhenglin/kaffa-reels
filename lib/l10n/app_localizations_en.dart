@@ -417,13 +417,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get membership_title => 'Unlock Premium';
 
   @override
-  String get membership_monthly => 'Monthly';
+  String get membership_monthly => 'VIP Monthly Card';
 
   @override
-  String get membership_quarterly => 'Quarterly';
+  String get membership_quarterly => 'VIP Season Pass';
 
   @override
-  String get membership_yearly => 'Yearly';
+  String get membership_yearly => 'VIP Annual';
 
   @override
   String get membership_subscribe => 'Subscribe Now';

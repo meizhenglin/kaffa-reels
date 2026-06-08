@@ -22,25 +22,36 @@ class PreloadNetworkImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: width ?? double.infinity,
-      height: height ?? double.infinity,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.asset(preloadAsset, width: double.infinity, height: double.infinity, fit: fit),
-          Image.network(
-            imageUrl,
-            width: double.infinity,
-            height: double.infinity,
-            fit: fit,
-            loadingBuilder: (_, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return AnimatedOpacity(opacity: 1.0, duration: fadeInDuration, child: child);
-            },
-            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-          ),
-        ],
+    final borderRadius = this.borderRadius;
+
+    return ClipRRect(
+      borderRadius: borderRadius ?? BorderRadius.zero,
+      child: SizedBox(
+        width: width ?? double.infinity,
+        height: height ?? double.infinity,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.asset(preloadAsset, width: double.infinity, height: double.infinity, fit: fit),
+            Image.network(
+              imageUrl,
+              width: double.infinity,
+              height: double.infinity,
+              fit: fit,
+              frameBuilder: (_, child, frame, wasSynchronouslyLoaded) {
+                if (wasSynchronouslyLoaded || frame != null) {
+                  return AnimatedOpacity(
+                    opacity: 1,
+                    duration: fadeInDuration,
+                    child: child,
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          ],
+        ),
       ),
     );
   }

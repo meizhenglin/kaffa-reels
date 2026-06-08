@@ -27,9 +27,9 @@
   "register_login": "تسجيل الدخول",
 
   "membership_title": "احصل على العضوية المميزة",
-  "membership_monthly": "شهري",
-  "membership_quarterly": "ربع سنوي",
-  "membership_yearly": "سنوي",
+  "membership_monthly": "بطاقة VIP الشهرية",
+  "membership_quarterly": "VIP مرور الموسم",
+  "membership_yearly": "VIP السنوي",
   "membership_subscribe": "اشترك الآن",
   "membership_restore": "استعادة الشراء",
   "membership_benefit_adFree": "تجربة خالية من الإعلانات",
