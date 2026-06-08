@@ -746,7 +746,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
             scrollDirection: Axis.vertical,
             itemCount: videoInfoList.length,
             itemBuilder: _buildItem,
-            preloadPagesCount: 4,
+            preloadPagesCount: 2,
           )
         : PageView.builder(
             controller: _pageController,
