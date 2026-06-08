@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_aliplayer/flutter_aliplayer.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/app_localizations.dart';
 import 'mini_player_controller.dart';
 import 'episode_selection_sheet.dart';
 
@@ -59,6 +60,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayerWidget>
     final controller = ref.read(miniPlayerProvider.notifier);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final playerHeight = screenWidth * 9 / 16;
+    final l10n = AppLocalizations.of(context);
 
     // No video loaded yet — show nothing
     if (state.videoUrl.isEmpty) {
@@ -200,14 +202,8 @@ class _MiniPlayerState extends ConsumerState<MiniPlayerWidget>
                   ),
                   const SizedBox(height: 16),
                   _ActionButton(
-                    icon: Icons.share_outlined,
-                    label: 'Share',
-                    onTap: () => _showToast(context, 'Share'),
-                  ),
-                  const SizedBox(height: 16),
-                  _ActionButton(
                     icon: Icons.list_outlined,
-                    label: 'Ep',
+                    label: l10n.episode,
                     onTap: () => _showEpisodeSheet(context, state, controller),
                   ),
                 ],

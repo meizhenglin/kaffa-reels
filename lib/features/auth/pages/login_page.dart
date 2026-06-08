@@ -1,3 +1,5 @@
+import 'dart:async' as async;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,7 +17,30 @@ class LoginPage extends ConsumerStatefulWidget {
   ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends ConsumerState<LoginPage> {
+class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserver {
+  bool _googleWarmUpStarted = false;
+  bool _appIsInForeground = true;
+
+  void _showMessage(String message, {bool isError = false}) {
+    if (!mounted || message.trim().isEmpty) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError ? const Color(0xFFD64545) : const Color(0xFF2E7D32),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  void _startGoogleWarmUpIfNeeded() {
+    if (!mounted || _googleWarmUpStarted) return;
+    _googleWarmUpStarted = true;
+    async.unawaited(ref.read(authRepositoryProvider).warmUpGoogleSignIn());
+  }
+
   void _navigateAfterLogin() {
     if (!mounted) return;
 
@@ -31,6 +56,32 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _startGoogleWarmUpIfNeeded();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startGoogleWarmUpIfNeeded();
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _appIsInForeground = true;
+        break;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        _appIsInForeground = false;
+        break;
+    }
   }
 
   @override
@@ -130,21 +181,31 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             builder: (_, ref, __) {
                               final isLoading =
                                   ref.watch(authProvider).isLoading;
-                              return _PlatformButton(
+                              return _GoogleSignInButton(
                                 label: 'Continue with Google',
-                                icon: Icons.g_mobiledata,
-                                iconPath: 'assets/images/google_icon.png',
                                 isLoading: isLoading,
                                 onTap: () async {
+                                  if (!_appIsInForeground) return;
+                                  _startGoogleWarmUpIfNeeded();
+                                  debugPrint('[LoginPage] Google button tapped');
                                   ref.read(authProvider.notifier).clearError();
+                                  await Future<void>.delayed(Duration.zero);
                                   final success = await ref
                                       .read(authProvider.notifier)
                                       .signInWithGoogle();
+                                  if (!mounted || !_appIsInForeground) return;
+                                  final errorMessage = ref.read(authProvider).errorMessage;
+                                  debugPrint('[LoginPage] Google sign-in returned success=$success error=$errorMessage');
                                   if (success) {
                                     WidgetsBinding.instance.addPostFrameCallback((_) {
                                       _navigateAfterLogin();
                                     });
+                                    return;
                                   }
+                                  _showMessage(
+                                    errorMessage ?? 'Google sign-in did not complete. Please try again.',
+                                    isError: true,
+                                  );
                                 },
                               );
                             },
@@ -305,6 +366,103 @@ class _PlatformButton extends StatelessWidget {
                   const SizedBox(width: 28),
                 ],
               )),
+      ),
+    );
+  }
+}
+
+class _GoogleSignInButton extends StatelessWidget {
+  const _GoogleSignInButton({
+    required this.label,
+    required this.isLoading,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isLoading;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        onTap: isLoading ? null : onTap,
+        child: Container(
+          width: double.infinity,
+          height: 50,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: const Color(0xFFDADCE0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x14000000),
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Row(
+              children: [
+                Image.asset(
+                  'assets/images/google_icon.png',
+                  width: 30,
+                  height: 30,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const SizedBox(
+                    width: 30,
+                    height: 30,
+                    child: Center(
+                      child: Text(
+                        'G',
+                        style: TextStyle(
+                          color: Color(0xFF4285F4),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Opacity(
+                        opacity: isLoading ? 0 : 1,
+                        child: Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFF1F1F1F),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.1,
+                          ),
+                        ),
+                      ),
+                      if (isLoading)
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Color(0xFF1F1F1F),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 46),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -11,6 +11,7 @@ import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:preload_page_view/preload_page_view.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../home/pages/main_page.dart';
 import '../../core/network/api_service.dart';
 import '../recommend/models/video_info.dart';
@@ -154,10 +155,6 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     return locale == 'ar' ? 'إعجاب' : 'Like';
   }
 
-  String _commentLabel(BuildContext context) {
-    final locale = Localizations.localeOf(context).languageCode;
-    return locale == 'ar' ? 'تعليق' : 'Comment';
-  }
 
   late List<VideoInfo> videoInfoList;
   AliPlayerPreload? _aliPlayerPreload;
@@ -614,6 +611,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   }
 
   Widget _buildDefaultSideOverlay(BuildContext context, VideoInfo videoInfo) {
+    final l10n = AppLocalizations.of(context);
     return Positioned(
       right: 12,
       bottom: _watchSideOverlayBottomInset(context),
@@ -629,20 +627,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
             ),
             const SizedBox(height: 16),
             _buildSideActionButton(
-              icon: Icons.comment_outlined,
-              label: _commentLabel(context),
-              onTap: () {},
-            ),
-            const SizedBox(height: 16),
-            _buildSideActionButton(
-              icon: Icons.share_outlined,
-              label: MaterialLocalizations.of(context).shareButtonLabel,
-              onTap: () {},
-            ),
-            const SizedBox(height: 16),
-            _buildSideActionButton(
               icon: Icons.list_alt_rounded,
-              label: '选集',
+              label: l10n.episode,
               onTap: _showEpisodePicker,
             ),
           ],

@@ -54,7 +54,7 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
                   ? recommendState.banners
                   : recommendState.isLoading
                       ? [preloadBanner]
-                      : _buildMockBanners(),
+                      : const <BannerItem>[],
               height: HomeCardLayout.scaled(context, 540),
               onBannerTap: (banner) => _onBannerTap(banner),
               onSearchTap: () => context.push('/search'),
@@ -126,28 +126,6 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
     await ref.read(recommendProvider.notifier).loadHomeSections(refresh: true);
   }
 
-  List<BannerItem> _buildMockBanners() {
-    return [
-      const BannerItem(
-        id: 'banner_1',
-        imageUrl: 'https://picsum.photos/seed/banner1/800/400',
-        dramaId: 'drama_0',
-        // title: 'Desert Rose / وردة الصحراء',
-      ),
-      const BannerItem(
-        id: 'banner_2',
-        imageUrl: 'https://picsum.photos/seed/banner2/800/400',
-        dramaId: 'drama_5',
-        title: 'The Shadow / الظل',
-      ),
-      const BannerItem(
-        id: 'banner_3',
-        imageUrl: 'https://picsum.photos/seed/banner3/800/400',
-        dramaId: 'drama_10',
-        title: 'The Mix-Up / الخلط',
-      ),
-    ];
-  }
 
   Future<void> _onBannerTap(BannerItem banner) async {
     final drama = await ref

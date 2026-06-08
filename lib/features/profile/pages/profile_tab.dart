@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/preload_network_image.dart';
 import '../../../l10n/app_localizations.dart';
@@ -449,6 +450,10 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
     );
   }
 
+  void _openComplaintAndReport() {
+    context.push('/profile/about');
+  }
+
   Widget _buildFunctionIcons(BuildContext context) {
     return Row(
       textDirection: Directionality.of(context),
@@ -464,13 +469,13 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
           context,
           imagePath: 'assets/images/favourites.png',
           label: 'Favourites',
-          onTap: () => context.push('/favorites'),
+          onTap: () => context.push('/profile/favorites'),
         ),
         _buildIconButton(
           context,
           imagePath: 'assets/images/report.png',
           label: 'Complaint and Report',
-          onTap: () {},
+          onTap: _openComplaintAndReport,
         ),
       ],
     );

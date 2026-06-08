@@ -176,24 +176,25 @@ class ApiService {
     );
   }
 
-  /// Google 登录（idToken 模式）
-  Future<ApiResponse> googleIdToken({required String idToken}) {
-    return request(
-      ApiEndpoints.googleIdToken,
-      data: {
-        'passportType': PassportType.google,
-        'idToken': idToken,
-      },
-    );
-  }
-
-  /// Google 登录（accessToken 模式）
-  Future<ApiResponse> googleLogin({required String accessToken}) {
+  /// Google 登录（统一 userAuthorization 接口）
+  Future<ApiResponse> googleLogin({
+    required String passportName,
+    required String idToken,
+    String? accessToken,
+    String? email,
+    String? displayName,
+    String? avatar,
+  }) {
     return request(
       ApiEndpoints.googleLogin,
       data: {
         'passportType': PassportType.google,
-        'accessToken': accessToken,
+        'passportName': passportName,
+        'idToken': idToken,
+        if (accessToken != null && accessToken.isNotEmpty) 'accessToken': accessToken,
+        if (email != null && email.isNotEmpty) 'email': email,
+        if (displayName != null && displayName.isNotEmpty) 'nickName': displayName,
+        if (avatar != null && avatar.isNotEmpty) 'userAvatar': avatar,
       },
     );
   }

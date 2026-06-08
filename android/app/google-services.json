@@ -1,26 +1,44 @@
 {
   "project_info": {
-    "project_number": "000000000000",
-    "project_id": "arab-drama-app-placeholder",
-    "storage_bucket": "arab-drama-app-placeholder.appspot.com"
+    "project_number": "278933660671",
+    "project_id": "qahwatv-eec1c",
+    "storage_bucket": "qahwatv-eec1c.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+        "mobilesdk_app_id": "1:278933660671:android:04d79ea6c540029889bdca",
         "android_client_info": {
-          "package_name": "com.video.qahwatvshort"
+          "package_name": "com.video.storydrama"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "278933660671-9410t48k95louv78nllc0c65suohc457.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.video.storydrama",
+            "certificate_hash": "446e41fa19102d0677e546b3cc631bbf66d2d545"
+          }
+        },
+        {
+          "client_id": "278933660671-jrqbp7tau6kofqgnar97qrat346uv0kp.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "REPLACE_WITH_YOUR_ANDROID_API_KEY"
+          "current_key": "AIzaSyDNeeTyqiS1_L48BEamNatpRyurlmmErHY"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "278933660671-jrqbp7tau6kofqgnar97qrat346uv0kp.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

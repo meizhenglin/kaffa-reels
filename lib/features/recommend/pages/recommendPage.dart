@@ -296,10 +296,6 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     return locale == 'ar' ? 'إعجاب' : 'Like';
   }
 
-  String _commentLabel(AppLocalizations l10n) {
-    final locale = Localizations.localeOf(context).languageCode;
-    return locale == 'ar' ? 'تعليق' : 'Comment';
-  }
 
   Widget _buildSideActionButton({
     required IconData icon,
@@ -350,18 +346,6 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
             _buildSideActionButton(
               icon: Icons.favorite_border,
               label: _likeLabel(l10n),
-              onTap: () {},
-            ),
-            const SizedBox(height: 16),
-            _buildSideActionButton(
-              icon: Icons.comment_outlined,
-              label: _commentLabel(l10n),
-              onTap: () {},
-            ),
-            const SizedBox(height: 16),
-            _buildSideActionButton(
-              icon: Icons.share_outlined,
-              label: l10n.share,
               onTap: () {},
             ),
             const SizedBox(height: 16),

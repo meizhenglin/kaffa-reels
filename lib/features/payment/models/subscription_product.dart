@@ -80,6 +80,7 @@ class SubscriptionProduct extends Equatable {
     required this.originalPrice,
     required this.originalPriceCn,
     required this.benefits,
+    this.displayName,
     this.isPopular = false,
     this.isBestValue = false,
     this.goodsId,
@@ -112,6 +113,9 @@ class SubscriptionProduct extends Equatable {
 
   /// List of benefits for this tier
   final List<String> benefits;
+
+  /// Display name from backend
+  final String? displayName;
 
   /// Whether this is a popular choice
   final bool isPopular;
@@ -147,6 +151,7 @@ class SubscriptionProduct extends Equatable {
     String? originalPrice,
     String? originalPriceCn,
     List<String>? benefits,
+    String? displayName,
     bool? isPopular,
     bool? isBestValue,
     int? goodsId,
@@ -162,6 +167,7 @@ class SubscriptionProduct extends Equatable {
       originalPrice: originalPrice ?? this.originalPrice,
       originalPriceCn: originalPriceCn ?? this.originalPriceCn,
       benefits: benefits ?? this.benefits,
+      displayName: displayName ?? this.displayName,
       isPopular: isPopular ?? this.isPopular,
       isBestValue: isBestValue ?? this.isBestValue,
       goodsId: goodsId ?? this.goodsId,
@@ -180,6 +186,7 @@ class SubscriptionProduct extends Equatable {
         originalPrice,
         originalPriceCn,
         benefits,
+        displayName,
         isPopular,
         isBestValue,
         goodsId,
@@ -240,19 +247,56 @@ class RechargeGoodsConfigItem extends Equatable {
     return RechargeGoodsConfigItem(
       goodsId: parseInt(json['goodsId'] ?? json['id']),
       rechargeGoodsType: parseInt(json['rechargeGoodsType']),
-      goodsName: readString(['goodsName', 'title', 'name']),
-      goodsGoogleId: readString(['goodsGoogleId', 'googlePlayId', 'googleProductId', 'productId']),
-      goodsIosId: readString(['goodsIosId', 'appStoreId', 'iosProductId']),
-      price: readString(['price', 'goodsPrice', 'amount']),
-      originalPrice: readString(['originalPrice', 'linePrice', 'goodsOriginalPrice']),
-      sort: parseInt(json['sort'], 999),
-      isEnable: parseBool(json['isEnable'] ?? json['status'] ?? 1),
-      description: readString(['description', 'desc', 'remark']).isEmpty
+      goodsName: readString([
+        'rechargeGoodsName',
+        'goodsName',
+        'title',
+        'name',
+      ]),
+      goodsGoogleId: readString([
+        'remarks',
+        'goodsGoogleId',
+        'googlePlayId',
+        'googleProductId',
+        'productId',
+      ]),
+      goodsIosId: readString([
+        'goodsIosId',
+        'appStoreId',
+        'iosProductId',
+      ]),
+      price: readString([
+        'rechargeGoodsPrice',
+        'price',
+        'goodsPrice',
+        'amount',
+      ]),
+      originalPrice: readString([
+        'rechargeGoodsSubname',
+        'originalPrice',
+        'linePrice',
+        'goodsOriginalPrice',
+      ]),
+      sort: parseInt(json['rechargeGoodsSort'] ?? json['sort'], 999),
+      isEnable: parseBool(
+        json['isEnable'] ?? json['status'] ?? ((json['isDelete'] ?? 0) == 0 ? 1 : 0),
+      ),
+      description: readString([
+        'rechargeGoodsSubname2',
+        'description',
+        'desc',
+        'remark',
+      ]).isEmpty
           ? null
-          : readString(['description', 'desc', 'remark']),
-      goodsCode: readString(['goodsCode', 'code']).isEmpty
+          : readString([
+              'rechargeGoodsSubname2',
+              'description',
+              'desc',
+              'remark',
+            ]),
+      goodsCode: readString(['goodsCode', 'code', 'remarks']).isEmpty
           ? null
-          : readString(['goodsCode', 'code']),
+          : readString(['goodsCode', 'code', 'remarks']),
     );
   }
 
@@ -332,6 +376,7 @@ class SubscriptionProducts {
         'Full library access',
       ],
       isPopular: true,
+      displayName: 'Monthly VIP',
     ),
     SubscriptionProduct(
       id: 'quarterly',
@@ -349,6 +394,7 @@ class SubscriptionProducts {
         'Save 40%',
       ],
       isBestValue: true,
+      displayName: 'Quarterly VIP',
     ),
     SubscriptionProduct(
       id: 'yearly',
@@ -365,6 +411,7 @@ class SubscriptionProducts {
         'Full library access',
         'Save 60%',
       ],
+      displayName: 'Yearly VIP',
     ),
   ];
 
@@ -395,6 +442,7 @@ class SubscriptionProducts {
             ? _formatPrice(item.originalPrice)
             : _formatPrice(item.price),
         benefits: _buildBenefits(type),
+        displayName: item.goodsName.isNotEmpty ? item.goodsName : null,
         isPopular: index == 0,
         isBestValue: index == 1 || type == SubscriptionPeriod.quarterly,
         goodsId: item.goodsId,

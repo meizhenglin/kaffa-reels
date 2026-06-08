@@ -65,7 +65,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       rootNavigator.pop();
     }
 
-    context.go('/');
     await AppRestart.restart();
   }
 

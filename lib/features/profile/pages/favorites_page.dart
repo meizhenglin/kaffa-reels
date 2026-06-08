@@ -124,20 +124,8 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   }
 
   Widget _buildEmptyState(AppLocalizations l10n) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        AppEmptyState(message: l10n.noFavorites),
-        const SizedBox(height: 8),
-        Text(
-          l10n.addFavoritesHint,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[500],
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ],
+    return AppEmptyState(
+      message: l10n.noDataAvailableAtTheMoment,
     );
   }
 

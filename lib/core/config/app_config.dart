@@ -15,10 +15,12 @@ class AppConfig {
   // ==================== API 配置 ====================
   /// API 基础地址
   /// 正式环境
-  static const String apiBaseUrl = 'https://tvapi.qahwatv.com/';
+  static const String apiBaseUrl = 'https://scolding-unbaked-refrain.ngrok-free.dev/';
 
   /// 如需切回联调环境，可临时使用：
   /// https://scolding-unbaked-refrain.ngrok-free.dev/
+  /// 
+  /// https://tvapi.qahwatv.com/
 
   /// 图片 CDN 地址
   // static const String picRootPath = 'https://image.qahwatv.com/';

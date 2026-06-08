@@ -14,7 +14,7 @@
             android:value="hPro64fDG4w5gTPmb58e1ab9918694ce6b449351127ba5ae3" />
         <meta-data
             android:name="com.aliyun.alivc_license.licensefile"
-            android:value="assets/release.crt" />
+            android:value="assets/newRelease.crt" />
 
         <!-- <meta-data
             android:name="com.aliyun.alivc_license.licensekey_SEA"
@@ -60,5 +60,14 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Required for Google Sign-In on Android 11+ (API 30+) -->
+        <intent>
+            <action android:name="com.google.android.gms.auth.GOOGLE_SIGN_IN"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <package android:name="com.google.android.gms"/>
     </queries>
 </manifest>

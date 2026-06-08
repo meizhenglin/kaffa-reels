@@ -128,33 +128,31 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     }
 
     return GradientScaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // 1. 顶部图片 379
-                    _buildTopImage(),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  // 1. 顶部图片 379
+                  _buildTopImage(),
 
-                    // 2. VIP 选项区 231
-                    _buildVipOptions(l10n, products),
+                  // 2. VIP 选项区 231
+                  _buildVipOptions(l10n, products),
 
-                    // 3. 剧卡片横向滚动 137
-                    _buildDramaSection(recommendState),
+                  // 3. 剧卡片横向滚动 137
+                  _buildDramaSection(recommendState),
 
-                    // 4. 五列文字介绍
-                    _buildBenefitsSection(l10n),
-                  ],
-                ),
+                  // 4. 五列文字介绍
+                  _buildBenefitsSection(l10n),
+                ],
               ),
             ),
+          ),
 
-            // 5. 底部支付按钮 42 + 安全区
-            _buildBottomPayButton(l10n, memberState, products),
-          ],
-        ),
+          // 5. 底部支付按钮 42 + 安全区
+          _buildBottomPayButton(l10n, memberState, products),
+        ],
       ),
     );
   }
@@ -169,7 +167,8 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         children: [
           Image.asset(
             'assets/images/vip_banner.png',
-            fit: BoxFit.cover,
+            fit: BoxFit.fitWidth,
+            alignment: Alignment.topCenter,
             errorBuilder: (_, __, ___) => Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -185,7 +184,13 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
             top: MediaQuery.of(context).padding.top + 8,
             start: 8,
             child: RtlBackButton(
-              onPressed: () => context.pop(),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  Navigator.of(context).maybePop();
+                }
+              },
               color: Colors.white,
             ),
           ),
@@ -218,6 +223,10 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     AppLocalizations l10n,
     SubscriptionProduct product,
   ) {
+    if (product.displayName != null && product.displayName!.trim().isNotEmpty) {
+      return product.displayName!.trim();
+    }
+
     final name = product.id.toLowerCase();
     if (name.contains('year')) {
       return l10n.membership_yearly;
@@ -397,26 +406,24 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     List<SubscriptionProduct> products,
   ) {
     return GradientScaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    _buildTopImage(),
-                    _buildVipOptions(l10n, products),
-                    _buildBenefitsSection(l10n),
-                    const SizedBox(height: 16),
-                    _buildActiveInfo(memberState, l10n),
-                    const SizedBox(height: 24),
-                  ],
-                ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildTopImage(),
+                  _buildVipOptions(l10n, products),
+                  _buildBenefitsSection(l10n),
+                  const SizedBox(height: 16),
+                  _buildActiveInfo(memberState, l10n),
+                  const SizedBox(height: 24),
+                ],
               ),
             ),
-            _buildBottomPayButton(l10n, memberState, products),
-          ],
-        ),
+          ),
+          _buildBottomPayButton(l10n, memberState, products),
+        ],
       ),
     );
   }
@@ -487,6 +494,9 @@ class _VipOptionItem extends StatelessWidget {
     final price = product.price;
     final symbol = price.isNotEmpty ? price.substring(0, 1) : '';
     final amount = price.length > 1 ? price.substring(1) : price;
+    final originalPrice = product.originalPrice;
+    final hasOriginalPrice =
+        originalPrice.isNotEmpty && originalPrice != price;
 
     return GestureDetector(
       onTap: onTap,
@@ -523,37 +533,53 @@ class _VipOptionItem extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 15),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                ShaderMask(
-                  shaderCallback: (bounds) => _priceGradient.createShader(
-                    Rect.fromLTWH(0, 0, bounds.width, bounds.height),
-                  ),
-                  blendMode: BlendMode.srcIn,
-                  child: Text(
-                    symbol,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
+                if (hasOriginalPrice)
+                  Text(
+                    originalPrice,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white.withAlpha(160),
+                      decoration: TextDecoration.lineThrough,
+                      decorationColor: Colors.white.withAlpha(160),
                     ),
                   ),
-                ),
-                ShaderMask(
-                  shaderCallback: (bounds) => _priceGradient.createShader(
-                    Rect.fromLTWH(0, 0, bounds.width, bounds.height),
-                  ),
-                  blendMode: BlendMode.srcIn,
-                  child: Text(
-                    amount,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    ShaderMask(
+                      shaderCallback: (bounds) => _priceGradient.createShader(
+                        Rect.fromLTWH(0, 0, bounds.width, bounds.height),
+                      ),
+                      blendMode: BlendMode.srcIn,
+                      child: Text(
+                        symbol,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
-                  ),
+                    ShaderMask(
+                      shaderCallback: (bounds) => _priceGradient.createShader(
+                        Rect.fromLTWH(0, 0, bounds.width, bounds.height),
+                      ),
+                      blendMode: BlendMode.srcIn,
+                      child: Text(
+                        amount,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

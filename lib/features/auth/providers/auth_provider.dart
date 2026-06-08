@@ -118,16 +118,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
       } catch (e) {
         debugPrint('[AuthNotifier] auto-login failed: $e, clearing credentials');
         await _repository.clearAutoLoginCredentials();
-        state = state.copyWith(status: AuthStatus.unauthenticated, isLoading: false);
+        state = state.copyWith(status: AuthStatus.unauthenticated, isLoading: false, clearUser: true);
       }
     }
 
-    final restoredStoredUser = await _restoreStoredAuthenticatedUser(
+    final hasStoredFormalSession = await _hasRestorableFormalSession(
       storedToken: storedToken,
       storedUserData: storedUserData,
+      firebaseUser: firebaseUser,
     );
-    if (restoredStoredUser) {
-      return;
+
+    if (hasStoredFormalSession) {
+      final restoredStoredUser = await _restoreStoredAuthenticatedUser(
+        storedToken: storedToken,
+        storedUserData: storedUserData,
+      );
+      if (restoredStoredUser) {
+        return;
+      }
     }
 
     if (firebaseUser != null) {
@@ -137,7 +145,43 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return;
     }
 
-    await initAsGuest();
+    await _enterGuestMode();
+  }
+
+  Future<bool> _hasRestorableFormalSession({
+    required String? storedToken,
+    required Map<String, dynamic>? storedUserData,
+    required dynamic firebaseUser,
+  }) async {
+    final hasToken = storedToken != null && storedToken.isNotEmpty;
+    if (!hasToken || storedUserData == null) {
+      return false;
+    }
+
+    final user = UserModel.fromJson(storedUserData);
+    if (user.isTourist) {
+      return false;
+    }
+
+    final passportType = user.passportType ?? 0;
+    final hasEmailIdentity = (user.email?.trim().isNotEmpty ?? false);
+    final isFirebaseBackedIdentity = passportType == 1 || passportType == 2 || firebaseUser != null;
+    final canRestore = hasEmailIdentity || isFirebaseBackedIdentity;
+
+    debugPrint(
+      '[AuthNotifier] formal session check '
+      'hasEmailIdentity=$hasEmailIdentity '
+      'passportType=$passportType '
+      'firebaseCurrentUser=$firebaseUser '
+      'canRestore=$canRestore',
+    );
+
+    if (!canRestore) {
+      debugPrint('[AuthNotifier] stale stored formal session detected, clearing residual auth data');
+      await _clearFormalAuthPersistence();
+    }
+
+    return canRestore;
   }
 
   Future<bool> _restoreStoredAuthenticatedUser({
@@ -191,13 +235,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> initAsGuest() async {
     debugPrint('[AuthNotifier] initAsGuest called, currentFirebaseUser: ${_repository.currentFirebaseUser}');
 
-    final restoredStoredUser = await _restoreStoredAuthenticatedUser(
+    final hasRestorableFormalSession = await _hasRestorableFormalSession(
       storedToken: await _ref.read(storageServiceProvider).getToken(),
       storedUserData: await _ref.read(authServiceProvider).getUserData(),
+      firebaseUser: _repository.currentFirebaseUser,
     );
-    if (restoredStoredUser) {
-      debugPrint('[AuthNotifier] initAsGuest aborted because authenticated user was restored from storage');
-      return;
+    if (hasRestorableFormalSession) {
+      final restoredStoredUser = await _restoreStoredAuthenticatedUser(
+        storedToken: await _ref.read(storageServiceProvider).getToken(),
+        storedUserData: await _ref.read(authServiceProvider).getUserData(),
+      );
+      if (restoredStoredUser) {
+        debugPrint('[AuthNotifier] initAsGuest aborted because authenticated user was restored from storage');
+        return;
+      }
     }
 
     final firebaseUser = _repository.currentFirebaseUser;
@@ -208,6 +259,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return;
     }
 
+    await _enterGuestMode();
+  }
+
+  Future<void> _enterGuestMode() async {
     debugPrint('[AuthNotifier] no authenticated session, creating guest user and fetching guest token...');
     final authService = _ref.read(authServiceProvider);
     final loginResult = await authService.ensureGuestLogin();
@@ -218,6 +273,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final guestId = loginResult?.uuid ?? 'guest_${DateTime.now().millisecondsSinceEpoch}';
     final guestUser = UserModel.guest(guestId);
     state = state.copyWith(status: AuthStatus.authenticated, user: guestUser);
+  }
+
+  Future<void> _clearFormalAuthPersistence() async {
+    await _repository.clearAutoLoginCredentials();
+    await _ref.read(authServiceProvider).logout();
+    await _repository.signOut();
+    clearGuestLoginStatus();
+    state = state.copyWith(
+      status: AuthStatus.unauthenticated,
+      clearUser: true,
+      clearError: true,
+    );
   }
 
   /// Firebase 认证状态变化回调
@@ -279,7 +346,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
       _runAuth(() => _repository.signUpWithEmail(email: email, password: password, username: username));
 
   /// Google 登录
-  Future<bool> signInWithGoogle() => _runAuth(_repository.signInWithGoogle);
+  Future<bool> signInWithGoogle() async {
+    final success = await _runAuth(_repository.signInWithGoogle);
+    if (!success) return false;
+
+    try {
+      final resp = await apiServiceProvider.getUserCenter();
+      if (resp.isSuccess && resp.data != null) {
+        await updateUserFromData(resp.data as Map<String, dynamic>);
+      }
+    } catch (e) {
+      debugPrint('[AuthNotifier] signInWithGoogle post-login profile refresh failed: $e');
+    }
+
+    return true;
+  }
 
   /// Apple 登录
   Future<bool> signInWithApple() => _runAuth(_repository.signInWithApple);
@@ -293,7 +374,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// 登出
   ///
-  /// 清理正式登录态后，立即补做游客初始化，保证 Web 刷新前后与 App 重启后的体验一致。
+  /// 完全退出：清空所有正式登录信息，绝不从旧缓存恢复；
+  /// 随后仅重新建立游客态所需的最小状态。
   Future<void> signOut() async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
@@ -308,13 +390,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
         'currentUser=${state.user?.toJson()}',
       );
 
-      // 先清自动登录，避免冷启动时先被自动登录分支重新拉回正式账号。
-      await _repository.clearAutoLoginCredentials();
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        isLoading: true,
+        clearUser: true,
+        clearError: true,
+      );
 
-      // AuthService 负责清理本地后端 token / 用户缓存；
-      // Repository 负责清理 Firebase / Google 登录态及其缓存。
+      await _repository.clearAutoLoginCredentials();
       await _ref.read(authServiceProvider).logout();
       await _repository.signOut();
+      clearGuestLoginStatus();
 
       debugPrint(
         '[AuthNotifier.signOut] after clear '
@@ -326,16 +412,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
         'firebaseCurrentUser=${_repository.currentFirebaseUser}',
       );
 
+      final authService = _ref.read(authServiceProvider);
+      final loginResult = await authService.ensureGuestLogin();
+      final currentToken = await storage.getToken();
+      final guestId = loginResult?.uuid ?? 'guest_${DateTime.now().millisecondsSinceEpoch}';
+      final guestUser = UserModel.guest(guestId);
+
       state = state.copyWith(
-        status: AuthStatus.unauthenticated,
+        status: AuthStatus.authenticated,
+        user: guestUser,
         isLoading: false,
-        clearUser: true,
         clearError: true,
       );
-      debugPrint('[AuthNotifier.signOut] local auth state cleared successfully');
 
-      await initAsGuest();
-      debugPrint('[AuthNotifier.signOut] guest session restored immediately after logout');
+      debugPrint(
+        '[AuthNotifier.signOut] strict logout completed '
+        'guestTokenPresent=${currentToken != null && currentToken.isNotEmpty} '
+        'guestId=$guestId',
+      );
     } catch (e) {
       debugPrint('[AuthNotifier.signOut] error: $e');
       state = state.copyWith(
@@ -375,6 +469,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final hasExplicitLoggedInIdentity =
         (data['email']?.toString().trim().isNotEmpty ?? false) ||
         (nextPassportType != null && nextPassportType != 0);
+    final currentUserIsLoggedIn = currentUser != null && !currentUser.isTourist;
     final shouldDiscardGuestBase =
         currentUser != null && currentUser.isTourist && hasExplicitLoggedInIdentity;
 
@@ -383,8 +478,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
       ...data,
     };
 
+    final shouldPreserveLoggedInIdentity =
+        currentUserIsLoggedIn && !hasExplicitLoggedInIdentity;
+
     if (hasExplicitLoggedInIdentity) {
       mergedData['isGuest'] = false;
+    } else if (shouldPreserveLoggedInIdentity) {
+      mergedData['isGuest'] = false;
+      mergedData['email'] = currentUser.email;
+      mergedData['nickName'] = mergedData['nickName'] ?? currentUser.nickname ?? currentUser.displayName;
+      mergedData['displayName'] = mergedData['displayName'] ?? currentUser.displayName ?? currentUser.nickname;
+      mergedData['avatar'] = mergedData['avatar'] ?? currentUser.avatar ?? currentUser.photoURL;
+      mergedData['photoURL'] = mergedData['photoURL'] ?? currentUser.photoURL ?? currentUser.avatar;
     } else if (currentUser?.isTourist ?? false) {
       mergedData['isGuest'] = true;
     }
@@ -402,6 +507,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     mergedData['userId'] =
         data['userId']?.toString() ??
         data['id']?.toString() ??
+        mergedData['userId']?.toString() ??
+        mergedData['id']?.toString() ??
         currentUser?.id ??
         '';
 
@@ -409,6 +516,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final shouldWriteUserCache = !user.isTourist;
     if (shouldWriteUserCache) {
       await _repository.saveUserData(user.toJson());
+      await _repository.cacheUser(user);
     }
     state = state.copyWith(
       status: AuthStatus.authenticated,
@@ -466,7 +574,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } on AuthCancelledException {
       state = state.copyWith(status: state.user != null ? AuthStatus.authenticated : AuthStatus.unauthenticated, isLoading: false);
       return false;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('[AuthNotifier] auth action failed: $e');
+      debugPrint('$stackTrace');
       state = state.copyWith(status: AuthStatus.error, errorMessage: _mapError(e), isLoading: false);
       return false;
     }
@@ -477,6 +587,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// 错误码映射
   String _mapError(Object error) {
     if (error is AuthCancelledException) return 'Sign in cancelled';
+    if (error is GoogleSignInException) {
+      switch (error.code) {
+        case 'google-network-error':
+          return 'Google sign-in could not reach Google services. Please check your network and Google Play services, then try again.';
+        case 'google-sign-in-timeout':
+          return 'Google sign-in timed out. Please retry on a more stable network.';
+        case 'google-play-services-unavailable':
+          return 'Google Play services is unavailable or outdated on this device. Please update it and try again.';
+        case 'google-sign-in-config-error':
+          return 'Google sign-in configuration is invalid for this build. Please verify Firebase/Google sign-in setup.';
+      }
+      return error.message;
+    }
 
     final errorString = error.toString();
     if (errorString.contains('invalid-email')) return 'Invalid email address';
@@ -488,6 +611,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (errorString.contains('operation-not-allowed')) return 'This sign-in method is not enabled';
     if (errorString.contains('invalid-credential')) return 'Invalid credentials';
     if (errorString.contains('network-request-failed')) return 'Network error. Please check your connection';
+    if (errorString.contains('ApiException: 7') || errorString.contains('network_error')) {
+      return 'Google sign-in could not reach Google services. Please check your network and Google Play services, then try again.';
+    }
 
     return errorString;
   }

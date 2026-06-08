@@ -17,9 +17,34 @@ class FirebaseService {
   static Future<void> initialize() async {
     if (_initialized) return;
 
-    // 项目使用设备匿名登录，不依赖 Firebase Auth，所有平台跳过初始化
-    _initialized = true;
-    _logger.i('Firebase skipped (project uses device anonymous login)');
+    try {
+      if (Firebase.apps.isNotEmpty) {
+        _initialized = true;
+        _logger.i('Firebase already initialized; reusing default app');
+        return;
+      }
+
+      if (kIsWeb) {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      } else {
+        await Firebase.initializeApp();
+      }
+      _initialized = true;
+      _logger.i('Firebase initialized successfully');
+    } on FirebaseException catch (e, stackTrace) {
+      if (e.code == 'duplicate-app') {
+        _initialized = true;
+        _logger.w('Firebase duplicate default app detected; treating as initialized');
+        return;
+      }
+      _logger.e('Firebase initialize failed', error: e, stackTrace: stackTrace);
+      rethrow;
+    } catch (e, stackTrace) {
+      _logger.e('Firebase initialize failed', error: e, stackTrace: stackTrace);
+      rethrow;
+    }
   }
 }
 
