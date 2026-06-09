@@ -20,6 +20,7 @@ import '../../commonAliPlayer/short_video_item.dart';
 import '../../commonAliPlayer/short_video_preload_tuning.dart';
 import '../models/video_info.dart';
 import '../providers/recommend_provider.dart';
+import '../providers/video_action_provider.dart';
 import '../../commonAliPlayer/ali_player_preload.dart';
 
 const bool _showRecommendPlaybackDebug = false;
@@ -256,6 +257,21 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     }
   }
 
+  Future<void> _playNextEpisode() async {
+    final nextIndex = _currentIndex + 1;
+    if (nextIndex < 0 || nextIndex >= widget.videos.length) return;
+    await _preloadPageController.animateToPage(
+      nextIndex,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+    if (!mounted) return;
+    _currentIndex = nextIndex;
+    _aliPlayerPreload?.moveTo(nextIndex);
+    _pauseAllExceptCurrent(nextIndex);
+    _prefetchAround(nextIndex);
+  }
+
   Widget _buildWatchButton(AppLocalizations l10n) {
     final watchLabel = _watchLabel(l10n);
     return GestureDetector(
@@ -291,11 +307,50 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     return locale == 'ar' ? 'مشاهدة' : 'Watch';
   }
 
-  String _likeLabel(AppLocalizations l10n) {
-    final locale = Localizations.localeOf(context).languageCode;
-    return locale == 'ar' ? 'إعجاب' : 'Like';
+  String _formatActionCount(int count) {
+    if (count > 999) return '999+';
+    return count.toString();
   }
 
+  Future<void> _toggleLike(VideoInfo videoInfo) async {
+    final videoId = videoInfo.videoId.toString();
+    if (videoId.isEmpty || videoId == '0') return;
+
+    final currentValue = ref.read(videoActionProvider).isLiked(
+          videoId,
+          fallback: videoInfo.isLike == 1,
+        );
+    final currentCount = ref.read(videoActionProvider).likeCount(
+          videoId,
+          fallback: videoInfo.likeNum,
+        );
+    await ref.read(videoActionProvider.notifier).toggleLike(
+          videoId: videoId,
+          episodesId: videoInfo.id.toString(),
+          currentValue: currentValue,
+          currentCount: currentCount,
+        );
+  }
+
+  Future<void> _toggleCollect(VideoInfo videoInfo) async {
+    final videoId = videoInfo.videoId.toString();
+    if (videoId.isEmpty || videoId == '0') return;
+
+    final currentValue = ref.read(videoActionProvider).isCollected(
+          videoId,
+          fallback: videoInfo.isCollect == 1,
+        );
+    final currentCount = ref.read(videoActionProvider).collectCount(
+          videoId,
+          fallback: videoInfo.collectNum,
+        );
+    await ref.read(videoActionProvider.notifier).toggleCollect(
+          videoId: videoId,
+          episodesId: videoInfo.id.toString(),
+          currentValue: currentValue,
+          currentCount: currentCount,
+        );
+  }
 
   Widget _buildSideActionButton({
     required IconData icon,
@@ -335,6 +390,14 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
   Widget _buildRecommendOverlay(BuildContext context, VideoInfo videoInfo) {
     final l10n = AppLocalizations.of(context);
+    final videoId = videoInfo.videoId.toString();
+    final actionState = ref.watch(videoActionProvider);
+
+    final isLiked = actionState.isLiked(videoId, fallback: videoInfo.isLike == 1);
+    final isCollected = actionState.isCollected(videoId, fallback: videoInfo.isCollect == 1);
+    final likeCount = actionState.likeCount(videoId, fallback: videoInfo.likeNum);
+    final collectCount = actionState.collectCount(videoId, fallback: videoInfo.collectNum);
+
     return PositionedDirectional(
       end: 12,
       bottom: _recommendSideOverlayBottomInset(context),
@@ -344,9 +407,15 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildSideActionButton(
-              icon: Icons.favorite_border,
-              label: _likeLabel(l10n),
-              onTap: () {},
+              icon: isLiked ? Icons.favorite : Icons.favorite_border,
+              label: _formatActionCount(likeCount),
+              onTap: () => _toggleLike(videoInfo),
+            ),
+            const SizedBox(height: 16),
+            _buildSideActionButton(
+              icon: isCollected ? Icons.star_rounded : Icons.star_border_rounded,
+              label: _formatActionCount(collectCount),
+              onTap: () => _toggleCollect(videoInfo),
             ),
             const SizedBox(height: 16),
             _buildWatchButton(l10n),
@@ -378,6 +447,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           videoInfo: video,
           autoPlay: autoPlay,
           resolvePlayableUrl: true,
+          onCompleted: _playNextEpisode,
           overlayBuilder: _buildRecommendOverlay,
           debugInfo: _showRecommendPlaybackDebug
               ? _buildDebugInfo(video, autoPlay)

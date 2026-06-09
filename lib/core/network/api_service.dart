@@ -467,11 +467,16 @@ class ApiService {
   /// [type] 1=喜欢 2=取消
   Future<ApiResponse> setVideoLike({
     required String videoId,
+    String? episodesId,
     required int type,
   }) {
     return request(
       ApiEndpoints.videoLike,
-      data: {'videoId': videoId, 'type': type},
+      data: {
+        'videoId': videoId,
+        if (episodesId != null && episodesId.isNotEmpty) 'episodesId': episodesId,
+        'type': type,
+      },
     );
   }
 
@@ -479,11 +484,16 @@ class ApiService {
   /// [type] 1=追 2=取消
   Future<ApiResponse> setVideoCollect({
     required String videoId,
+    String? episodesId,
     required int type,
   }) {
     return request(
       ApiEndpoints.videoCollect,
-      data: {'videoId': videoId, 'type': type},
+      data: {
+        'videoId': videoId,
+        if (episodesId != null && episodesId.isNotEmpty) 'episodesId': episodesId,
+        'type': type,
+      },
     );
   }
 

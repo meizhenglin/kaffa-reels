@@ -41,6 +41,7 @@ class ShortVideoItem extends StatefulWidget {
 
 class ShortVideoItemState extends State<ShortVideoItem> {
   static const String _tag = 'ShortVideoItem';
+  static const int _completedStateCode = FlutterAvpdef.completion;
 
   AliPlayerWidgetController? _controller;
   int? _lastPrepareCostMs;
@@ -54,6 +55,7 @@ class ShortVideoItemState extends State<ShortVideoItem> {
   bool _isFetchingPlayableUrl = false;
   bool _isPlaying = false;
   bool _showCenterPlayPause = false;
+  bool _didNotifyCompletion = false;
   Timer? _centerPlayPauseTimer;
 
   AliPlayerWidgetController? get controller => _controller;
@@ -83,6 +85,7 @@ class ShortVideoItemState extends State<ShortVideoItem> {
     final hadController = _controller != null;
     if (!hadController) {
       _controller = AliPlayerWidgetController(context);
+      _controller!.playStateNotifier.addListener(_handlePlayStateChanged);
       _controller!.strategyManager
         ..register(FirstFrameStrategy(
           onPrepared: (cost) {
@@ -126,6 +129,17 @@ class ShortVideoItemState extends State<ShortVideoItem> {
       },
     );
     _controller!.configure(data);
+  }
+
+  void _handlePlayStateChanged() {
+    final playState = _controller?.playStateNotifier.value;
+    if (playState == _completedStateCode) {
+      if (_didNotifyCompletion) return;
+      _didNotifyCompletion = true;
+      widget.onCompleted?.call();
+      return;
+    }
+    _didNotifyCompletion = false;
   }
 
   @override
@@ -228,6 +242,7 @@ class ShortVideoItemState extends State<ShortVideoItem> {
 
   void _disposeController() {
     if (_controller != null) {
+      _controller!.playStateNotifier.removeListener(_handlePlayStateChanged);
       _controller!.pause();
       _controller!.stop();
       _controller!.destroy();
@@ -371,7 +386,24 @@ class ShortVideoItemState extends State<ShortVideoItem> {
             Positioned.fill(
               child: AliPlayerWidget(
                 _controller!,
-                slotBuilders: const {},
+                slotBuilders: {
+                  SlotType.playState: (_) => ValueListenableBuilder<bool>(
+                    valueListenable: _controller!.isLoadingStateNotifier,
+                    builder: (context, isLoadingState, __) {
+                      if (!isLoadingState) return const SizedBox.shrink();
+                      return const Center(
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            color: Colors.white,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                },
                 hiddenSlotElements: {
                   SlotType.topBar: {
                     TopBarElements.back,

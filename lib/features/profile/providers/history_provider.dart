@@ -1,113 +1,161 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/providers/auth_provider.dart' show apiServiceProviderRef;
 import '../../recommend/models/drama.dart';
 
-/// 观看历史条目
-class HistoryItem {
-  final String id;
-  final Drama drama;
-  final DateTime watchedAt;
-  final double progress; // 0.0 ~ 1.0
+const int historyPageSize = 21;
 
-  const HistoryItem({
-    required this.id,
-    required this.drama,
-    required this.watchedAt,
-    required this.progress,
-  });
-
-  HistoryItem copyWith({double? progress, DateTime? watchedAt}) {
-    return HistoryItem(
-      id: id,
-      drama: drama,
-      watchedAt: watchedAt ?? this.watchedAt,
-      progress: progress ?? this.progress,
-    );
-  }
+enum HistoryStatus {
+  initial,
+  loading,
+  success,
+  error,
 }
 
-/// 观看历史状态
 class HistoryState {
-  final List<HistoryItem> items;
-  final bool isLoading;
-  final bool isEditMode;
-
   const HistoryState({
+    this.status = HistoryStatus.initial,
     this.items = const [],
-    this.isLoading = false,
-    this.isEditMode = false,
+    this.isLoadingMore = false,
+    this.isRefreshing = false,
+    this.hasMore = true,
+    this.page = 1,
+    this.errorMessage,
   });
 
+  final HistoryStatus status;
+  final List<Drama> items;
+  final bool isLoadingMore;
+  final bool isRefreshing;
+  final bool hasMore;
+  final int page;
+  final String? errorMessage;
+
+  bool get isLoading => status == HistoryStatus.loading;
   bool get isEmpty => items.isEmpty;
 
   HistoryState copyWith({
-    List<HistoryItem>? items,
-    bool? isLoading,
-    bool? isEditMode,
+    HistoryStatus? status,
+    List<Drama>? items,
+    bool? isLoadingMore,
+    bool? isRefreshing,
+    bool? hasMore,
+    int? page,
+    String? errorMessage,
+    bool clearErrorMessage = false,
   }) {
     return HistoryState(
+      status: status ?? this.status,
       items: items ?? this.items,
-      isLoading: isLoading ?? this.isLoading,
-      isEditMode: isEditMode ?? this.isEditMode,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
+      hasMore: hasMore ?? this.hasMore,
+      page: page ?? this.page,
+      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
     );
   }
 }
 
 final historyProvider = StateNotifierProvider<HistoryNotifier, HistoryState>((ref) {
-  return HistoryNotifier();
+  return HistoryNotifier(ref);
 });
 
 class HistoryNotifier extends StateNotifier<HistoryState> {
-  HistoryNotifier() : super(const HistoryState(isLoading: false)); // TODO: 接入后端时改为 true 并加载数据
+  HistoryNotifier(this._ref) : super(const HistoryState());
 
-  void addHistory(Drama drama) {
-    final id = drama.id;
-    final existingIndex = state.items.indexWhere((i) => i.drama.id == id);
-    if (existingIndex >= 0) {
-      // 更新已有条目
-      state = state.copyWith(
-        items: [
-          state.items[existingIndex].copyWith(watchedAt: DateTime.now()),
-          ...state.items.sublist(0, existingIndex),
-          ...state.items.sublist(existingIndex + 1),
-        ],
-      );
-    } else {
-      state = state.copyWith(
-        items: [
-          HistoryItem(
-            id: id,
-            drama: drama,
-            watchedAt: DateTime.now(),
-            progress: 0,
-          ),
-          ...state.items,
-        ],
-      );
+  final Ref _ref;
+
+  Future<void> loadInitial() async {
+    if (state.isLoading) return;
+
+    state = state.copyWith(
+      status: HistoryStatus.loading,
+      items: const [],
+      page: 1,
+      hasMore: true,
+      isLoadingMore: false,
+      isRefreshing: false,
+      clearErrorMessage: true,
+    );
+
+    await _fetchPage(page: 1, replace: true);
+  }
+
+  Future<void> refresh() async {
+    if (state.isLoading || state.isRefreshing) return;
+
+    state = state.copyWith(
+      isRefreshing: true,
+      page: 1,
+      hasMore: true,
+      clearErrorMessage: true,
+    );
+
+    await _fetchPage(page: 1, replace: true);
+  }
+
+  Future<void> loadMore() async {
+    if (state.isLoading || state.isRefreshing || state.isLoadingMore || !state.hasMore) {
+      return;
     }
+
+    state = state.copyWith(isLoadingMore: true, clearErrorMessage: true);
+    await _fetchPage(page: state.page + 1, replace: false);
   }
 
-  void toggleEditMode() {
-    state = state.copyWith(isEditMode: !state.isEditMode);
-  }
+  Future<void> _fetchPage({required int page, required bool replace}) async {
+    final response = await _ref.read(apiServiceProviderRef).getUserViewHistoryList(
+          page: page,
+          pageSize: historyPageSize,
+        );
 
-  void deleteItem(String id) {
+    if (!response.isSuccess) {
+      state = state.copyWith(
+        status: HistoryStatus.error,
+        isLoadingMore: false,
+        isRefreshing: false,
+        errorMessage: response.error ?? 'Failed to load history',
+      );
+      return;
+    }
+
+    final records = _extractList(response.data);
+    final dramas = records
+        .whereType<Map>()
+        .map((item) => Drama.fromJson(Map<String, dynamic>.from(item)))
+        .where((drama) => drama.id.isNotEmpty && drama.id != '0')
+        .toList();
+
     state = state.copyWith(
-      items: state.items.where((i) => i.id != id).toList(),
+      status: HistoryStatus.success,
+      items: replace ? dramas : [...state.items, ...dramas],
+      page: page,
+      hasMore: dramas.length >= historyPageSize,
+      isLoadingMore: false,
+      isRefreshing: false,
+      clearErrorMessage: true,
     );
   }
 
-  void deleteSelected(Set<String> ids) {
-    state = state.copyWith(
-      items: state.items.where((i) => !ids.contains(i.id)).toList(),
-    );
-  }
+  List<dynamic> _extractList(dynamic data) {
+    if (data is List) return data;
+    if (data is! Map) return const [];
 
-  void updateProgress(String id, double progress) {
-    state = state.copyWith(
-      items: state.items.map((i) {
-        if (i.id == id) return i.copyWith(progress: progress);
-        return i;
-      }).toList(),
-    );
+    final map = Map<String, dynamic>.from(data);
+    final candidates = [
+      map['list'],
+      map['dataList'],
+      map['records'],
+      map['rows'],
+      map['items'],
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate is List) {
+        return candidate;
+      }
+    }
+
+    return const [];
   }
 }

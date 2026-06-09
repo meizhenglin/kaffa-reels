@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../components/rtl_back_button.dart';
+
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../components/preload_network_image.dart';
+import '../../../components/rtl_back_button.dart';
+import '../../../core/utils/localized_badge_assets.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../home/models/home_card_layout.dart';
+import '../../payment/providers/membership_provider.dart';
+import '../../recommend/models/drama.dart';
 import '../../recommend/utils/drama_navigation.dart';
 import '../providers/history_provider.dart';
 
@@ -16,74 +23,43 @@ class HistoryPage extends ConsumerStatefulWidget {
 }
 
 class _HistoryPageState extends ConsumerState<HistoryPage> {
-  final Set<String> _selectedIds = {};
+  final ScrollController _scrollController = ScrollController();
 
-  void _toggleEdit() {
-    if (_selectedIds.isNotEmpty) {
-      ref.read(historyProvider.notifier).deleteSelected(_selectedIds);
-      _selectedIds.clear();
-    }
-    ref.read(historyProvider.notifier).toggleEditMode();
-    setState(() {});
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+    Future.microtask(() => ref.read(historyProvider.notifier).loadInitial());
   }
 
-  void _onDelete(String id) {
-    ref.read(historyProvider.notifier).deleteItem(id);
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_onScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 200) {
+      ref.read(historyProvider.notifier).loadMore();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final history = ref.watch(historyProvider);
-    final isEditMode = history.isEditMode;
     final l10n = AppLocalizations.of(context);
 
     return GradientScaffold(
       body: SafeArea(
         child: Column(
           children: [
-            // 顶部栏
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  RtlBackButton(
-                    onPressed: () => context.pop(),
-                    constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-                  ),
-                  const Expanded(
-                    child: Text(
-                      'Watching History',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  if (!history.isEmpty)
-                    GestureDetector(
-                      onTap: _toggleEdit,
-                      child: Text(
-                        isEditMode ? 'Done' : 'Edit',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    )
-                  else
-                    const SizedBox(width: 40),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            // 内容区
+            _buildHeader(context),
             Expanded(
-              child: history.isEmpty
-                  ? _buildEmptyState(l10n)
-                  : _buildHistoryList(history.items),
+              child: _buildBody(context, history, l10n),
             ),
           ],
         ),
@@ -91,165 +67,178 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
     );
   }
 
-  Widget _buildEmptyState(AppLocalizations l10n) {
-    return AppEmptyState(
-      message: l10n.noDataAvailableAtTheMoment,
-    );
-  }
-
-  Widget _buildHistoryList(List<HistoryItem> items) {
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final item = items[index];
-        return _HistoryListItem(
-          item: item,
-          isEditMode: ref.watch(historyProvider).isEditMode,
-          isSelected: _selectedIds.contains(item.id),
-          onTap: () => openDramaPlayer(context, item.drama),
-          onDelete: () => _onDelete(item.id),
-          onToggleSelect: () {
-            setState(() {
-              if (_selectedIds.contains(item.id)) {
-                _selectedIds.remove(item.id);
-              } else {
-                _selectedIds.add(item.id);
-              }
-            });
-          },
-        );
-      },
-    );
-  }
-}
-
-class _HistoryListItem extends StatelessWidget {
-  final HistoryItem item;
-  final bool isEditMode;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final VoidCallback onDelete;
-  final VoidCallback onToggleSelect;
-
-  const _HistoryListItem({
-    required this.item,
-    required this.isEditMode,
-    required this.isSelected,
-    required this.onTap,
-    required this.onDelete,
-    required this.onToggleSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: isEditMode ? onToggleSelect : onTap,
+  Widget _buildHeader(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: HomeCardLayout.sectionHorizontalPadding(context),
+        vertical: HomeCardLayout.scaled(context, 8),
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 封面图
+          RtlBackButton(
+            color: Colors.white,
+            onPressed: () => context.pop(),
+          ),
+          Expanded(
+            child: Text(
+              'Watching History',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: HomeCardLayout.scaled(context, 17),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          SizedBox(width: HomeCardLayout.scaled(context, 24)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody(
+    BuildContext context,
+    HistoryState history,
+    AppLocalizations l10n,
+  ) {
+    final gridGap = HomeCardLayout.cardGap(context);
+    final gridPadding = HomeCardLayout.gridPadding(context);
+
+    if (history.isLoading && history.items.isEmpty) {
+      return GridView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.all(gridPadding),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          mainAxisSpacing: gridGap,
+          crossAxisSpacing: gridGap,
+          childAspectRatio: 106 / 178,
+        ),
+        itemCount: 9,
+        itemBuilder: (context, index) => _buildLoadingCard(context),
+      );
+    }
+
+    if (history.isEmpty) {
+      return AppEmptyState(message: l10n.noDataAvailableAtTheMoment);
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => ref.read(historyProvider.notifier).refresh(),
+      child: GridView.builder(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        padding: EdgeInsets.all(gridPadding),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          mainAxisSpacing: gridGap,
+          crossAxisSpacing: gridGap,
+          childAspectRatio: 106 / 178,
+        ),
+        itemCount: history.items.length + (history.isLoadingMore ? 3 : 0),
+        itemBuilder: (context, index) {
+          if (index >= history.items.length) {
+            return _buildLoadingCard(context);
+          }
+
+          return _buildDramaCard(context, history.items[index]);
+        },
+      ),
+    );
+  }
+
+  Widget _buildLoadingCard(BuildContext context) {
+    final cardWidth = HomeCardLayout.smallCardWidth(context);
+    final cardHeight = HomeCardLayout.smallCardHeight(context);
+
+    return SizedBox(
+      width: cardWidth,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(HomeCardLayout.smallCardRadius(context)),
+            child: Image.asset(
+              'assets/images/small_preload_bg.png',
+              width: cardWidth,
+              height: cardHeight,
+              fit: BoxFit.cover,
+            ),
+          ),
+          SizedBox(height: HomeCardLayout.scaled(context, 5)),
+          Container(
+            width: HomeCardLayout.scaled(context, 80),
+            height: HomeCardLayout.scaled(context, 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDramaCard(BuildContext context, Drama drama) {
+    final authState = ref.watch(authProvider);
+    final memberState = ref.watch(memberStateProvider);
+    final coverUrl = drama.coverUrl;
+    final vipBadgeAsset = localizedHomeVipBadgeAsset(context);
+    final cardWidth = HomeCardLayout.smallCardWidth(context);
+    final cardHeight = HomeCardLayout.smallCardHeight(context);
+    final showVipBadge = drama.videoAccessType == 1;
+
+    return SizedBox(
+      width: cardWidth,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: () => openDramaPlayerWithVipCheck(
+              context: context,
+              drama: drama,
+              authState: authState,
+              memberState: memberState,
+            ),
             child: Stack(
               children: [
-                Image.network(
-                  item.drama.coverUrl,
-                  width: 120,
-                  height: 80,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
-                    return Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.asset('assets/images/small_preload_bg.png', fit: BoxFit.cover),
-                        AnimatedOpacity(opacity: 1.0, duration: const Duration(milliseconds: 300), child: child),
-                      ],
-                    );
-                  },
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 120,
-                    height: 80,
-                    color: Colors.grey[800],
-                    child: const Icon(Icons.movie, color: Colors.white54),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(HomeCardLayout.smallCardRadius(context)),
+                  child: PreloadNetworkImage(
+                    imageUrl: coverUrl,
+                    preloadAsset: 'assets/images/small_preload_bg.png',
+                    width: cardWidth,
+                    height: cardHeight,
+                    fit: BoxFit.cover,
                   ),
                 ),
-                // 进度条
-                PositionedDirectional(
-                  start: 0,
-                  end: 0,
-                  bottom: 0,
-                  child: Container(
-                    height: 3,
-                    color: Colors.grey[700],
-                    child: FractionallySizedBox(
-                      alignment: AlignmentDirectional.centerStart,
-                      widthFactor: item.progress.clamp(0.0, 1.0),
-                      child: Container(color: const Color(0xFF9843FF)),
+                if (showVipBadge)
+                  PositionedDirectional(
+                    top: 0,
+                    start: 0,
+                    child: Image.asset(
+                      vipBadgeAsset,
+                      width: HomeCardLayout.scaled(context, 42),
+                      height: HomeCardLayout.scaled(context, 18),
                     ),
                   ),
-                ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          // 标题
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Text(
-                  item.drama.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+          SizedBox(height: HomeCardLayout.scaled(context, 5)),
+          Text(
+            drama.title.split(' / ').first,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white,
+                  fontSize: HomeCardLayout.scaled(context, 13),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '${(item.progress * 100).toInt()}%',
-                  style: const TextStyle(
-                    color: Color(0xFF9843FF),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ],
-            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(width: 8),
-          // 删除按钮
-          if (isEditMode)
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF9843FF) : Colors.transparent,
-                border: Border.all(
-                  color: isSelected ? const Color(0xFF9843FF) : Colors.white54,
-                  width: 1.5,
-                ),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: isSelected
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
-                  : null,
-            )
-          else
-            GestureDetector(
-              onTap: onDelete,
-              child: Image.asset(
-                'assets/images/delete.png',
-                width: 20,
-                height: 20,
-              ),
-            ),
         ],
       ),
     );

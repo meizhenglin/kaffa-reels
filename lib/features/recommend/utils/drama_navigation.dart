@@ -95,8 +95,8 @@ Future<void> openDramaPlayerWithVipCheck({
 Future<void> openDramaPlayer(BuildContext context, Drama drama) async {
   try {
     final container = ProviderScope.containerOf(context);
-    container.read(historyProvider.notifier).addHistory(drama);
     await context.push('/short-video', extra: {'videoId': drama.id});
     container.read(lastWatchedProvider.notifier).load();
+    container.read(historyProvider.notifier).refresh();
   } catch (_) {}
 }
