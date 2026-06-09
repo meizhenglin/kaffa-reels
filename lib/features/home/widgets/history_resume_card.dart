@@ -86,7 +86,8 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
       return const SizedBox.shrink();
     }
 
-    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    final locale = Localizations.localeOf(context);
+    final isRtl = locale.languageCode.toLowerCase() == 'ar';
     final continueWatchingText =
         AppLocalizations.of(context).continueWatching;
 
@@ -133,22 +134,26 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 20),
-                  child: Align(
-                    alignment: cardSideAlignment,
-                    child: GestureDetector(
-                      onHorizontalDragEnd: handleDragEnd,
-                      child: FadeTransition(
-                        opacity: coverOpacity,
-                        child: SlideTransition(
-                          position: coverSlideAnimation,
-                          child: _buildCoverCard(info, isRtl),
-                        ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: Align(
+                alignment: cardSideAlignment,
+                child: GestureDetector(
+                  onHorizontalDragEnd: handleDragEnd,
+                  child: Directionality(
+                    textDirection:
+                        isRtl ? TextDirection.rtl : TextDirection.ltr,
+                    child: FadeTransition(
+                      opacity: coverOpacity,
+                      child: SlideTransition(
+                        position: coverSlideAnimation,
+                        child: _buildCoverCard(info, isRtl),
                       ),
                     ),
                   ),
                 ),
+              ),
+            ),
             PositionedDirectional(
               bottom: 20,
               start: 0,
@@ -181,20 +186,35 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                           ),
                         ],
                       ),
-                      child: Row(
-                        textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                        children: [
-                          if (!isRtl) ...[
-                            const SizedBox(width: 4),
-                            _buildThumbnail(info.coverUrl),
-                            const SizedBox(width: 11),
-                          ],
-                          Expanded(
-                            child: _buildContent(info, continueWatchingText),
-                          ),
-                          const SizedBox(width: 12),
-                          Padding(
-                            padding: const EdgeInsetsDirectional.only(end: 15),
+                      child: Builder(
+                        builder: (context) {
+                          final thumbnail = Padding(
+                            padding: EdgeInsets.only(
+                              left: isRtl ? 0 : 4,
+                              right: isRtl ? 4 : 0,
+                            ),
+                            child: _buildThumbnail(info.coverUrl),
+                          );
+
+                          final content = Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.only(
+                                left: isRtl ? 8 : 11,
+                                right: isRtl ? 11 : 8,
+                              ),
+                              child: _buildContent(
+                                info,
+                                continueWatchingText,
+                                isRtl ? TextDirection.rtl : TextDirection.ltr,
+                              ),
+                            ),
+                          );
+
+                          final playButton = Padding(
+                            padding: EdgeInsets.only(
+                              left: isRtl ? 15 : 0,
+                              right: isRtl ? 0 : 15,
+                            ),
                             child: Image.asset(
                               'assets/images/card_play_icon.png',
                               width: 25,
@@ -205,13 +225,19 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                                 size: 25,
                               ),
                             ),
-                          ),
-                          if (isRtl) ...[
-                            const SizedBox(width: 11),
-                            _buildThumbnail(info.coverUrl),
-                            const SizedBox(width: 4),
-                          ],
-                        ],
+                          );
+
+                          return Row(
+                            textDirection:
+                                isRtl ? TextDirection.rtl : TextDirection.ltr,
+                            children: [
+                              thumbnail,
+                              content,
+                              const SizedBox(width: 12),
+                              playButton,
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -253,10 +279,10 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
                   : _buildThumbnailPlaceholder(),
             ),
           ),
-          PositionedDirectional(
+          Positioned(
             top: -4,
-            start: isRtl ? null : -4,
-            end: isRtl ? -4 : null,
+            left: isRtl ? null : -4,
+            right: isRtl ? -4 : null,
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () {
@@ -309,7 +335,11 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
     );
   }
 
-  Widget _buildContent(LastWatchedInfo? info, String continueWatchingText) {
+  Widget _buildContent(
+    LastWatchedInfo? info,
+    String continueWatchingText,
+    TextDirection textDirection,
+  ) {
     if (info == null) {
       return const Center(
         child: SizedBox(
@@ -322,32 +352,42 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Text(
-          info.videoName,
-          style: const TextStyle(
-            color: Color(0xFFFFFFFF),
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
+    final isRtl = textDirection == TextDirection.rtl;
+
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment:
+            isRtl ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            info.videoName,
+            textDirection: textDirection,
+            textAlign: isRtl ? TextAlign.right : TextAlign.left,
+            style: const TextStyle(
+              color: Color(0xFFFFFFFF),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '$continueWatchingText EP.${info.watchedEpNum}',
-          style: const TextStyle(
-            color: Color(0xFFAEAEAE),
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
+          const SizedBox(height: 4),
+          Text(
+            '$continueWatchingText EP.${info.watchedEpNum}',
+            textDirection: textDirection,
+            textAlign: isRtl ? TextAlign.right : TextAlign.left,
+            style: const TextStyle(
+              color: Color(0xFFAEAEAE),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

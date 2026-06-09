@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../../l10n/app_localizations.dart';
 import '../providers/games_provider.dart';
 
 class GuessLineQuestion {
@@ -138,6 +139,7 @@ class _GuessLineGamePageState extends ConsumerState<GuessLineGamePage> {
   }
 
   void _showResult() {
+    final l10n = AppLocalizations.of(context);
     ref.read(gameScoresProvider.notifier).updateGuessLineScore(_score);
     ref.read(gameScoresProvider.notifier).markGuessLinePlayed(_questions.length);
 
@@ -160,7 +162,7 @@ class _GuessLineGamePageState extends ConsumerState<GuessLineGamePage> {
                       : Colors.grey,
             ),
             const SizedBox(width: 8),
-            const Text('本轮结束'),
+            Text(l10n.gamesRoundEnd),
           ],
         ),
         content: Column(
@@ -190,7 +192,7 @@ class _GuessLineGamePageState extends ConsumerState<GuessLineGamePage> {
               Navigator.pop(context);
               Navigator.pop(context);
             },
-            child: const Text('返回'),
+            child: Text(l10n.gamesBack),
           ),
           if (_score < 80)
             FilledButton(
@@ -203,7 +205,7 @@ class _GuessLineGamePageState extends ConsumerState<GuessLineGamePage> {
                   _answered = false;
                 });
               },
-              child: const Text('再玩一次'),
+              child: Text(l10n.gamesPlayAgain),
             ),
         ],
       ),

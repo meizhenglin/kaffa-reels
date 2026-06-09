@@ -73,7 +73,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     if (!authState.isAuthenticated || (authState.user?.isTourist ?? true)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please log in before subscribing.')),
+          SnackBar(content: Text(l10n.membershipLoginBeforeSubscribe)),
         );
       }
       context.push('/auth/login?redirect=/membership');
@@ -83,7 +83,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirm Subscription'),
+        title: Text(l10n.subscriptionConfirmTitle),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,7 +122,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     if (kIsWeb) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Web does not support Google Play in-app purchases.')),
+          SnackBar(content: Text(l10n.membershipWebPurchaseUnsupported)),
         );
       }
       return;
@@ -134,8 +134,8 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Google Play opened. Please complete the subscription payment.'),
+        SnackBar(
+          content: Text(l10n.membershipPurchaseOpened),
         ),
       );
     }

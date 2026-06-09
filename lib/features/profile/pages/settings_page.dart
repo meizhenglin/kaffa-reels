@@ -35,9 +35,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF2C2C2E),
-        title: const Text(
-          'Log out',
-          style: TextStyle(color: Colors.white),
+        title: Text(
+          AppLocalizations.of(context).logoutTitle,
+          style: const TextStyle(color: Colors.white),
         ),
         content: const Text(
           'Are you sure you want to log out?',

@@ -6,6 +6,7 @@ import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/utils/app_restart.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class DeleteAccountPage extends ConsumerStatefulWidget {
@@ -138,10 +139,10 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
     }
 
     messenger.showSnackBar(
-      const SnackBar(
-        content: Text('Account deleted successfully'),
-        backgroundColor: Color(0xFF5D4391),
-        duration: Duration(milliseconds: 1200),
+      SnackBar(
+        content: Text(AppLocalizations.of(context).accountDeletedSuccessfully),
+        backgroundColor: const Color(0xFF5D4391),
+        duration: const Duration(milliseconds: 1200),
       ),
     );
 

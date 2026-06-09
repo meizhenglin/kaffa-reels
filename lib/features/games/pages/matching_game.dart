@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../../l10n/app_localizations.dart';
 import '../providers/games_provider.dart';
 
 class MatchingItem {
@@ -166,6 +167,7 @@ class _MatchingGamePageState extends ConsumerState<MatchingGamePage> {
   }
 
   void _checkCompletion() {
+    final l10n = AppLocalizations.of(context);
     if (_items.every((item) => item.isMatched)) {
       _timer?.cancel();
 
@@ -179,7 +181,7 @@ class _MatchingGamePageState extends ConsumerState<MatchingGamePage> {
             children: [
               const Icon(Icons.celebration, color: Colors.amber),
               const SizedBox(width: 8),
-              const Text('恭喜通关!'),
+              Text(l10n.gamesWinTitle),
             ],
           ),
           content: Column(
@@ -193,7 +195,7 @@ class _MatchingGamePageState extends ConsumerState<MatchingGamePage> {
                     ),
               ),
               const SizedBox(height: 8),
-              const Text('完成时间'),
+              Text(l10n.gamesCompletionTime),
             ],
           ),
           actions: [
@@ -202,14 +204,14 @@ class _MatchingGamePageState extends ConsumerState<MatchingGamePage> {
                 Navigator.pop(context);
                 Navigator.pop(context);
               },
-              child: const Text('返回'),
+              child: Text(l10n.gamesBack),
             ),
             FilledButton(
               onPressed: () {
                 Navigator.pop(context);
                 _initGame();
               },
-              child: const Text('再玩一次'),
+              child: Text(l10n.gamesPlayAgain),
             ),
           ],
         ),
@@ -225,6 +227,7 @@ class _MatchingGamePageState extends ConsumerState<MatchingGamePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return GradientScaffold(
       body: SafeArea(
         child: Padding(
@@ -276,7 +279,7 @@ class _MatchingGamePageState extends ConsumerState<MatchingGamePage> {
               FilledButton.tonalIcon(
                 onPressed: _initGame,
                 icon: const Icon(Icons.refresh),
-                label: const Text('重新开始'),
+                label: Text(l10n.gamesRestart),
               ),
             ],
           ),

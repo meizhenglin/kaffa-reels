@@ -291,8 +291,8 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
     final auth = ref.read(authProvider);
     if (auth.user == null || auth.user!.isTourist) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please log in first'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).profileLoginFirst),
           backgroundColor: Colors.red,
         ),
       );
@@ -305,8 +305,8 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
     final auth = ref.read(authProvider);
     if (auth.user == null || auth.user!.isTourist) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please log in first'),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).profileLoginFirst),
           backgroundColor: Colors.red,
         ),
       );

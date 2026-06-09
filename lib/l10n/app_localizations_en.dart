@@ -487,6 +487,109 @@ class AppLocalizationsEn extends AppLocalizations {
       'During the subscription period, you can access all VIP series unlimited times.';
 
   @override
+  String get logoutTitle => 'Log out';
+
+  @override
+  String get subscriptionConfirmTitle => 'Confirm Subscription';
+
+  @override
+  String get loginRequiredTitle => 'Login Required';
+
+  @override
+  String get vipRequiredTitle => 'VIP Required';
+
+  @override
+  String get quality => 'Quality';
+
+  @override
+  String get selectQuality => 'Select Quality';
+
+  @override
+  String get qualityStandard => 'Standard quality';
+
+  @override
+  String get qualityHigh => 'High quality';
+
+  @override
+  String get qualityFullHd => 'Full HD';
+
+  @override
+  String get unavailable => 'Unavailable';
+
+  @override
+  String get subscriptionSetupGuide => 'Subscription Setup Guide';
+
+  @override
+  String get googlePlay => 'Google Play';
+
+  @override
+  String get appStore => 'App Store';
+
+  @override
+  String get backend => 'Backend';
+
+  @override
+  String get errors => 'Errors';
+
+  @override
+  String get gamesRoundEnd => 'Round Complete';
+
+  @override
+  String get gamesBack => 'Back';
+
+  @override
+  String get gamesPlayAgain => 'Play Again';
+
+  @override
+  String get gamesWinTitle => 'You Win!';
+
+  @override
+  String get gamesCompletionTime => 'Completion Time';
+
+  @override
+  String get gamesRestart => 'Restart';
+
+  @override
+  String get gamesDailySignInTitle => 'Daily Sign-in';
+
+  @override
+  String get forgotPasswordSendEmail => 'Send Reset Email';
+
+  @override
+  String get forgotPasswordEmailSentTitle => 'Email Sent!';
+
+  @override
+  String get playerVipContent => 'VIP Content';
+
+  @override
+  String get vipSubscribeNow => 'Subscribe Now';
+
+  @override
+  String get membershipLoginBeforeSubscribe =>
+      'Please log in before subscribing.';
+
+  @override
+  String get membershipWebPurchaseUnsupported =>
+      'Web does not support Google Play in-app purchases.';
+
+  @override
+  String get membershipPurchaseOpened =>
+      'Google Play opened. Please complete the subscription payment.';
+
+  @override
+  String get profileLoginFirst => 'Please log in first';
+
+  @override
+  String get accountDeletedSuccessfully => 'Account deleted successfully';
+
+  @override
+  String get dailySigninRewardHint =>
+      'Get one VIP day after signing in for 7 consecutive days';
+
+  @override
+  String get gotIt => 'Got it';
+
+  @override
   String get player_loading => 'Loading...';
 
   @override

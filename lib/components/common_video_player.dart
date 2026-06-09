@@ -10,6 +10,7 @@ import '../core/constants/api_error_code.dart';
 import '../features/payment/widgets/vip_paywall_overlay.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/payment/providers/membership_provider.dart';
+import '../l10n/app_localizations.dart';
 import 'rtl_back_button.dart';
 
 /// Common video player component.
@@ -505,7 +506,7 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
                       setState(() => _hasError = false);
                       _loadUrl(_urlForQuality(widget.currentQuality));
                     },
-                    child: const Text('Retry'),
+                    child: Text(AppLocalizations.of(context).retry),
                   ),
                 ],
               ),
@@ -514,7 +515,9 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
           // VIP 解锁弹层（isCanPlay=0 或 isVip=1 或 404 错误时显示）
           if (_isLocked)
             VipPaywallOverlay(
-              title: widget.title.isNotEmpty ? widget.title : 'VIP Content',
+              title: widget.title.isNotEmpty
+                  ? widget.title
+                  : AppLocalizations.of(context).playerVipContent,
               onUnlock: () => context.push('/membership'),
               canClose: false,
             ),
@@ -619,8 +622,8 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
                       const Icon(Icons.list, color: Colors.white, size: 28),
                 ),
                 const SizedBox(height: 4),
-                const Text('Episode',
-                    style: TextStyle(
+                Text(AppLocalizations.of(context).episode,
+                    style: const TextStyle(
                         color: Colors.white,
                         fontSize: 11,
                         shadows: [Shadow(blurRadius: 4)])),
@@ -867,13 +870,14 @@ class _CommonEpisodeSheet extends StatelessWidget {
   }
 
   void _showLockedDialog(BuildContext context, int episodeIndex) {
+    final l10n = AppLocalizations.of(context);
     final isGuest =
         authState == null || !authState!.isAuthenticated || authState!.user?.isGuest == true;
 
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(isGuest ? 'Login Required' : 'VIP Required'),
+        title: Text(isGuest ? l10n.loginRequiredTitle : l10n.vipRequiredTitle),
         content: Text(
           isGuest
               ? 'Episode ${episodeIndex + 1} is locked. Please login to continue.'
@@ -882,7 +886,7 @@ class _CommonEpisodeSheet extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () {
@@ -958,6 +962,7 @@ class _QualityBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return GestureDetector(
       onTap: () => _showPicker(context),
       child: Column(
@@ -975,7 +980,7 @@ class _QualityBtn extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          const Text('Quality',
+          Text(l10n.quality,
               style: TextStyle(
                   color: Colors.white,
                   fontSize: 11,
@@ -1017,6 +1022,7 @@ class _QualitySheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
@@ -1037,7 +1043,7 @@ class _QualitySheet extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Text('Select Quality',
+                Text(l10n.selectQuality,
                     style: Theme.of(context)
                         .textTheme
                         .titleLarge
@@ -1048,11 +1054,11 @@ class _QualitySheet extends StatelessWidget {
               ],
             ),
           ),
-          _qualityTile(VideoQuality.sd, 'SD', 'Standard quality', currentQuality,
+          _qualityTile(context, VideoQuality.sd, 'SD', l10n.qualityStandard, currentQuality,
               onQualityChanged),
-          _qualityTile(VideoQuality.hd, 'HD', 'High quality', currentQuality,
+          _qualityTile(context, VideoQuality.hd, 'HD', l10n.qualityHigh, currentQuality,
               onQualityChanged, enabled: hasHd),
-          _qualityTile(VideoQuality.fhd, 'FHD', 'Full HD', currentQuality,
+          _qualityTile(context, VideoQuality.fhd, 'FHD', l10n.qualityFullHd, currentQuality,
               onQualityChanged, enabled: hasFhd),
           SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
         ],
@@ -1072,6 +1078,7 @@ class _QualitySheet extends StatelessWidget {
   }
 
   Widget _qualityTile(
+    BuildContext context,
     VideoQuality q,
     String label,
     String desc,
@@ -1079,6 +1086,7 @@ class _QualitySheet extends StatelessWidget {
     void Function(VideoQuality) onTap, {
     bool enabled = true,
   }) {
+    final l10n = AppLocalizations.of(context);
     final selected = q == current;
     return ListTile(
       leading:
@@ -1091,8 +1099,8 @@ class _QualitySheet extends StatelessWidget {
               color: enabled ? Colors.grey : Colors.grey.shade400, fontSize: 12)),
       trailing: enabled
           ? null
-          : const Text('Unavailable',
-              style: TextStyle(color: Colors.grey, fontSize: 12)),
+          : Text(l10n.unavailable,
+              style: const TextStyle(color: Colors.grey, fontSize: 12)),
       onTap: enabled ? () => onTap(q) : null,
     );
   }

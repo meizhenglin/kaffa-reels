@@ -489,6 +489,109 @@ class AppLocalizationsAr extends AppLocalizations {
       'خلال فترة الاشتراك، يمكنك الوصول إلى جميع مسلسلات VIP بعدد غير محدود من المرات.';
 
   @override
+  String get logoutTitle => 'تسجيل الخروج';
+
+  @override
+  String get subscriptionConfirmTitle => 'تأكيد الاشتراك';
+
+  @override
+  String get loginRequiredTitle => 'تسجيل الدخول مطلوب';
+
+  @override
+  String get vipRequiredTitle => 'مطلوب اشتراك VIP';
+
+  @override
+  String get quality => 'الجودة';
+
+  @override
+  String get selectQuality => 'اختر الجودة';
+
+  @override
+  String get qualityStandard => 'جودة عادية';
+
+  @override
+  String get qualityHigh => 'جودة عالية';
+
+  @override
+  String get qualityFullHd => 'فل إتش دي';
+
+  @override
+  String get unavailable => 'غير متاح';
+
+  @override
+  String get subscriptionSetupGuide => 'دليل إعداد الاشتراك';
+
+  @override
+  String get googlePlay => 'جوجل بلاي';
+
+  @override
+  String get appStore => 'آب ستور';
+
+  @override
+  String get backend => 'الخلفية';
+
+  @override
+  String get errors => 'الأخطاء';
+
+  @override
+  String get gamesRoundEnd => 'انتهت الجولة';
+
+  @override
+  String get gamesBack => 'رجوع';
+
+  @override
+  String get gamesPlayAgain => 'العب مرة أخرى';
+
+  @override
+  String get gamesWinTitle => 'أحسنت!';
+
+  @override
+  String get gamesCompletionTime => 'وقت الإكمال';
+
+  @override
+  String get gamesRestart => 'إعادة البدء';
+
+  @override
+  String get gamesDailySignInTitle => 'تسجيل الدخول اليومي';
+
+  @override
+  String get forgotPasswordSendEmail => 'إرسال رسالة إعادة التعيين';
+
+  @override
+  String get forgotPasswordEmailSentTitle => 'تم إرسال البريد الإلكتروني!';
+
+  @override
+  String get playerVipContent => 'محتوى VIP';
+
+  @override
+  String get vipSubscribeNow => 'اشترك الآن';
+
+  @override
+  String get membershipLoginBeforeSubscribe =>
+      'يرجى تسجيل الدخول قبل الاشتراك.';
+
+  @override
+  String get membershipWebPurchaseUnsupported =>
+      'الويب لا يدعم مشتريات Google Play داخل التطبيق.';
+
+  @override
+  String get membershipPurchaseOpened =>
+      'تم فتح Google Play. يرجى إكمال عملية دفع الاشتراك.';
+
+  @override
+  String get profileLoginFirst => 'يرجى تسجيل الدخول أولاً';
+
+  @override
+  String get accountDeletedSuccessfully => 'تم حذف الحساب بنجاح';
+
+  @override
+  String get dailySigninRewardHint =>
+      'احصل على يوم VIP واحد بعد تسجيل الدخول لمدة 7 أيام متتالية';
+
+  @override
+  String get gotIt => 'حسنًا';
+
+  @override
   String get player_loading => 'جاري التحميل...';
 
   @override

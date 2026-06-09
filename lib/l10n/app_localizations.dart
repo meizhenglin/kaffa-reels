@@ -1034,6 +1034,204 @@ abstract class AppLocalizations {
   /// **'During the subscription period, you can access all VIP series unlimited times.'**
   String get membership_benefits_tipContent;
 
+  /// No description provided for @logoutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log out'**
+  String get logoutTitle;
+
+  /// No description provided for @subscriptionConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Subscription'**
+  String get subscriptionConfirmTitle;
+
+  /// No description provided for @loginRequiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Login Required'**
+  String get loginRequiredTitle;
+
+  /// No description provided for @vipRequiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'VIP Required'**
+  String get vipRequiredTitle;
+
+  /// No description provided for @quality.
+  ///
+  /// In en, this message translates to:
+  /// **'Quality'**
+  String get quality;
+
+  /// No description provided for @selectQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Quality'**
+  String get selectQuality;
+
+  /// No description provided for @qualityStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard quality'**
+  String get qualityStandard;
+
+  /// No description provided for @qualityHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High quality'**
+  String get qualityHigh;
+
+  /// No description provided for @qualityFullHd.
+  ///
+  /// In en, this message translates to:
+  /// **'Full HD'**
+  String get qualityFullHd;
+
+  /// No description provided for @unavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get unavailable;
+
+  /// No description provided for @subscriptionSetupGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription Setup Guide'**
+  String get subscriptionSetupGuide;
+
+  /// No description provided for @googlePlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Play'**
+  String get googlePlay;
+
+  /// No description provided for @appStore.
+  ///
+  /// In en, this message translates to:
+  /// **'App Store'**
+  String get appStore;
+
+  /// No description provided for @backend.
+  ///
+  /// In en, this message translates to:
+  /// **'Backend'**
+  String get backend;
+
+  /// No description provided for @errors.
+  ///
+  /// In en, this message translates to:
+  /// **'Errors'**
+  String get errors;
+
+  /// No description provided for @gamesRoundEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Round Complete'**
+  String get gamesRoundEnd;
+
+  /// No description provided for @gamesBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get gamesBack;
+
+  /// No description provided for @gamesPlayAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Play Again'**
+  String get gamesPlayAgain;
+
+  /// No description provided for @gamesWinTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You Win!'**
+  String get gamesWinTitle;
+
+  /// No description provided for @gamesCompletionTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Completion Time'**
+  String get gamesCompletionTime;
+
+  /// No description provided for @gamesRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart'**
+  String get gamesRestart;
+
+  /// No description provided for @gamesDailySignInTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily Sign-in'**
+  String get gamesDailySignInTitle;
+
+  /// No description provided for @forgotPasswordSendEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Send Reset Email'**
+  String get forgotPasswordSendEmail;
+
+  /// No description provided for @forgotPasswordEmailSentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Email Sent!'**
+  String get forgotPasswordEmailSentTitle;
+
+  /// No description provided for @playerVipContent.
+  ///
+  /// In en, this message translates to:
+  /// **'VIP Content'**
+  String get playerVipContent;
+
+  /// No description provided for @vipSubscribeNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribe Now'**
+  String get vipSubscribeNow;
+
+  /// No description provided for @membershipLoginBeforeSubscribe.
+  ///
+  /// In en, this message translates to:
+  /// **'Please log in before subscribing.'**
+  String get membershipLoginBeforeSubscribe;
+
+  /// No description provided for @membershipWebPurchaseUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Web does not support Google Play in-app purchases.'**
+  String get membershipWebPurchaseUnsupported;
+
+  /// No description provided for @membershipPurchaseOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Play opened. Please complete the subscription payment.'**
+  String get membershipPurchaseOpened;
+
+  /// No description provided for @profileLoginFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Please log in first'**
+  String get profileLoginFirst;
+
+  /// No description provided for @accountDeletedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Account deleted successfully'**
+  String get accountDeletedSuccessfully;
+
+  /// No description provided for @dailySigninRewardHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Get one VIP day after signing in for 7 consecutive days'**
+  String get dailySigninRewardHint;
+
+  /// No description provided for @gotIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get gotIt;
+
   /// No description provided for @player_loading.
   ///
   /// In en, this message translates to:

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../l10n/app_localizations.dart';
+
 /// ============================================================================
 /// VIP 付费墙覆盖层组件
 ///
@@ -118,7 +120,7 @@ class VipPaywallOverlay extends StatelessWidget {
                     onUnlock?.call();
                   },
                   icon: const Icon(Icons.workspace_premium),
-                  label: const Text('Subscribe Now'),
+                  label: Text(AppLocalizations.of(context).vipSubscribeNow),
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.amber[700],
                     foregroundColor: Colors.white,

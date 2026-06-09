@@ -181,31 +181,29 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
           PositionedDirectional(
             top: topPadding + HomeCardLayout.bannerScaled(context, 16),
             end: HomeCardLayout.bannerScaled(context, 12),
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-                    child: Row(
-                      children: [
-                        _ActionButton(
-                          onTap: () => widget.onSearchTap?.call(),
-                          isVip: false,
-                          child: Image.asset(
-                            'assets/images/search_icon.png',
-                            width: HomeCardLayout.bannerScaled(context, 32),
-                            height: HomeCardLayout.bannerScaled(context, 32),
-                          ),
-                        ),
-                        SizedBox(width: HomeCardLayout.bannerScaled(context, 8)),
-                        _ActionButton(
-                          onTap: () => context.push('/membership'),
-                          isVip: true,
-                          child: Image.asset(
-                            'assets/images/vip_icon.png',
-                            width: HomeCardLayout.bannerScaled(context, 32),
-                            height: HomeCardLayout.bannerScaled(context, 32),
-                          ),
-                        ),
-                      ],
-                    ),
+            child: Row(
+              textDirection: Directionality.of(context),
+              children: [
+                _ActionButton(
+                  onTap: () => widget.onSearchTap?.call(),
+                  isVip: false,
+                  child: Image.asset(
+                    'assets/images/search_icon.png',
+                    width: HomeCardLayout.bannerScaled(context, 32),
+                    height: HomeCardLayout.bannerScaled(context, 32),
+                  ),
+                ),
+                SizedBox(width: HomeCardLayout.bannerScaled(context, 8)),
+                _ActionButton(
+                  onTap: () => context.push('/membership'),
+                  isVip: true,
+                  child: Image.asset(
+                    'assets/images/vip_icon.png',
+                    width: HomeCardLayout.bannerScaled(context, 32),
+                    height: HomeCardLayout.bannerScaled(context, 32),
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -352,6 +350,7 @@ class _PlayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -369,6 +368,7 @@ class _PlayButton extends StatelessWidget {
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
+          textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
           children: [
             // const Icon(
             //   Icons.play_arrow_rounded,

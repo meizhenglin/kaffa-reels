@@ -91,7 +91,11 @@ class _MainPageState extends ConsumerState<MainPage> {
         fit: StackFit.expand,
         children: [
           widget.navigationShell,
-          if (currentIndex == 0) HistoryResumeCard(),
+          if (currentIndex == 0)
+            Directionality(
+              textDirection: Directionality.of(context),
+              child: const HistoryResumeCard(),
+            ),
         ],
       ),
       bottomNavigationBar: AppBottomNavBar(

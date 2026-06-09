@@ -126,7 +126,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                       color: Colors.white,
                     ),
                   )
-                : const Text('Send Reset Email'),
+                : Text(l10n.forgotPasswordSendEmail),
           ),
         ],
       ),
@@ -144,7 +144,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
         ),
         const SizedBox(height: 24),
         Text(
-          'Email Sent!',
+          l10n.forgotPasswordEmailSentTitle,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../../l10n/app_localizations.dart';
 import '../providers/games_provider.dart';
 
 class DailySigninPage extends ConsumerStatefulWidget {
@@ -23,6 +24,7 @@ class _DailySigninPageState extends ConsumerState<DailySigninPage> {
   }
 
   Future<void> _signIn() async {
+    final l10n = AppLocalizations.of(context);
     final notifier = ref.read(gameScoresProvider.notifier);
     final scores = ref.read(gameScoresProvider);
 
@@ -38,7 +40,7 @@ class _DailySigninPageState extends ConsumerState<DailySigninPage> {
           children: [
             const Icon(Icons.card_giftcard, color: Colors.amber),
             const SizedBox(width: 8),
-            const Text('签到成功!'),
+            Text(l10n.gamesDailySignInTitle),
           ],
         ),
         content: Column(
@@ -65,14 +67,14 @@ class _DailySigninPageState extends ConsumerState<DailySigninPage> {
                   color: Colors.amber.withAlpha(51),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Column(
+                child: Column(
                   children: [
-                    Text(
+                    const Text(
                       '🎉 连续签到奖励!',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    SizedBox(height: 4),
-                    Text('连续7天签到可获得VIP一天'),
+                    const SizedBox(height: 4),
+                    Text(l10n.dailySigninRewardHint),
                   ],
                 ),
               ),
@@ -81,7 +83,7 @@ class _DailySigninPageState extends ConsumerState<DailySigninPage> {
         actions: [
           FilledButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('知道了'),
+            child: Text(l10n.gotIt),
           ),
         ],
       ),
@@ -90,6 +92,7 @@ class _DailySigninPageState extends ConsumerState<DailySigninPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     if (_isLoading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -121,8 +124,8 @@ class _DailySigninPageState extends ConsumerState<DailySigninPage> {
                     onPressed: () => Navigator.pop(context),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
-                    '每日签到',
+                  Text(
+                    l10n.gamesDailySignInTitle,
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 20,

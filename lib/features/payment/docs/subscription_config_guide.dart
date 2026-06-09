@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+
+import '../../../l10n/app_localizations.dart';
 
 /// Configuration guide for setting up subscriptions in Google Play Console and App Store Connect
 class SubscriptionConfigGuide {
@@ -317,20 +318,21 @@ subscriptions table:
         maxChildSize: 0.95,
         expand: false,
         builder: (context, scrollController) {
+          final l10n = AppLocalizations.of(context);
           return DefaultTabController(
             length: 4,
             child: Column(
               children: [
                 AppBar(
-                  title: const Text('Subscription Setup Guide'),
+                  title: Text(l10n.subscriptionSetupGuide),
                   automaticallyImplyLeading: false,
-                  bottom: const TabBar(
+                  bottom: TabBar(
                     isScrollable: true,
                     tabs: [
-                      Tab(text: 'Google Play'),
-                      Tab(text: 'App Store'),
-                      Tab(text: 'Backend'),
-                      Tab(text: 'Errors'),
+                      Tab(text: l10n.googlePlay),
+                      Tab(text: l10n.appStore),
+                      Tab(text: l10n.backend),
+                      Tab(text: l10n.errors),
                     ],
                   ),
                 ),
