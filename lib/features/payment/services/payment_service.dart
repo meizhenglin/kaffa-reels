@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,20 +24,21 @@ class PaymentService {
     Function(PurchaseDetails)? onPurchaseComplete,
     Function(String)? onPurchaseError,
   }) async {
-    if (_isInitialized) return true;
-
     _onPurchaseComplete = onPurchaseComplete;
     _onPurchaseError = onPurchaseError;
+
+    if (_isInitialized) return true;
 
     try {
       final isAvailable = await _inAppPurchase.isAvailable();
       if (!isAvailable) {
         debugPrint('In-app purchases not available');
+        _onPurchaseError?.call('Google Play billing is not available on this device.');
         return false;
       }
 
       // Listen to purchase updates
-      _subscription = _inAppPurchase.purchaseStream.listen(
+      _subscription ??= _inAppPurchase.purchaseStream.listen(
         _handlePurchaseUpdate,
         onError: (error) {
           debugPrint('Purchase stream error: $error');
@@ -51,6 +51,7 @@ class PaymentService {
       return true;
     } catch (e) {
       debugPrint('Failed to initialize payment service: $e');
+      _onPurchaseError?.call('Failed to initialize billing: $e');
       return false;
     }
   }
@@ -66,63 +67,58 @@ class PaymentService {
 
       if (response.error != null) {
         debugPrint('Error fetching products: ${response.error}');
+        _onPurchaseError?.call(response.error!.message);
         return [];
+      }
+
+      if (response.notFoundIDs.isNotEmpty) {
+        debugPrint('Products not found: ${response.notFoundIDs.join(', ')}');
       }
 
       _availableProducts = response.productDetails;
       return _availableProducts;
     } catch (e) {
       debugPrint('Exception fetching products: $e');
+      _onPurchaseError?.call('Failed to fetch products: $e');
       return [];
     }
   }
 
   /// Check if user has active subscriptions
   Future<List<PurchaseDetails>> getPurchases() async {
-    // The current in_app_purchase API no longer exposes a direct queryPastPurchases
-    // method on the shared InAppPurchase class. Restored purchases are delivered
-    // through [purchaseStream] after calling [restorePurchases].
     await restorePurchases();
     return [];
   }
 
-  /// Check if a purchase is a valid subscription
-  bool _isActiveSubscription(PurchaseDetails purchase) {
-    switch (purchase.status) {
-      case PurchaseStatus.purchased:
-      case PurchaseStatus.restored:
-        // For subscriptions, we need to check expiration date
-        // The actual expiration check should be done server-side
-        return true;
-      case PurchaseStatus.pending:
-        return false;
-      case PurchaseStatus.canceled:
-        return false;
-      case PurchaseStatus.error:
-        return false;
-    }
-  }
-
-  /// Initiate a purchase flow
+  /// Initiate a subscription purchase flow
   Future<bool> purchase({
     required ProductDetails product,
-    bool consumeNonConsumablePurchases = false,
+    String? applicationUserName,
   }) async {
     if (!_isInitialized) {
-      debugPrint('PaymentService not initialized');
-      return false;
+      final initialized = await initialize(
+        onPurchaseComplete: _onPurchaseComplete,
+        onPurchaseError: _onPurchaseError,
+      );
+      if (!initialized) {
+        debugPrint('PaymentService not initialized');
+        return false;
+      }
     }
 
     try {
       final purchaseParam = PurchaseParam(
         productDetails: product,
-        applicationUserName: null, // Optional: user ID for tracking
+        applicationUserName: applicationUserName,
       );
 
       final success = await _inAppPurchase.buyNonConsumable(
         purchaseParam: purchaseParam,
       );
 
+      if (!success) {
+        _onPurchaseError?.call('Failed to open Google Play purchase sheet.');
+      }
       return success;
     } catch (e) {
       debugPrint('Purchase error: $e');
@@ -134,8 +130,14 @@ class PaymentService {
   /// Restore previous purchases
   Future<bool> restorePurchases() async {
     if (!_isInitialized) {
-      debugPrint('PaymentService not initialized');
-      return false;
+      final initialized = await initialize(
+        onPurchaseComplete: _onPurchaseComplete,
+        onPurchaseError: _onPurchaseError,
+      );
+      if (!initialized) {
+        debugPrint('PaymentService not initialized');
+        return false;
+      }
     }
 
     try {
@@ -156,7 +158,6 @@ class PaymentService {
       switch (purchase.status) {
         case PurchaseStatus.purchased:
         case PurchaseStatus.restored:
-          // Verify receipt before completing
           _onPurchaseComplete?.call(purchase);
           _completePurchase(purchase);
           break;
@@ -177,8 +178,6 @@ class PaymentService {
 
   /// Complete a purchase (acknowledge on Android)
   Future<void> _completePurchase(PurchaseDetails purchase) async {
-    // IMPORTANT: On Android, purchases must be completed if the framework
-    // indicates they are still pending completion.
     if (purchase.pendingCompletePurchase) {
       try {
         await _inAppPurchase.completePurchase(purchase);
@@ -191,22 +190,8 @@ class PaymentService {
 
   /// Get the current platform type
   TargetPlatform get currentPlatform {
-    if (Platform.isAndroid) return TargetPlatform.android;
-    if (Platform.isIOS) return TargetPlatform.iOS;
-    return TargetPlatform.android;
-  }
-
-  /// Get product ID for current platform
-  String getProductIdForCurrentPlatform(String productId) {
-    switch (currentPlatform) {
-      case TargetPlatform.android:
-        return 'android_$productId';
-      case TargetPlatform.iOS:
-        return 'ios_$productId';
-      case TargetPlatform.fuchsia:
-      default:
-        return 'android_$productId';
-    }
+    if (kIsWeb) return defaultTargetPlatform;
+    return defaultTargetPlatform;
   }
 
   /// Dispose resources

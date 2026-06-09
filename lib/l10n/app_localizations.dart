@@ -764,6 +764,42 @@ abstract class AppLocalizations {
   /// **'Message Settings'**
   String get messageSettings;
 
+  /// No description provided for @notificationsOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get notificationsOff;
+
+  /// No description provided for @notificationsOffSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off all push notifications.'**
+  String get notificationsOffSubtitle;
+
+  /// No description provided for @notificationsImportant.
+  ///
+  /// In en, this message translates to:
+  /// **'Important only'**
+  String get notificationsImportant;
+
+  /// No description provided for @notificationsImportantSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive important alerts and account-related updates.'**
+  String get notificationsImportantSubtitle;
+
+  /// No description provided for @notificationsAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All messages'**
+  String get notificationsAll;
+
+  /// No description provided for @notificationsAllSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive all notifications including updates and promotions.'**
+  String get notificationsAllSubtitle;
+
   /// No description provided for @versionNumber.
   ///
   /// In en, this message translates to:
@@ -955,6 +991,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Early access'**
   String get membership_benefit_early;
+
+  /// No description provided for @membership_benefits_title.
+  ///
+  /// In en, this message translates to:
+  /// **'Member Benefits'**
+  String get membership_benefits_title;
+
+  /// No description provided for @membership_benefits_complaint.
+  ///
+  /// In en, this message translates to:
+  /// **'Complaint and Report'**
+  String get membership_benefits_complaint;
+
+  /// No description provided for @membership_benefits_unlockEpisodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock all VIP episodes'**
+  String get membership_benefits_unlockEpisodes;
+
+  /// No description provided for @membership_benefits_watchHd.
+  ///
+  /// In en, this message translates to:
+  /// **'Watch in 1080p/1440p HD'**
+  String get membership_benefits_watchHd;
+
+  /// No description provided for @membership_benefits_singleDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Only 1 device can be logged in at the same time'**
+  String get membership_benefits_singleDevice;
+
+  /// No description provided for @membership_benefits_tipsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips'**
+  String get membership_benefits_tipsLabel;
+
+  /// No description provided for @membership_benefits_tipContent.
+  ///
+  /// In en, this message translates to:
+  /// **'During the subscription period, you can access all VIP series unlimited times.'**
+  String get membership_benefits_tipContent;
 
   /// No description provided for @player_loading.
   ///

@@ -366,9 +366,9 @@ class SubscriptionProducts {
       type: SubscriptionPeriod.monthly,
       googlePlayId: '${_googlePlayBase}monthly',
       appStoreId: '${_appStoreBase}monthly',
-      price: ' 24.99',
+      price: r'$24.99',
       priceCn: '¥30',
-      originalPrice: ' 39.99',
+      originalPrice: r'$39.99',
       originalPriceCn: '¥60',
       benefits: const [
         'Ad-free for 1 month',
@@ -383,9 +383,9 @@ class SubscriptionProducts {
       type: SubscriptionPeriod.quarterly,
       googlePlayId: '${_googlePlayBase}quarterly',
       appStoreId: '${_appStoreBase}quarterly',
-      price: ' 32.99',
+      price: r'$32.99',
       priceCn: '¥78',
-      originalPrice: ' 59.99',
+      originalPrice: r'$59.99',
       originalPriceCn: '¥150',
       benefits: const [
         'Ad-free for 3 months',
@@ -401,9 +401,9 @@ class SubscriptionProducts {
       type: SubscriptionPeriod.yearly,
       googlePlayId: '${_googlePlayBase}yearly',
       appStoreId: '${_appStoreBase}yearly',
-      price: ' 99.99',
+      price: r'$99.99',
       priceCn: '¥258',
-      originalPrice: ' 159.99',
+      originalPrice: r'$159.99',
       originalPriceCn: '¥598',
       benefits: const [
         'Ad-free for 12 months',
@@ -486,12 +486,13 @@ class SubscriptionProducts {
   }
 
   static String _formatPrice(String value) {
-    final trimmed = value.trim();
+    final cleaned = value.replaceAll(RegExp(r'[\u0000-\u001F\u007F\u200E\u200F\u202A-\u202E]'), '');
+    final trimmed = cleaned.trim();
     if (trimmed.isEmpty) return '';
-    if (trimmed.startsWith(' 24') || trimmed.startsWith('¥') || trimmed.startsWith('€') || trimmed.startsWith('£')) {
+    if (trimmed.startsWith(r'$') || trimmed.startsWith('¥') || trimmed.startsWith('€') || trimmed.startsWith('£')) {
       return trimmed;
     }
-    return ' 24$trimmed';
+    return r'$' + trimmed;
   }
 
   static List<String> _buildBenefits(SubscriptionPeriod type) {

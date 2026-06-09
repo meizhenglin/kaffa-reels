@@ -64,9 +64,9 @@ class AppConfig {
 
   // ==================== 支付类型 ====================
   /// Android 支付标识
-  static const int payTypeAndroid = 1;
+  static const int payTypeAndroid = 5;
   /// iOS 支付标识
-  static const int payTypeiOS = 2;
+  static const int payTypeiOS = 6;
 
   // ==================== 当前环境 ====================
   /// 当前平台类型（Android / iOS）

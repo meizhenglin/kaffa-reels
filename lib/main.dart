@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:aliplayer_widget/aliplayer_widget_lib.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +11,8 @@ import 'package:qahwa_tv/l10n/app_localizations.dart';
 import '_aliplayer_log_stub.dart'
     if (dart.library.io) '_aliplayer_log_native.dart'
     as aliplayer_impl;
+import 'core/platform/platform_info_stub.dart'
+    if (dart.library.io) 'core/platform/platform_info_io.dart';
 
 import 'app/providers/app_providers.dart';
 import 'app/router/router_config.dart';
@@ -27,13 +29,18 @@ Future<void> _withTimeout(Future<void> future, Duration timeout) async {
 }
 
 Future<void> _initializeAliPlayerWidgetGlobalSettings() async {
+  if (kIsWeb) {
+    debugPrint('[MAIN] Skip AliPlayerWidget global settings on Web');
+    return;
+  }
+
   try {
     await AliPlayerWidgetGlobalSetting.setupConfig();
 
     String? cachePath;
     String? filesPath;
 
-    if (Platform.isAndroid) {
+    if (isAndroidPlatform) {
       final externalCacheDirs = await getExternalCacheDirectories();
       cachePath = externalCacheDirs?.isNotEmpty == true
           ? externalCacheDirs!.first.path
@@ -79,15 +86,16 @@ Future<void> main() async {
   await aliplayer_impl.AliPlayerLog.init();
   await _initializeAliPlayerWidgetGlobalSettings();
 
-  // Firebase 初始化
-  await _withTimeout(
-    FirebaseService.initialize(),
-    const Duration(seconds: 15),
-  );
+  // Web：不在这里 await Firebase 初始化，避免被远端脚本超时阻塞首屏。
+  // Firebase 会在首帧渲染后后台初始化。
+  // 非 Web 平台：本地初始化，不需要网络，直接 await。
+  if (!kIsWeb) {
+    await _withTimeout(
+      FirebaseService.initialize(),
+      const Duration(seconds: 15),
+    );
+  }
 
-  // 这里只做基础设施初始化，不在 main() 提前执行游客登录。
-  // 当前用户身份（自动登录 / 正式登录恢复 / 游客初始化）统一由 AuthNotifier._init() 决定，
-  // 避免启动阶段出现两套认证入口，导致 token 与 UI 状态来源不一致。
   runApp(
     ProviderScope(
       overrides: [
@@ -96,6 +104,21 @@ Future<void> main() async {
       child: const QahwaTVApp(),
     ),
   );
+
+  if (kIsWeb) {
+    _initFirebaseInBackground();
+  }
+}
+
+void _initFirebaseInBackground() {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    debugPrint('[MAIN] Web: scheduling background Firebase init');
+    FirebaseService.initialize().then((_) {
+      debugPrint('[MAIN] Web: Firebase initialized in background');
+    }).catchError((e) {
+      debugPrint('[MAIN] Web: Firebase background init failed: $e');
+    });
+  });
 }
 
 class QahwaTVApp extends ConsumerStatefulWidget {

@@ -4,9 +4,11 @@ import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logger/logger.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+
+import 'google_sign_in_client_stub.dart'
+    if (dart.library.io) 'google_sign_in_client_mobile.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/firebase/firebase_service.dart';
@@ -23,10 +25,7 @@ class AuthRepository {
 
   final StorageService _storage;
   FirebaseAuth get _auth => FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: _googleScopes,
-    serverClientId: _googleServerClientId,
-  );
+  GoogleSignInClient? _googleSignIn;
   final Logger _logger = Logger();
 
   bool get _isFirebaseAuthAvailable => FirebaseService.isInitialized;
@@ -108,7 +107,12 @@ class AuthRepository {
   }
 
   Future<void> warmUpGoogleSignIn() async {
-    if (kIsWeb) return;
+    if (!isGoogleSignInSupported) {
+      _logger.i('[AuthRepo] Google sign-in warm-up skipped: unsupported on current platform/config');
+      return;
+    }
+
+    _initializeGoogleSignInIfSupported();
 
     debugPrint(
       '[GoogleLoginFlow] googleSignIn config scopes=$_googleScopes serverClientId=$_googleServerClientId',
@@ -139,6 +143,38 @@ class AuthRepository {
     if (!FirebaseService.isInitialized) {
       throw StateError('Firebase Auth is unavailable because Firebase is not initialized.');
     }
+  }
+
+  GoogleSignInClient get _requiredGoogleSignIn {
+    final instance = _googleSignIn;
+    if (instance == null) {
+      throw GoogleSignInException(
+        'google-sign-in-not-configured',
+        'Google Sign-In is not configured for this platform.',
+      );
+    }
+    return instance;
+  }
+
+  bool get isGoogleSignInSupported {
+    if (!FirebaseService.isInitialized) {
+      return false;
+    }
+    if (kIsWeb) {
+      return false;
+    }
+    return true;
+  }
+
+  void _initializeGoogleSignInIfSupported() {
+    if (!isGoogleSignInSupported || _googleSignIn != null) {
+      return;
+    }
+
+    _googleSignIn = createGoogleSignInClient(
+      scopes: _googleScopes,
+      serverClientId: _googleServerClientId,
+    );
   }
 
   Exception _normalizeGoogleSignInError(Object error) {
@@ -296,6 +332,8 @@ class AuthRepository {
 
   Future<UserModel> signInWithGoogle() async {
     await _ensureFirebaseAuthReady();
+    _initializeGoogleSignInIfSupported();
+    final googleSignIn = _requiredGoogleSignIn;
 
     final stopwatch = Stopwatch()..start();
     debugPrint('[GoogleLoginFlow] start');
@@ -303,10 +341,10 @@ class AuthRepository {
     debugPrint('[GoogleLoginFlow] launching chooser');
     _logger.i('[AuthRepo] Launching Google account chooser');
 
-    GoogleSignInAccount? googleUser;
+    GoogleSignInAccountClient? googleUser;
     final chooserStopwatch = Stopwatch()..start();
     try {
-      googleUser = await _googleSignIn.signIn();
+      googleUser = await googleSignIn.signIn();
     } catch (e, stackTrace) {
       debugPrint(
         '[GoogleLoginFlow] chooser failed after ${chooserStopwatch.elapsedMilliseconds}ms error=$e',
@@ -335,7 +373,7 @@ class AuthRepository {
 
     final authStopwatch = Stopwatch()..start();
     debugPrint('[GoogleLoginFlow] fetching google tokens');
-    GoogleSignInAuthentication googleAuth;
+    GoogleSignInAuthenticationClient googleAuth;
     try {
       googleAuth = await googleUser.authentication.timeout(
         const Duration(seconds: 30),
@@ -512,7 +550,7 @@ class AuthRepository {
     }
 
     try {
-      await _googleSignIn.signOut();
+      await _requiredGoogleSignIn.signOut();
     } catch (e) {
       signOutError ??= e;
       _logger.w('[AuthRepo] Google signOut failed: $e');

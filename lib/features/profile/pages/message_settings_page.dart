@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../components/rtl_back_button.dart';
+
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../components/rtl_back_button.dart';
+import '../../../l10n/app_localizations.dart';
 
 class MessageSettingsPage extends StatefulWidget {
   const MessageSettingsPage({super.key});
@@ -11,70 +15,101 @@ class MessageSettingsPage extends StatefulWidget {
 }
 
 class _MessageSettingsPageState extends State<MessageSettingsPage> {
-  bool _pushEnabled = true;
-  bool _emailEnabled = false;
-  bool _smsEnabled = false;
+  int _selectedOption = 0;
+  bool _isSaving = false;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return GradientScaffold(
       body: SafeArea(
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               child: Row(
                 children: [
                   RtlBackButton(
                     onPressed: () => context.pop(),
                     color: Colors.white,
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
-                        'Message Settings',
-                        style: TextStyle(
+                        l10n.messageSettings,
+                        style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
                         ),
                       ),
                     ),
                   ),
-                  const Opacity(
-                    opacity: 0,
-                    child: RtlBackButton(
-                      onPressed: null,
-                      color: Colors.white,
-                    ),
-                  ),
+                  const SizedBox(width: 48),
                 ],
               ),
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 child: Column(
                   children: [
                     const SizedBox(height: 8),
-                    _ToggleItem(
-                      title: 'Push Notifications',
-                      value: _pushEnabled,
-                      onChanged: (v) => setState(() => _pushEnabled = v),
+                    _MessageOptionItem(
+                      title: l10n.notifications,
+                      subtitle:
+                          'Get essential push notifications, alerts, and more.',
+                      isSelected: _selectedOption == 0,
+                      onTap: () => setState(() => _selectedOption = 0),
                     ),
-                    const SizedBox(height: 10),
-                    _ToggleItem(
-                      title: 'Email Notifications',
-                      value: _emailEnabled,
-                      onChanged: (v) => setState(() => _emailEnabled = v),
-                    ),
-                    const SizedBox(height: 10),
-                    _ToggleItem(
-                      title: 'SMS Notifications',
-                      value: _smsEnabled,
-                      onChanged: (v) => setState(() => _smsEnabled = v),
+                    const SizedBox(height: 14),
+                    _MessageOptionItem(
+                      title: 'Promotions',
+                      subtitle:
+                          'Get updates on new releases, events, and more.',
+                      isSelected: _selectedOption == 1,
+                      onTap: () => setState(() => _selectedOption = 1),
                     ),
                   ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(14, 0, 14, 8),
+              child: GestureDetector(
+                onTap: _isSaving ? null : _saveSettings,
+                child: Opacity(
+                  opacity: _isSaving ? 0.7 : 1,
+                  child: Container(
+                    width: double.infinity,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : Text(
+                              l10n.common_confirm,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -83,41 +118,81 @@ class _MessageSettingsPageState extends State<MessageSettingsPage> {
       ),
     );
   }
+
+  Future<void> _saveSettings() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+    context.pop();
+  }
 }
 
-class _ToggleItem extends StatelessWidget {
-  const _ToggleItem({
+class _MessageOptionItem extends StatelessWidget {
+  const _MessageOptionItem({
     required this.title,
-    required this.value,
-    required this.onChanged,
+    required this.subtitle,
+    required this.isSelected,
+    required this.onTap,
   });
 
   final String title;
-  final bool value;
-  final ValueChanged<bool> onChanged;
+  final String subtitle;
+  final bool isSelected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF464950),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(color: Colors.white, fontSize: 15),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF3B3C45),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Image.asset(
+                isSelected
+                    ? 'assets/images/checked_icon.png'
+                    : 'assets/images/check_icon.png',
+                width: 20,
+                height: 20,
+              ),
             ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: const Color(0xFF8F4EFF),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:in_app_purchase/in_app_purchase.dart';
 
 import '../config/app_config.dart';
@@ -66,10 +68,10 @@ class PayService {
   // ==================== 统一下单 ====================
 
   /// 请求创建订单
-  /// [goodsId] 商品 ID
+  /// [payConfigId] 支付配置 ID
   /// [payType] 支付渠道类型
   Future<PayOrderResult?> createOrder({
-    required int goodsId,
+    required int payConfigId,
     int? payType,
   }) async {
     final enabled = await isPayEnabled();
@@ -79,7 +81,7 @@ class PayService {
 
     final resp = await _apiService.userRechange(
       payType: payType ?? currentPayType,
-      goodsId: goodsId,
+      payConfigId: payConfigId,
     );
 
     if (resp.isSuccess && resp.data != null) {
@@ -103,17 +105,12 @@ class PayService {
   }
 
   /// Google Play 购买（Flutter 原生通道）
-  /// [productId] 商品 ID
-  /// [purchaseToken] Google 返回的购买 token
+  /// [params] Google 返回的购买回调完整信息，序列化后透传给服务端
   Future<bool> confirmGooglePurchase({
-    required String purchaseToken,
-    required String productId,
-    required String orderId,
+    required Map<String, dynamic> params,
   }) async {
     final resp = await _apiService.googleCallBack(
-      purchaseToken: purchaseToken,
-      productId: productId,
-      orderId: orderId,
+      params: jsonEncode(params),
     );
     return resp.isSuccess;
   }
@@ -197,14 +194,26 @@ class PayOrderResult {
   });
 
   factory PayOrderResult.fromJson(Map<String, dynamic> json) {
+    String? asString(dynamic value) {
+      if (value == null) return null;
+      return value.toString();
+    }
+
+    final nestedOrderData = json['data'] as Map<String, dynamic>?;
+
     return PayOrderResult(
-      orderData: json['data'] as Map<String, dynamic>?,
-      byteAuthorization: json['byteAuthorization'] as String?,
-      signData: json['signData'] as String?,
-      paySig: json['paySig'] as String?,
-      signature: json['signature'] as String?,
-      mode: json['mode'] as String?,
-      orderId: json['orderId'] as String?,
+      orderData: nestedOrderData,
+      byteAuthorization: asString(json['byteAuthorization'] ?? nestedOrderData?['byteAuthorization']),
+      signData: asString(json['signData'] ?? nestedOrderData?['signData']),
+      paySig: asString(json['paySig'] ?? nestedOrderData?['paySig']),
+      signature: asString(json['signature'] ?? nestedOrderData?['signature']),
+      mode: asString(json['mode'] ?? nestedOrderData?['mode']),
+      orderId: asString(
+        json['orderId'] ??
+            json['orderNo'] ??
+            nestedOrderData?['orderId'] ??
+            nestedOrderData?['orderNo'],
+      ),
     );
   }
 }

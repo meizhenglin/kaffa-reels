@@ -95,7 +95,7 @@ class AuthTextField extends StatelessWidget {
             suffixIcon: suffixIcon,
             errorText: errorText,
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(30),
             ),
           ),
         ),

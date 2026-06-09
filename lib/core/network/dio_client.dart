@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:ui' show Locale, PlatformDispatcher;
 
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter/foundation.dart';
+
+import 'http_client_adapter_stub.dart'
+    if (dart.library.io) 'http_client_adapter_io.dart';
 
 import '../config/app_config.dart';
 import '../constants/api_error_code.dart';
@@ -313,18 +314,7 @@ class DioClient {
   }
 
   HttpClientAdapter _buildHttpClientAdapter() {
-    if (kIsWeb) {
-      return HttpClientAdapter();
-    }
-    return IOHttpClientAdapter(
-      createHttpClient: () {
-        final client = HttpClient();
-        if (kDebugMode) {
-          client.badCertificateCallback = (cert, host, port) => true;
-        }
-        return client;
-      },
-    );
+    return createPlatformHttpClientAdapter();
   }
 }
 

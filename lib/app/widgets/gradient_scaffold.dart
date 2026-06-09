@@ -9,12 +9,14 @@ class GradientScaffold extends StatelessWidget {
     required this.body,
     this.bottomNavigationBar,
     this.resizeToAvoidBottomInset = true, // ✅ 添加参数，默认 true
+    this.bottomBackgroundColor = const Color(0xFF1F2025),
   });
 
   final PreferredSizeWidget? appBar;
   final Widget body;
   final Widget? bottomNavigationBar;
   final bool resizeToAvoidBottomInset; // ✅ 添加
+  final Color bottomBackgroundColor;
   
 
   @override
@@ -42,8 +44,8 @@ class GradientScaffold extends StatelessWidget {
                 ),
               ),
               // 底部纯色（自适应填充剩余空间）
-              const Expanded(
-                child: ColoredBox(color: Color(0xFF1F2025)),
+              Expanded(
+                child: ColoredBox(color: bottomBackgroundColor),
               ),
             ],
           ),

@@ -176,7 +176,7 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
                           ),
                         )
                       : GridView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          padding: const EdgeInsets.symmetric(horizontal: 15),
                           gridDelegate:
                               const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 4,
@@ -223,7 +223,7 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
                 onTap: _onSkip,
                 child: Container(
                   width: double.infinity,
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  margin: const EdgeInsets.symmetric(horizontal: 15),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
                     color: Colors.transparent,
@@ -248,7 +248,7 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
               onTap: _selectedAvatar != null && !_isSubmitting ? _onContinue : null,
               child: Container(
                 width: double.infinity,
-                margin: const EdgeInsets.symmetric(horizontal: 16),
+                margin: const EdgeInsets.symmetric(horizontal: 15),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
                   gradient: _selectedAvatar != null && !_isSubmitting

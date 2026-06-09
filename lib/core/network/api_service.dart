@@ -622,13 +622,13 @@ class ApiService {
   /// [payType] 3=抖音 2=微信 5=Android 6=iOS
   Future<ApiResponse> userRechange({
     required int payType,
-    int? goodsId,
+    int? payConfigId,
   }) {
     return request(
       ApiEndpoints.userRechange,
       data: {
         'payType': payType,
-        if (goodsId != null) 'goodsId': goodsId,
+        if (payConfigId != null) 'payConfigId': payConfigId,
       },
     );
   }
@@ -645,16 +645,12 @@ class ApiService {
 
   /// Google 支付回调通知
   Future<ApiResponse> googleCallBack({
-    required String purchaseToken,
-    required String productId,
-    required String orderId,
+    required String params,
   }) {
     return request(
       ApiEndpoints.googleCallBack,
       data: {
-        'purchaseToken': purchaseToken,
-        'productId': productId,
-        'orderId': orderId,
+        'params': params,
       },
     );
   }

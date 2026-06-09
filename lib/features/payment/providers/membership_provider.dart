@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
 import '../../../app/providers/app_providers.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/service/pay_service.dart';
 import '../../../core/storage/storage_service.dart';
 import '../models/subscription_product.dart';
 import '../services/payment_service.dart';
@@ -20,6 +20,9 @@ class MemberState {
     this.isLoading = false,
     this.errorMessage,
     this.isRestoring = false,
+    this.pendingOrderId,
+    this.pendingProductId,
+    this.pendingSubscriptionType,
   });
 
   final bool isVip;
@@ -28,6 +31,9 @@ class MemberState {
   final bool isLoading;
   final String? errorMessage;
   final bool isRestoring;
+  final String? pendingOrderId;
+  final String? pendingProductId;
+  final String? pendingSubscriptionType;
 
   MemberState copyWith({
     bool? isVip,
@@ -36,6 +42,10 @@ class MemberState {
     bool? isLoading,
     String? errorMessage,
     bool? isRestoring,
+    String? pendingOrderId,
+    String? pendingProductId,
+    String? pendingSubscriptionType,
+    bool clearPendingOrder = false,
   }) {
     return MemberState(
       isVip: isVip ?? this.isVip,
@@ -44,6 +54,11 @@ class MemberState {
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
       isRestoring: isRestoring ?? this.isRestoring,
+      pendingOrderId: clearPendingOrder ? null : (pendingOrderId ?? this.pendingOrderId),
+      pendingProductId: clearPendingOrder ? null : (pendingProductId ?? this.pendingProductId),
+      pendingSubscriptionType: clearPendingOrder
+          ? null
+          : (pendingSubscriptionType ?? this.pendingSubscriptionType),
     );
   }
 
@@ -91,7 +106,10 @@ class MembershipProductsState {
 /// Member state provider
 final memberStateProvider =
     StateNotifierProvider<MemberStateNotifier, MemberState>((ref) {
-  return MemberStateNotifier();
+  final notifier = MemberStateNotifier(ref);
+  Future.microtask(notifier.initialize);
+  ref.onDispose(notifier.dispose);
+  return notifier;
 });
 
 final membershipProductsProvider = StateNotifierProvider<MembershipProductsNotifier,
@@ -100,17 +118,17 @@ final membershipProductsProvider = StateNotifierProvider<MembershipProductsNotif
 });
 
 class MemberStateNotifier extends StateNotifier<MemberState> {
-  MemberStateNotifier() : super(const MemberState());
+  MemberStateNotifier(this._ref) : super(const MemberState());
 
-  SharedPreferences? _prefs;
+  final Ref _ref;
+  PayService get _payService => payServiceProvider;
   PaymentService get _paymentService => PaymentService.instance;
   ReceiptVerificationService get _receiptService =>
       ReceiptVerificationService.instance;
+  StorageService get _storage => _ref.read(storageServiceProvider);
 
   /// Initialize the provider
   Future<void> initialize() async {
-    _prefs = await SharedPreferences.getInstance();
-
     _receiptService.initialize(baseUrl: 'https://api.your-domain.com');
 
     await _paymentService.initialize(
@@ -123,11 +141,9 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
   }
 
   Future<void> _loadCachedState() async {
-    if (_prefs == null) return;
-
-    final isVip = _prefs!.getBool('is_vip') ?? false;
-    final expireStr = _prefs!.getString('vip_expire_date');
-    final type = _prefs!.getString('subscription_type');
+    final isVip = _storage.getString('is_vip') == 'true';
+    final expireStr = _storage.getString('vip_expire_date');
+    final type = _storage.getString('subscription_type');
 
     state = state.copyWith(
       isVip: isVip,
@@ -141,8 +157,8 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
   }
 
   Future<void> _syncWithBackend() async {
-    final userId = _prefs?.getString('user_id');
-    if (userId == null) return;
+    final userId = _resolveUserId();
+    if (userId == null || userId.isEmpty) return;
 
     final status = await _receiptService.checkSubscriptionStatus(
       userId: userId,
@@ -154,8 +170,7 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         expireDate: status.expireDate,
         type: status.type,
       );
-    } else if (state.isVip && !state.isExpired) {
-    } else {
+    } else if (!state.isVip || state.isExpired) {
       await _clearVipStatus();
     }
   }
@@ -164,33 +179,55 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      final receiptData = {
-        'purchase_id': purchase.purchaseID,
-        'product_id': purchase.productID,
+      final purchaseToken = purchase.verificationData.serverVerificationData;
+      final orderId = state.pendingOrderId;
+      final productId = state.pendingProductId ?? purchase.productID;
+
+      if (orderId == null || orderId.isEmpty) {
+        throw StateError('Missing pending order id for purchase callback');
+      }
+      if (purchaseToken.isEmpty) {
+        throw StateError('Missing Google purchase token');
+      }
+
+      final callbackPayload = <String, dynamic>{
+        'orderId': orderId,
+        'productId': productId,
+        'purchaseId': purchase.purchaseID,
+        'transactionDate': purchase.transactionDate,
         'status': purchase.status.name,
-        'transaction_date': purchase.transactionDate,
-        'data': purchase.verificationData.localVerificationData,
-        'server_verification_data': purchase.verificationData.serverVerificationData,
+        'pendingCompletePurchase': purchase.pendingCompletePurchase,
+        'verificationData': {
+          'localVerificationData': purchase.verificationData.localVerificationData,
+          'serverVerificationData': purchase.verificationData.serverVerificationData,
+          'source': purchase.verificationData.source,
+        },
+        'error': purchase.error == null
+            ? null
+            : {
+                'source': purchase.error!.source,
+                'code': purchase.error!.code,
+                'message': purchase.error!.message,
+                'details': purchase.error!.details?.toString(),
+              },
       };
 
-      final result = await _receiptService.verifyReceipt(
-        receiptData: receiptData,
-        platform: _paymentService.currentPlatform == TargetPlatform.android
-            ? 'google_play'
-            : 'app_store',
-        userId: _prefs?.getString('user_id'),
+      final confirmed = await _payService.confirmGooglePurchase(
+        params: callbackPayload,
       );
 
-      if (result.success) {
+      final productType = state.pendingSubscriptionType ?? _inferTypeFromProductId(productId);
+      if (confirmed) {
         await _updateVipStatus(
           isVip: true,
-          expireDate: result.expireDate ?? _calculateExpireDate(purchase),
-          type: result.subscriptionType ?? _inferTypeFromProductId(purchase.productID),
+          expireDate: DateTime.now().add(Duration(days: _getDaysForType(productType))),
+          type: productType,
         );
+        state = state.copyWith(clearPendingOrder: true);
       } else {
         state = state.copyWith(
           isLoading: false,
-          errorMessage: result.message ?? 'Purchase verification failed',
+          errorMessage: 'Purchase verification failed',
         );
       }
     } catch (e) {
@@ -222,14 +259,16 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
       errorMessage: null,
     );
 
-    if (_prefs != null) {
-      await _prefs!.setBool('is_vip', isVip);
-      if (expireDate != null) {
-        await _prefs!.setString('vip_expire_date', expireDate.toIso8601String());
-      }
-      if (type != null) {
-        await _prefs!.setString('subscription_type', type);
-      }
+    await _storage.setString('is_vip', isVip.toString());
+    if (expireDate != null) {
+      await _storage.setString('vip_expire_date', expireDate.toIso8601String());
+    } else {
+      await _storage.remove('vip_expire_date');
+    }
+    if (type != null && type.isNotEmpty) {
+      await _storage.setString('subscription_type', type);
+    } else {
+      await _storage.remove('subscription_type');
     }
   }
 
@@ -239,13 +278,12 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
       expireDate: null,
       subscriptionType: null,
       isLoading: false,
+      errorMessage: null,
     );
 
-    if (_prefs != null) {
-      await _prefs!.remove('is_vip');
-      await _prefs!.remove('vip_expire_date');
-      await _prefs!.remove('subscription_type');
-    }
+    await _storage.remove('is_vip');
+    await _storage.remove('vip_expire_date');
+    await _storage.remove('subscription_type');
   }
 
   Future<bool> restorePurchases() async {
@@ -293,18 +331,76 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         .where((id) => id.isNotEmpty)
         .toList();
 
-    return await _paymentService.getProducts(productIds: productIds);
+    return _paymentService.getProducts(productIds: productIds);
   }
 
-  Future<bool> purchase(ProductDetails product) async {
+  Future<bool> purchase({
+    required SubscriptionProduct selectedProduct,
+  }) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
-    return await _paymentService.purchase(product: product);
+
+    try {
+      final order = await _payService.createOrder(payConfigId: selectedProduct.goodsId!);
+      final orderId = order?.orderId;
+      if (orderId == null || orderId.isEmpty) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Failed to create order',
+          clearPendingOrder: true,
+        );
+        return false;
+      }
+
+      final products = await getProducts([selectedProduct]);
+      final platformProductId = selectedProduct.getProductId(_paymentService.currentPlatform);
+
+      ProductDetails? productDetails;
+      try {
+        productDetails = products.firstWhere((p) => p.id == platformProductId);
+      } catch (_) {
+        try {
+          productDetails = products.firstWhere((p) => p.id.contains(selectedProduct.id));
+        } catch (_) {
+          state = state.copyWith(
+            isLoading: false,
+            errorMessage: 'Product not available in Google Play: $platformProductId',
+            clearPendingOrder: true,
+          );
+          return false;
+        }
+      }
+
+      state = state.copyWith(
+        pendingOrderId: orderId,
+        pendingProductId: productDetails.id,
+        pendingSubscriptionType: selectedProduct.id,
+      );
+
+      final success = await _paymentService.purchase(
+        product: productDetails,
+        applicationUserName: _resolveUserId(),
+      );
+
+      if (!success) {
+        state = state.copyWith(
+          isLoading: false,
+          clearPendingOrder: true,
+        );
+      }
+      return success;
+    } catch (e) {
+      debugPrint('Error creating order: $e');
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e.toString(),
+        clearPendingOrder: true,
+      );
+      return false;
+    }
   }
 
-  DateTime _calculateExpireDate(PurchaseDetails purchase) {
-    final type = _inferTypeFromProductId(purchase.productID);
-    final days = _getDaysForType(type);
-    return DateTime.now().add(Duration(days: days));
+  String? _resolveUserId() {
+    return _storage.getString('user_id');
   }
 
   String _inferTypeFromProductId(String productId) {
@@ -326,6 +422,12 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         return 30;
     }
   }
+
+  @override
+  void dispose() {
+    _paymentService.dispose();
+    super.dispose();
+  }
 }
 
 class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> {
@@ -345,7 +447,7 @@ class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> 
       if (!response.isSuccess) {
         state = state.copyWith(
           isLoading: false,
-          products: SubscriptionProducts.fallbackProducts,
+          products: const [],
           errorMessage: response.error,
         );
         return;
@@ -362,7 +464,7 @@ class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> 
       debugPrint('Failed to load vip products: $e');
       state = state.copyWith(
         isLoading: false,
-        products: SubscriptionProducts.fallbackProducts,
+        products: const [],
         errorMessage: 'Failed to load products',
       );
     }

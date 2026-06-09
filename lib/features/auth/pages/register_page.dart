@@ -210,7 +210,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
+              padding: const EdgeInsets.symmetric(horizontal: 15),
               child: Column(
                 children: [
                   const SizedBox(height: 18),

@@ -143,7 +143,7 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
+              padding: const EdgeInsets.symmetric(horizontal: 15),
               child: Column(
                 children: [
                   const SizedBox(height: 18),
@@ -274,7 +274,7 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                           onTap: auth.isLoading ? null : _submit,
                           child: Container(
                             width: double.infinity,
-                            height: 48,
+                            height: 50,
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
                                 colors: [

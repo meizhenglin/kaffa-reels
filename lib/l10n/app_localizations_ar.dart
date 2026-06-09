@@ -348,6 +348,26 @@ class AppLocalizationsAr extends AppLocalizations {
   String get messageSettings => 'إعدادات الرسائل';
 
   @override
+  String get notificationsOff => 'إيقاف';
+
+  @override
+  String get notificationsOffSubtitle => 'إيقاف جميع الإشعارات الفورية.';
+
+  @override
+  String get notificationsImportant => 'المهم فقط';
+
+  @override
+  String get notificationsImportantSubtitle =>
+      'استلام التنبيهات المهمة وتحديثات الحساب فقط.';
+
+  @override
+  String get notificationsAll => 'جميع الرسائل';
+
+  @override
+  String get notificationsAllSubtitle =>
+      'استلام جميع الإشعارات بما في ذلك التحديثات والعروض.';
+
+  @override
   String get versionNumber => 'رقم الإصدار';
 
   @override
@@ -444,6 +464,29 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get membership_benefit_early => 'مشاهدة مبكرة';
+
+  @override
+  String get membership_benefits_title => 'مزايا العضوية';
+
+  @override
+  String get membership_benefits_complaint => 'الشكوى والإبلاغ';
+
+  @override
+  String get membership_benefits_unlockEpisodes => 'فتح جميع حلقات VIP';
+
+  @override
+  String get membership_benefits_watchHd => 'المشاهدة بدقة 1080p/1440p HD';
+
+  @override
+  String get membership_benefits_singleDevice =>
+      'يمكن تسجيل الدخول على جهاز واحد فقط في نفس الوقت';
+
+  @override
+  String get membership_benefits_tipsLabel => 'ملاحظات';
+
+  @override
+  String get membership_benefits_tipContent =>
+      'خلال فترة الاشتراك، يمكنك الوصول إلى جميع مسلسلات VIP بعدد غير محدود من المرات.';
 
   @override
   String get player_loading => 'جاري التحميل...';

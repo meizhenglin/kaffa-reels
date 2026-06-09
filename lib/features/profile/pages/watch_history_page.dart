@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/preload_network_image.dart';
 import '../../../components/rtl_back_button.dart';
@@ -111,7 +112,7 @@ class _WatchHistoryPageState extends ConsumerState<WatchHistoryPage> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator(color: Colors.white))
                   : _historyList.isEmpty
-                      ? _buildEmptyState(l10n)
+                      ? AppEmptyState(message: l10n.noDataAvailableAtTheMoment)
                       : _buildHistoryList(),
             ),
           ],
@@ -119,30 +120,6 @@ class _WatchHistoryPageState extends ConsumerState<WatchHistoryPage> {
       ),
     );
   }
-
-  Widget _buildEmptyState(AppLocalizations l10n) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.history,
-            size: 80,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            l10n.noHistory,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[400],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildHistoryList() {
     final groupedHistory = <String, List<Map<String, dynamic>>>{};
 

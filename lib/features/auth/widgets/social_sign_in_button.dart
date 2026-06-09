@@ -50,9 +50,10 @@ class SocialSignInButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: 50,
       decoration: BoxDecoration(
         color: backgroundColor ?? Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(30),
         border: Border.all(
           color: const Color(0xFFEEEEEE),
           width: 1,
@@ -62,7 +63,7 @@ class SocialSignInButton extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: isLoading ? null : onPressed,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(30),
           child: Container(
             height: 50,
             padding: const EdgeInsets.symmetric(horizontal: 16),

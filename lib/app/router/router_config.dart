@@ -23,7 +23,7 @@ import '../../features/profile/pages/change_name_page.dart';
 import '../../features/profile/pages/personal_info_page.dart';
 import '../../features/profile/pages/history_page.dart';
 import '../../features/profile/pages/favorites_page.dart';
-import '../../features/profile/pages/about_page.dart';
+import '../../features/profile/pages/report_page.dart';
 import '../../features/recommend/models/drama_list_type.dart';
 import '../../features/recommend/pages/recommend_tab.dart';
 import '../../features/home/pages/drama_list_page.dart';
@@ -293,9 +293,9 @@ final routerProvider = Provider<GoRouter>((ref) {
                   ),
                   GoRoute(
                     parentNavigatorKey: rootNavigatorKey,
-                    path: 'about',
-                    name: 'profile-about',
-                    builder: (context, state) => const AboutPage(),
+                    path: 'report',
+                    name: 'profile-report',
+                    builder: (context, state) => const ReportPage(),
                   ),
                 ],
               ),

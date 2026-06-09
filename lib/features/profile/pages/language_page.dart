@@ -101,7 +101,7 @@ class _LanguagePageState extends ConsumerState<LanguagePage> {
                       onTap: () =>
                           setState(() => _selectedLocale = const Locale('en')),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 14),
                     _LanguageItem(
                       language: 'العربية',
                       isSelected: _selectedLocale.languageCode == 'ar',

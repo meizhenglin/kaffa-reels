@@ -173,7 +173,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
                 onTap: () => context.go('/profile'),
                 child: Container(
                   width: double.infinity,
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  margin: const EdgeInsets.symmetric(horizontal: 15),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
                     color: Colors.transparent,
@@ -197,7 +197,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
               onTap: _canConfirm ? _onConfirm : null,
               child: Container(
                 width: double.infinity,
-                margin: const EdgeInsets.symmetric(horizontal: 16),
+                margin: const EdgeInsets.symmetric(horizontal: 15),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
                   gradient: _canConfirm

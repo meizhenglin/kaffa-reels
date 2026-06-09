@@ -347,6 +347,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageSettings => 'Message Settings';
 
   @override
+  String get notificationsOff => 'Off';
+
+  @override
+  String get notificationsOffSubtitle => 'Turn off all push notifications.';
+
+  @override
+  String get notificationsImportant => 'Important only';
+
+  @override
+  String get notificationsImportantSubtitle =>
+      'Receive important alerts and account-related updates.';
+
+  @override
+  String get notificationsAll => 'All messages';
+
+  @override
+  String get notificationsAllSubtitle =>
+      'Receive all notifications including updates and promotions.';
+
+  @override
   String get versionNumber => 'Version Number';
 
   @override
@@ -442,6 +462,29 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get membership_benefit_early => 'Early access';
+
+  @override
+  String get membership_benefits_title => 'Member Benefits';
+
+  @override
+  String get membership_benefits_complaint => 'Complaint and Report';
+
+  @override
+  String get membership_benefits_unlockEpisodes => 'Unlock all VIP episodes';
+
+  @override
+  String get membership_benefits_watchHd => 'Watch in 1080p/1440p HD';
+
+  @override
+  String get membership_benefits_singleDevice =>
+      'Only 1 device can be logged in at the same time';
+
+  @override
+  String get membership_benefits_tipsLabel => 'Tips';
+
+  @override
+  String get membership_benefits_tipContent =>
+      'During the subscription period, you can access all VIP series unlimited times.';
 
   @override
   String get player_loading => 'Loading...';

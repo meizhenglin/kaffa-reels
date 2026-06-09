@@ -122,7 +122,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 15),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -158,7 +158,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 15),
                 child: Column(
                   children: [
                     _buildUserSection(context),
@@ -426,7 +426,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
             )
           else
             GestureDetector(
-              onTap: () => context.go('/membership'),
+              onTap: () => context.push('/membership'),
               child: Container(
                 padding: const EdgeInsetsDirectional.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
@@ -451,7 +451,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
   }
 
   void _openComplaintAndReport() {
-    context.push('/profile/about');
+    context.push('/profile/report');
   }
 
   Widget _buildFunctionIcons(BuildContext context) {

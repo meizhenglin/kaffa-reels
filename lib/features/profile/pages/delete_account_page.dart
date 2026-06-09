@@ -56,7 +56,7 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 15),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -85,7 +85,7 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
                         height: 50,
                         decoration: BoxDecoration(
                           color: const Color(0xFFFF6B6B),
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(24),
                         ),
                         child: Center(
                           child: _isLoading

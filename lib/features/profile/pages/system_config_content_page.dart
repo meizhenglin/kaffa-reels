@@ -160,7 +160,7 @@ class _SystemConfigContentPageState
                   if (snapshot.hasError) {
                     return Center(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: const EdgeInsets.symmetric(horizontal: 15),
                         child: Text(
                           snapshot.error.toString().replaceFirst('Exception: ', ''),
                           textAlign: TextAlign.center,
@@ -187,7 +187,7 @@ class _SystemConfigContentPageState
                   }
 
                   return SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
                     child: Directionality(
                       textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
                       child: Align(

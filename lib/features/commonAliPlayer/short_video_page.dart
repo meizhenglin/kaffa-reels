@@ -532,7 +532,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                  padding: const EdgeInsets.fromLTRB(15, 16, 15, 12),
                   child: Row(
                     children: [
                       const Text(
@@ -571,7 +571,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
                 ),
                 Flexible(
                   child: GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(15, 0, 15, 24),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 5,

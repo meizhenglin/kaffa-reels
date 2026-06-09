@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../app/router/router_config.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
@@ -21,6 +22,12 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
+  late final Future<String> _appVersionFuture = _loadAppVersion();
+
+  Future<String> _loadAppVersion() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    return packageInfo.version;
+  }
 
   Future<void> _handleLogout() async {
     final confirmed = await showDialog<bool>(
@@ -218,16 +225,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     const SizedBox(height: 14),
 
                     // Version Number
-                    _SettingsItem(
-                      title: l10n.versionNumber,
-                      trailing: const Text(
-                        '1.0.0',
-                        style: TextStyle(
-                          // color: Color(0xFF999999),
-                          fontSize: 15,
-                        ),
-                      ),
-                      onTap: () {},
+                    FutureBuilder<String>(
+                      future: _appVersionFuture,
+                      builder: (context, snapshot) {
+                        final versionText = snapshot.data ?? '...';
+                        return _SettingsItem(
+                          title: l10n.versionNumber,
+                          trailing: Text(
+                            versionText,
+                            style: const TextStyle(
+                              fontSize: 15,
+                            ),
+                          ),
+                          onTap: () {},
+                        );
+                      },
                     ),
 
                     const SizedBox(height: 14),

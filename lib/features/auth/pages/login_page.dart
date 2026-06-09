@@ -1,5 +1,3 @@
-import 'dart:async' as async;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,7 +16,6 @@ class LoginPage extends ConsumerStatefulWidget {
 }
 
 class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserver {
-  bool _googleWarmUpStarted = false;
   bool _appIsInForeground = true;
 
   void _showMessage(String message, {bool isError = false}) {
@@ -33,12 +30,6 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
           behavior: SnackBarBehavior.floating,
         ),
       );
-  }
-
-  void _startGoogleWarmUpIfNeeded() {
-    if (!mounted || _googleWarmUpStarted) return;
-    _googleWarmUpStarted = true;
-    async.unawaited(ref.read(authRepositoryProvider).warmUpGoogleSignIn());
   }
 
   void _navigateAfterLogin() {
@@ -57,10 +48,6 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _startGoogleWarmUpIfNeeded();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _startGoogleWarmUpIfNeeded();
-    });
   }
 
   @override
@@ -99,7 +86,7 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
+              padding: const EdgeInsets.symmetric(horizontal: 15),
               child: Column(
                 children: [
                   const SizedBox(height: 18),
@@ -179,6 +166,11 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                           const SizedBox(height: 15),
                           Consumer(
                             builder: (_, ref, __) {
+                              final repository = ref.watch(authRepositoryProvider);
+                              if (!repository.isGoogleSignInSupported) {
+                                return const SizedBox.shrink();
+                              }
+
                               final isLoading =
                                   ref.watch(authProvider).isLoading;
                               return _GoogleSignInButton(
@@ -186,7 +178,6 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                 isLoading: isLoading,
                                 onTap: () async {
                                   if (!_appIsInForeground) return;
-                                  _startGoogleWarmUpIfNeeded();
                                   debugPrint('[LoginPage] Google button tapped');
                                   ref.read(authProvider.notifier).clearError();
                                   await Future<void>.delayed(Duration.zero);
