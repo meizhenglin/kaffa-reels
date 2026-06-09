@@ -15,6 +15,7 @@ class VideoInfo {
   final int isLike;       // isLike
   final int totalEpisodes; // videoEpisodes
   final String title;     // videoName
+  final String content;   // video content / introduction / description
   final int isCanPlay;   // isCanPlay（0=需解锁，1=可播放）
 
   const VideoInfo({
@@ -33,6 +34,7 @@ class VideoInfo {
     this.isLike = 0,
     this.totalEpisodes = 0,
     this.title = '',
+    this.content = '',
     this.isCanPlay = 1,
   });
 
@@ -53,6 +55,13 @@ class VideoInfo {
       isLike: (json['isLike'] as int?) ?? 0,
       totalEpisodes: (json['totalEpisodes'] as int?) ?? (json['videoEpisodes'] as int?) ?? 0,
       title: (json['title'] as String?) ?? (json['videoName'] as String?) ?? '',
+      content: (json['content'] as String?) ??
+          (json['description'] as String?) ??
+          (json['videoDesc'] as String?) ??
+          (json['videoDescription'] as String?) ??
+          (json['introduction'] as String?) ??
+          (json['brief'] as String?) ??
+          '',
       isCanPlay: (json['isCanPlay'] as int?) ?? 1,
     );
   }
@@ -73,6 +82,7 @@ class VideoInfo {
         'isLike': isLike,
         'totalEpisodes': totalEpisodes,
         'title': title,
+        'content': content,
         'isCanPlay': isCanPlay,
       };
 
@@ -92,6 +102,7 @@ class VideoInfo {
     int? isLike,
     int? totalEpisodes,
     String? title,
+    String? content,
     int? isCanPlay,
   }) {
     return VideoInfo(
@@ -110,6 +121,7 @@ class VideoInfo {
       isLike: isLike ?? this.isLike,
       totalEpisodes: totalEpisodes ?? this.totalEpisodes,
       title: title ?? this.title,
+      content: content ?? this.content,
       isCanPlay: isCanPlay ?? this.isCanPlay,
     );
   }

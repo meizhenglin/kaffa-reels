@@ -1,26 +1,21 @@
-// Copyright © 2025 Alibaba Cloud. All rights reserved.
-//
-// Author: keria
-// Date: 2025/2/19
-// Brief: 沉浸式列表播放页面（适配本项目 VideoInfo 模型）
-//
-// 【数据加载策略】 — watch 页先完整拉齐 episodes，再走与 recommend 同款的播放链路
-
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:preload_page_view/preload_page_view.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../home/pages/main_page.dart';
+import '../home/providers/last_watched_provider.dart';
 import '../../core/network/api_service.dart';
 import '../recommend/models/video_info.dart';
 import '../recommend/providers/video_action_provider.dart';
 import 'ali_player_preload.dart';
 import 'watch_short_video_item.dart';
-import 'short_video_preload_tuning.dart';
 
 const bool _showWatchPlaybackDebug = false;
+
+enum _EpisodeSheetTab { episodes, content }
 
 typedef ShortVideoOverlayBuilder = Widget Function(
   BuildContext context,
@@ -190,7 +185,6 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           currentCount: currentCount,
         );
   }
-
 
   late List<VideoInfo> videoInfoList;
   AliPlayerPreload? _aliPlayerPreload;
@@ -418,212 +412,98 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
     debugPrint('[$_tag]${'-' * 30}[index][$_currentIndex->$newPageIndex]');
 
-    setState(() {
-      _currentIndex = newPageIndex;
-    });
-    _aliPlayerPreload?.moveTo(newPageIndex);
-    _pauseAllExceptCurrent(newPageIndex);
-    _prefetchAround(newPageIndex);
-  }
-
-  void _prefetchAround(int centerIndex) {
-    final indices = ShortVideoPreloadTuning.pagePlayablePrefetchOffsets
-        .map((offset) => centerIndex + offset)
-        .toSet();
-    for (final index in indices) {
-      if (index < 0 || index >= _itemKeys.length) continue;
-      _itemKeys[index].currentState?.prefetchPlayableUrl(
-        playIfReady: index == centerIndex && _isCurrentTabActive,
-      );
+    _pauseAtIndex(_currentIndex);
+    _currentIndex = newPageIndex;
+    _aliPlayerPreload?.moveTo(_currentIndex);
+    _prefetchAround(_currentIndex);
+    _resumeCurrent();
+    if (mounted) {
+      setState(() {});
     }
   }
 
+  void _prefetchAround(int centerIndex) {
+    final preload = _aliPlayerPreload;
+    if (preload == null) return;
+    preload.moveTo(centerIndex);
+  }
+
+  void _pauseAtIndex(int index) {
+    if (index < 0 || index >= _itemKeys.length) return;
+    _itemKeys[index].currentState?.pause();
+  }
+
   void _pauseCurrent() {
-    if (_itemKeys.isEmpty) return;
-    _itemKeys[_currentIndex].currentState?.pause();
+    _pauseAtIndex(_currentIndex);
   }
 
   void _resumeCurrent() {
-    if (_itemKeys.isEmpty) return;
+    if (_currentIndex < 0 || _currentIndex >= _itemKeys.length) return;
     _itemKeys[_currentIndex].currentState?.resume();
   }
 
   void _reportViewHistory(int index) {
     if (index < 0 || index >= videoInfoList.length) return;
-    final videoInfo = videoInfoList[index];
-    final episodesId = videoInfo.id.toString();
-    debugPrint(
-      '[$_tag] setUserViewAddHistory videoId=${widget.videoId} episodesId=$episodesId',
-    );
-    apiServiceProvider.setUserViewAddHistory(
-      videoId: widget.videoId,
-      episodesId: episodesId,
-    );
-  }
 
-  void _pauseAllExceptCurrent(int currentIndex) {
-    for (int i = 0; i < _itemKeys.length; i++) {
-      if (i != currentIndex) {
-        _itemKeys[i].currentState?.pause();
-      } else if (_isCurrentTabActive) {
-        _itemKeys[i].currentState?.resume();
-      }
-    }
+    final item = videoInfoList[index];
+    final episodesId = item.id.toString();
+    if (widget.videoId.isEmpty || episodesId.isEmpty || episodesId == '0') return;
+
+    Future.microtask(() async {
+      final response = await apiServiceProvider.setUserViewAddHistory(
+        videoId: widget.videoId,
+        episodesId: episodesId,
+      );
+      if (!response.isSuccess) return;
+      if (!mounted) return;
+      await ref.read(lastWatchedProvider.notifier).load();
+    });
   }
 
   void _jumpToEpisode(int index) {
     if (index < 0 || index >= videoInfoList.length) return;
+    if (index == _currentIndex) return;
     if (_usePreloadMode) {
       _preloadPageController.jumpToPage(index);
     } else {
       _pageController.jumpToPage(index);
     }
+    if (!mounted) return;
     _onPageChanged(index);
     _reportViewHistory(index);
   }
 
-  Future<void> _playNextEpisode() async {
+  void _playNextEpisode() {
     final nextIndex = _currentIndex + 1;
-    if (nextIndex < 0 || nextIndex >= videoInfoList.length) return;
-    if (_usePreloadMode) {
-      await _preloadPageController.animateToPage(
-        nextIndex,
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
-      );
-    } else {
-      await _pageController.animateToPage(
-        nextIndex,
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
-      );
+    if (nextIndex >= videoInfoList.length) {
+      return;
     }
     if (!mounted) return;
-    _onPageChanged(nextIndex);
-    _reportViewHistory(nextIndex);
+    _jumpToEpisode(nextIndex);
   }
 
   void _showEpisodePicker() {
+    final currentEpisode = videoInfoList[_currentIndex];
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        return SafeArea(
-          top: false,
-          child: Container(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.of(context).size.height * 0.62,
-            ),
-            decoration: const BoxDecoration(
-              color: Color(0xFF111111),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 12),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(15, 16, 15, 12),
-                  child: Row(
-                    children: [
-                      const Text(
-                        '选集',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white10,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '${videoInfoList.length} 集',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        onPressed: () => Navigator.of(sheetContext).pop(),
-                        icon: const Icon(Icons.close, color: Colors.white),
-                      ),
-                    ],
-                  ),
-                ),
-                Flexible(
-                  child: GridView.builder(
-                    padding: const EdgeInsets.fromLTRB(15, 0, 15, 24),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 5,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 1,
-                    ),
-                    itemCount: videoInfoList.length,
-                    itemBuilder: (context, index) {
-                      final item = videoInfoList[index];
-                      final selected = index == _currentIndex;
-                      final locked = item.isCanPlay == 0;
-                      return GestureDetector(
-                        onTap: () {
-                          if (locked) return;
-                          Navigator.of(sheetContext).pop();
-                          _jumpToEpisode(index);
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? Colors.white
-                                : const Color(0xFF222222),
-                            borderRadius: BorderRadius.circular(12),
-                            border: selected
-                                ? Border.all(color: Colors.white, width: 2)
-                                : null,
-                          ),
-                          child: Center(
-                            child: locked
-                                ? const Icon(
-                                    Icons.lock_rounded,
-                                    color: Colors.white38,
-                                  )
-                                : Text(
-                                    '${item.serialNum > 0 ? item.serialNum : index + 1}',
-                                    style: TextStyle(
-                                      color: selected
-                                          ? Colors.black
-                                          : Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
+        return _WatchEpisodeBottomSheet(
+          episodes: videoInfoList,
+          currentIndex: _currentIndex,
+          title: currentEpisode.title,
+          coverUrl: currentEpisode.coverUrl,
+          onEpisodeTap: (index) {
+            final item = videoInfoList[index];
+            if (item.isCanPlay == 0) {
+              Navigator.of(sheetContext).pop();
+              context.push('/membership');
+              return;
+            }
+            Navigator.of(sheetContext).pop();
+            _jumpToEpisode(index);
+          },
         );
       },
     );
@@ -839,6 +719,416 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         if (widget.floatingOverlayBuilder != null)
           widget.floatingOverlayBuilder!(context, _listController),
       ],
+    );
+  }
+}
+
+class _WatchEpisodeBottomSheet extends StatefulWidget {
+  const _WatchEpisodeBottomSheet({
+    required this.episodes,
+    required this.currentIndex,
+    required this.title,
+    required this.coverUrl,
+    required this.onEpisodeTap,
+  });
+
+  final List<VideoInfo> episodes;
+  final int currentIndex;
+  final String title;
+  final String? coverUrl;
+  final ValueChanged<int> onEpisodeTap;
+
+  @override
+  State<_WatchEpisodeBottomSheet> createState() => _WatchEpisodeBottomSheetState();
+}
+
+class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
+  static const Color _sheetColor = Color(0xFF202126);
+  static const Color _tabColor = Color(0xFF323337);
+  static const LinearGradient _activeGradient = LinearGradient(
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+    colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
+  );
+
+  late _EpisodeSheetTab _activeTab;
+  late int _selectedSegment;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeTab = _EpisodeSheetTab.episodes;
+    _selectedSegment = widget.currentIndex ~/ 20;
+  }
+
+  List<List<int>> get _episodeSegments {
+    final result = <List<int>>[];
+    for (var start = 0; start < widget.episodes.length; start += 20) {
+      final end = math.min(start + 20, widget.episodes.length);
+      result.add(List<int>.generate(end - start, (index) => start + index));
+    }
+    return result;
+  }
+
+  List<int> get _currentSegmentEpisodes {
+    if (_episodeSegments.isEmpty) return const [];
+    return _episodeSegments[_selectedSegment.clamp(0, _episodeSegments.length - 1)];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final currentEpisode = widget.episodes[widget.currentIndex];
+    final maxHeight = mediaQuery.size.height * 0.72;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        decoration: const BoxDecoration(
+          color: _sheetColor,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(15),
+            topRight: Radius.circular(15),
+          ),
+        ),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(15, 15, 15, mediaQuery.padding.bottom + 15),
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildHeader(context, currentEpisode),
+                    const SizedBox(height: 15),
+                    _buildTabs(context),
+                    const SizedBox(height: 15),
+                    Expanded(
+                      child: _activeTab == _EpisodeSheetTab.episodes
+                          ? _buildEpisodesPanel()
+                          : _buildContentPanel(currentEpisode),
+                    ),
+                  ],
+                ),
+              ),
+              PositionedDirectional(
+                top: 10,
+                end: 0,
+                child: _buildReportButton(context),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, VideoInfo currentEpisode) {
+    final subtitle = currentEpisode.content.trim().isNotEmpty
+        ? currentEpisode.content.trim()
+        : 'Short drama series';
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: widget.coverUrl != null && widget.coverUrl!.isNotEmpty
+              ? Image.network(
+                  widget.coverUrl!,
+                  width: 80,
+                  height: 114,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _buildCoverPlaceholder(),
+                )
+              : _buildCoverPlaceholder(),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: SizedBox(
+            height: 114,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 72),
+                  child: Text(
+                    widget.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                    color: Color(0xFF999999),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  currentEpisode.serialNum > 0
+                      ? '${widget.title} EP.${currentEpisode.serialNum}'
+                      : '${widget.title} EP.${widget.currentIndex + 1}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReportButton(BuildContext context) {
+    final isArabic = Directionality.of(context) == TextDirection.rtl;
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).pop();
+        GoRouter.of(context).push('/profile/report');
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.help_outline,
+              size: 16,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              isArabic ? 'تقرير' : 'Report',
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCoverPlaceholder() {
+    return Container(
+      width: 80,
+      height: 114,
+      color: const Color(0xFF323337),
+      alignment: Alignment.center,
+      child: const Icon(Icons.movie_creation_outlined, color: Colors.white38),
+    );
+  }
+
+  Widget _buildTabs(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Row(
+      children: [
+        Expanded(
+          child: _buildTabButton(
+            label: l10n.episodes,
+            isActive: _activeTab == _EpisodeSheetTab.episodes,
+            onTap: () => setState(() => _activeTab = _EpisodeSheetTab.episodes),
+          ),
+        ),
+        const SizedBox(width: 15),
+        Expanded(
+          child: _buildTabButton(
+            label: 'Content',
+            isActive: _activeTab == _EpisodeSheetTab.content,
+            onTap: () => setState(() => _activeTab = _EpisodeSheetTab.content),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTabButton({
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 40,
+        decoration: BoxDecoration(
+          color: isActive ? null : _tabColor,
+          gradient: isActive ? _activeGradient : null,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 15,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEpisodesPanel() {
+    final segments = _episodeSegments;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (segments.length > 1)
+          SizedBox(
+            height: 30,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: segments.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 18),
+              itemBuilder: (context, index) {
+                final segment = segments[index];
+                final startEpisode = widget.episodes[segment.first].serialNum > 0
+                    ? widget.episodes[segment.first].serialNum
+                    : segment.first + 1;
+                final endEpisode = widget.episodes[segment.last].serialNum > 0
+                    ? widget.episodes[segment.last].serialNum
+                    : segment.last + 1;
+                final isActive = index == _selectedSegment;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedSegment = index),
+                  child: Text(
+                    '$startEpisode-$endEpisode',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      color: isActive ? const Color(0xFF8F4EFF) : Colors.white,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        if (segments.length > 1) const SizedBox(height: 15),
+        Expanded(
+          child: SingleChildScrollView(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                const itemSize = 50.0;
+                const minSpacing = 12.0;
+                final columnCount = math.max(
+                  1,
+                  ((constraints.maxWidth + minSpacing) / (itemSize + minSpacing)).floor(),
+                );
+                final totalItemWidth = columnCount * itemSize;
+                final spacing = columnCount > 1
+                    ? math.max(
+                        minSpacing,
+                        (constraints.maxWidth - totalItemWidth) / (columnCount - 1),
+                      )
+                    : 0.0;
+
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: 12,
+                  children: _currentSegmentEpisodes.map((episodeIndex) {
+                    final episode = widget.episodes[episodeIndex];
+                    return SizedBox(
+                      width: itemSize,
+                      height: itemSize,
+                      child: _buildEpisodeItem(episode, episodeIndex),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEpisodeItem(VideoInfo episode, int index) {
+    final isCurrent = index == widget.currentIndex;
+    final isLocked = episode.isCanPlay == 0;
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    return GestureDetector(
+      onTap: () => widget.onEpisodeTap(index),
+      child: Container(
+        decoration: BoxDecoration(
+          color: _tabColor,
+          borderRadius: BorderRadius.circular(8),
+          border: isCurrent
+              ? Border.all(
+                  width: 2,
+                  color: const Color(0xFF8F4EFF),
+                )
+              : null,
+        ),
+        child: Stack(
+          children: [
+            Center(
+              child: isCurrent
+                  ? Image.asset(
+                      'assets/images/playing_icon.png',
+                      width: 22,
+                      height: 22,
+                    )
+                  : Text(
+                      '${episode.serialNum > 0 ? episode.serialNum : index + 1}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+            ),
+            if (isLocked)
+              PositionedDirectional(
+                top: 1,
+                start: 1,
+                child: Image.asset(
+                  isRtl
+                      ? 'assets/images/play_lock_right_icon.png'
+                      : 'assets/images/play_lock_icon.png',
+                  width: 14,
+                  height: 14,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContentPanel(VideoInfo currentEpisode) {
+    final content = currentEpisode.content.trim();
+    return SingleChildScrollView(
+      child: Text(
+        content,
+        style: const TextStyle(
+          fontWeight: FontWeight.w500,
+          fontSize: 13,
+          color: Colors.white,
+          height: 1.5,
+        ),
+      ),
     );
   }
 }

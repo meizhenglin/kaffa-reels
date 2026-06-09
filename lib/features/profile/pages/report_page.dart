@@ -39,7 +39,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
   @override
   Widget build(BuildContext context) {
     return GradientScaffold(
-      resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: Column(
           children: [
@@ -65,7 +65,12 @@ class _ReportPageState extends ConsumerState<ReportPage> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  0,
+                  16,
+                  MediaQuery.of(context).viewInsets.bottom + 100,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -107,12 +112,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
               ),
             ),
             Padding(
-              padding: EdgeInsets.fromLTRB(
-                16,
-                0,
-                16,
-                24 + MediaQuery.of(context).viewInsets.bottom,
-              ),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               child: _SubmitButton(
                 onPressed: () {},
               ),

@@ -60,7 +60,18 @@ class _HistoryResumeCardState extends ConsumerState<HistoryResumeCard>
 
     await context.push(
       '/short-video',
-      extra: {'videoId': info.videoId},
+      extra: {
+        'videoId': info.videoId,
+        'initialIndex': info.watchedEpNum > 0 ? info.watchedEpNum - 1 : 0,
+        'seedVideo': {
+          'id': info.episodesId,
+          'videoId': int.tryParse(info.videoId) ?? 0,
+          'serialNum': info.watchedEpNum,
+          'title': info.videoName,
+          'coverUrl': info.coverUrl,
+          'totalEpisodes': info.totalEpisodes,
+        },
+      },
     );
     if (!mounted) return;
     await ref.read(lastWatchedProvider.notifier).load();
