@@ -579,6 +579,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'تم فتح Google Play. يرجى إكمال عملية دفع الاشتراك.';
 
   @override
+  String get watchLockedReminderTitle => 'تذكير';
+
+  @override
+  String get watchLockedReminderMessage =>
+      'أنت على وشك الانتقال لتفعيل العضوية';
+
+  @override
   String get profileLoginFirst => 'يرجى تسجيل الدخول أولاً';
 
   @override

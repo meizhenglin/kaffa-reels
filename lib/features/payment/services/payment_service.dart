@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Payment service for handling in-app purchases
@@ -59,6 +60,7 @@ class PaymentService {
   /// Get available subscription products
   Future<List<ProductDetails>> getProducts({
     required List<String> productIds,
+    bool requireSubscriptionOnAndroid = false,
   }) async {
     try {
       final response = await _inAppPurchase.queryProductDetails(
@@ -76,6 +78,37 @@ class PaymentService {
       }
 
       _availableProducts = response.productDetails;
+      for (final product in _availableProducts) {
+        final googlePlayType = product is GooglePlayProductDetails
+            ? product.productDetails.productType
+            : 'unknown';
+        debugPrint(
+          'IAP product loaded: id=${product.id}, title=${product.title}, '
+          'price=${product.price}, type=$googlePlayType',
+        );
+      }
+
+      if (requireSubscriptionOnAndroid && defaultTargetPlatform == TargetPlatform.android) {
+        final invalidProducts = _availableProducts.where((product) {
+          return product is! GooglePlayProductDetails ||
+              product.productDetails.productType != 'subs';
+        }).toList();
+
+        if (invalidProducts.isNotEmpty) {
+          final invalidSummary = invalidProducts.map((product) {
+            final type = product is GooglePlayProductDetails
+                ? product.productDetails.productType
+                : 'unknown';
+            return '${product.id}($type)';
+          }).join(', ');
+          final message =
+              'Google Play products must be subscriptions (subs), but got: $invalidSummary';
+          debugPrint(message);
+          _onPurchaseError?.call(message);
+          return [];
+        }
+      }
+
       return _availableProducts;
     } catch (e) {
       debugPrint('Exception fetching products: $e');
@@ -112,9 +145,25 @@ class PaymentService {
         applicationUserName: applicationUserName,
       );
 
-      final success = await _inAppPurchase.buyNonConsumable(
-        purchaseParam: purchaseParam,
+      final isAndroidSubscription = product is GooglePlayProductDetails &&
+          product.productDetails.productType == 'subs';
+      final googlePlayType = product is GooglePlayProductDetails
+          ? product.productDetails.productType
+          : 'unknown';
+
+      debugPrint(
+        'Starting purchase: id=${product.id}, type=$googlePlayType, '
+        'branch=${isAndroidSubscription ? 'subs' : 'inapp'}',
       );
+
+      final success = isAndroidSubscription
+          ? await _inAppPurchase.buyConsumable(
+              purchaseParam: purchaseParam,
+              autoConsume: false,
+            )
+          : await _inAppPurchase.buyNonConsumable(
+              purchaseParam: purchaseParam,
+            );
 
       if (!success) {
         _onPurchaseError?.call('Failed to open Google Play purchase sheet.');

@@ -192,6 +192,8 @@
   "membershipLoginBeforeSubscribe": "Please log in before subscribing.",
   "membershipWebPurchaseUnsupported": "Web does not support Google Play in-app purchases.",
   "membershipPurchaseOpened": "Google Play opened. Please complete the subscription payment.",
+  "watchLockedReminderTitle": "Reminder",
+  "watchLockedReminderMessage": "About to jump to activate membership",
   "profileLoginFirst": "Please log in first",
   "accountDeletedSuccessfully": "Account deleted successfully",
   "dailySigninRewardHint": "Get one VIP day after signing in for 7 consecutive days",

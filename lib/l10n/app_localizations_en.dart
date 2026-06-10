@@ -577,6 +577,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Google Play opened. Please complete the subscription payment.';
 
   @override
+  String get watchLockedReminderTitle => 'Reminder';
+
+  @override
+  String get watchLockedReminderMessage =>
+      'About to jump to activate membership';
+
+  @override
   String get profileLoginFirst => 'Please log in first';
 
   @override

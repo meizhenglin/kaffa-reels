@@ -9,6 +9,7 @@ import '../../../core/providers/auth_provider.dart' show apiServiceProviderRef;
 import '../../home/pages/main_page.dart' show currentTabIndexProvider;
 import '../../auth/providers/auth_provider.dart'
     show AuthState, AuthStatus, authProvider, authServiceProvider;
+import '../../recommend/utils/drama_navigation.dart';
 import 'chat_page.dart';
 
 class ProfileTab extends ConsumerStatefulWidget {
@@ -426,7 +427,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
             )
           else
             GestureDetector(
-              onTap: () => context.push('/membership'),
+              onTap: () => openMembershipPage(context, ref),
               child: Container(
                 padding: const EdgeInsetsDirectional.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(

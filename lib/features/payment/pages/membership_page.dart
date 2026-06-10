@@ -71,12 +71,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     final authState = ref.read(authProvider);
 
     if (!authState.isAuthenticated || (authState.user?.isTourist ?? true)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.membershipLoginBeforeSubscribe)),
-        );
-      }
-      context.push('/auth/login?redirect=/membership');
+      await openMembershipPage(context, ref);
       return;
     }
 
@@ -138,6 +133,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
           content: Text(l10n.membershipPurchaseOpened),
         ),
       );
+      context.pop(true);
     }
   }
 

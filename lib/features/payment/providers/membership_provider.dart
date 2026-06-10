@@ -140,6 +140,11 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     await _syncWithBackend();
   }
 
+  Future<void> refreshStatus() async {
+    await _loadCachedState();
+    await _syncWithBackend();
+  }
+
   Future<void> _loadCachedState() async {
     final isVip = _storage.getString('is_vip') == 'true';
     final expireStr = _storage.getString('vip_expire_date');
@@ -331,7 +336,10 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         .where((id) => id.isNotEmpty)
         .toList();
 
-    return _paymentService.getProducts(productIds: productIds);
+    return _paymentService.getProducts(
+      productIds: productIds,
+      requireSubscriptionOnAndroid: true,
+    );
   }
 
   Future<bool> purchase({
@@ -353,6 +361,15 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
 
       final products = await getProducts([selectedProduct]);
       final platformProductId = selectedProduct.getProductId(_paymentService.currentPlatform);
+
+      if (products.isEmpty) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Subscription product is unavailable or not configured as subs in Google Play.',
+          clearPendingOrder: true,
+        );
+        return false;
+      }
 
       ProductDetails? productDetails;
       try {
@@ -433,9 +450,11 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
 class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> {
   MembershipProductsNotifier(DioClient dioClient, StorageService storage)
       : _apiService = ApiService(dioClient: dioClient, storage: storage),
+        _paymentService = PaymentService.instance,
         super(const MembershipProductsState());
 
   final ApiService _apiService;
+  final PaymentService _paymentService;
 
   Future<void> loadVipProducts() async {
     if (state.isLoading) return;
@@ -454,7 +473,8 @@ class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> 
       }
 
       final items = _parseRechargeGoods(response.data);
-      final products = SubscriptionProducts.fromRechargeGoods(items);
+      final baseProducts = SubscriptionProducts.fromRechargeGoods(items);
+      final products = await _syncStorePrices(baseProducts);
       state = state.copyWith(
         isLoading: false,
         products: products,
@@ -485,6 +505,52 @@ class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> 
         .whereType<Map>()
         .map((item) => RechargeGoodsConfigItem.fromJson(Map<String, dynamic>.from(item)))
         .toList();
+  }
+
+  Future<List<SubscriptionProduct>> _syncStorePrices(
+    List<SubscriptionProduct> baseProducts,
+  ) async {
+    if (baseProducts.isEmpty || kIsWeb) return baseProducts;
+
+    try {
+      final storeProducts = await _paymentService.getProducts(
+        productIds: baseProducts
+            .map((product) => product.getProductId(_paymentService.currentPlatform))
+            .where((id) => id.isNotEmpty)
+            .toList(),
+        requireSubscriptionOnAndroid: defaultTargetPlatform == TargetPlatform.android,
+      );
+
+      if (storeProducts.isEmpty) {
+        return baseProducts;
+      }
+
+      final storeProductMap = {
+        for (final product in storeProducts) product.id: product,
+      };
+
+      return baseProducts.map((product) {
+        final storeProduct = storeProductMap[product.getProductId(_paymentService.currentPlatform)];
+        if (storeProduct == null) {
+          return product;
+        }
+
+        final storePrice = storeProduct.price.trim();
+        final originalPrice = product.originalPrice.trim();
+        final nextOriginalPrice =
+            originalPrice.isEmpty || originalPrice == storePrice ? product.price : product.originalPrice;
+
+        return product.copyWith(
+          price: storePrice,
+          priceCn: storePrice,
+          originalPrice: nextOriginalPrice,
+          originalPriceCn: nextOriginalPrice,
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('Failed to sync store prices: $e');
+      return baseProducts;
+    }
   }
 }
 

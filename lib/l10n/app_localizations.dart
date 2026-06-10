@@ -1208,6 +1208,18 @@ abstract class AppLocalizations {
   /// **'Google Play opened. Please complete the subscription payment.'**
   String get membershipPurchaseOpened;
 
+  /// No description provided for @watchLockedReminderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder'**
+  String get watchLockedReminderTitle;
+
+  /// No description provided for @watchLockedReminderMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'About to jump to activate membership'**
+  String get watchLockedReminderMessage;
+
   /// No description provided for @profileLoginFirst.
   ///
   /// In en, this message translates to:

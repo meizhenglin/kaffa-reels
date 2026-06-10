@@ -10,6 +10,7 @@ import '../core/constants/api_error_code.dart';
 import '../features/payment/widgets/vip_paywall_overlay.dart';
 import '../features/auth/providers/auth_provider.dart';
 import '../features/payment/providers/membership_provider.dart';
+import '../features/recommend/utils/drama_navigation.dart';
 import '../l10n/app_localizations.dart';
 import 'rtl_back_button.dart';
 
@@ -427,6 +428,9 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
   }
 
   void _togglePlay() {
+    if (_isLocked) {
+      return;
+    }
     if (_isPlaying) {
       _player.pause();
     } else {
@@ -435,6 +439,26 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
       }
       _player.play();
     }
+  }
+
+  Future<void> _handleUnlock() async {
+    final purchased = await openMembershipPage(
+      context,
+      ref,
+      showLoginPrompt: false,
+    );
+    if (!mounted || !purchased) return;
+
+    await ref.read(memberStateProvider.notifier).refreshStatus();
+    if (!mounted) return;
+
+    setState(() {
+      _isLocked = false;
+      _hasError = false;
+      _errorMessage = null;
+    });
+
+    _loadUrl(_urlForQuality(widget.currentQuality));
   }
 
   void _toggleControls() {
@@ -518,7 +542,7 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
               title: widget.title.isNotEmpty
                   ? widget.title
                   : AppLocalizations.of(context).playerVipContent,
-              onUnlock: () => context.push('/membership'),
+              onUnlock: _handleUnlock,
               canClose: false,
             ),
 
@@ -714,9 +738,25 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
           Navigator.pop(sheetContext);
           widget.onEpisodeChanged?.call(index);
         },
-        onUnlock: () {
+        onUnlock: () async {
           Navigator.pop(sheetContext);
-          context.push('/membership');
+          final purchased = await openMembershipPage(
+            context,
+            ref,
+            showLoginPrompt: false,
+          );
+          if (!mounted || !purchased) return;
+
+          await ref.read(memberStateProvider.notifier).refreshStatus();
+          if (!mounted) return;
+
+          final refreshedMemberState = ref.read(memberStateProvider);
+          if (widget.currentIndex >= 0 && widget.currentIndex < widget.allEpisodes.length) {
+            final currentEpisode = widget.allEpisodes[widget.currentIndex];
+            if (currentEpisode.isUnlocked || (refreshedMemberState.isVip && !refreshedMemberState.isExpired)) {
+              widget.onEpisodeChanged?.call(widget.currentIndex);
+            }
+          }
         },
       ),
     );

@@ -10,6 +10,8 @@ class WatchShortVideoItem extends StatefulWidget {
   final VideoInfo videoInfo;
   final bool autoPlay;
   final bool resolvePlayableUrl;
+  final bool lockedPreviewMode;
+  final VoidCallback? onLockedWatchNowTap;
   final Widget Function(BuildContext context, VideoInfo videoInfo)? overlayBuilder;
   final Widget Function(BuildContext context, VideoInfo videoInfo)? topOverlayBuilder;
   final bool showDebugInfo;
@@ -20,6 +22,8 @@ class WatchShortVideoItem extends StatefulWidget {
     required this.videoInfo,
     this.autoPlay = false,
     this.resolvePlayableUrl = true,
+    this.lockedPreviewMode = false,
+    this.onLockedWatchNowTap,
     this.overlayBuilder,
     this.topOverlayBuilder,
     this.showDebugInfo = false,
@@ -33,6 +37,8 @@ class WatchShortVideoItem extends StatefulWidget {
 class WatchShortVideoItemState extends State<WatchShortVideoItem> {
   static const String _tag = 'WatchShortVideoItem';
   static const int _completedStateCode = FlutterAvpdef.completion;
+
+  bool get _isPlaybackBlocked => widget.lockedPreviewMode;
 
   AliPlayerWidgetController? _controller;
   int? _lastPrepareCostMs;
@@ -67,7 +73,7 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
       '[$_tag][initState] id=${widget.videoInfo.id} autoPlay=${widget.autoPlay} resolve=${widget.resolvePlayableUrl}',
     );
 
-    if (_currentUrl.isNotEmpty && widget.autoPlay) {
+    if (_currentUrl.isNotEmpty && widget.autoPlay && !_isPlaybackBlocked) {
       _configurePlayer(_currentUrl, autoPlay: true);
     }
 
@@ -82,7 +88,7 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
       });
     }
 
-    if (widget.resolvePlayableUrl && _currentUrl.isEmpty) {
+    if (widget.resolvePlayableUrl && _currentUrl.isEmpty && !_isPlaybackBlocked) {
       scheduleMicrotask(() => prefetchPlayableUrl(playIfReady: widget.autoPlay));
     }
   }
@@ -152,8 +158,21 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
   void didUpdateWidget(covariant WatchShortVideoItem oldWidget) {
     super.didUpdateWidget(oldWidget);
 
+    if (widget.lockedPreviewMode != oldWidget.lockedPreviewMode) {
+      if (widget.lockedPreviewMode) {
+        pause();
+        if (mounted) {
+          setState(() {
+            _showCenterPlayPause = false;
+          });
+        }
+      } else if (widget.autoPlay) {
+        resume();
+      }
+    }
+
     if (widget.autoPlay != oldWidget.autoPlay) {
-      if (widget.autoPlay) {
+      if (widget.autoPlay && !widget.lockedPreviewMode) {
         resume();
       } else {
         pause();
@@ -165,7 +184,7 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
         widget.videoInfo.videoUrl != _currentUrl) {
       _currentUrl = widget.videoInfo.videoUrl;
       _hasResolvedPlayableUrl = true;
-      if (widget.autoPlay) {
+      if (widget.autoPlay && !_isPlaybackBlocked) {
         _configurePlayer(_currentUrl, autoPlay: true);
       } else {
         if (_controller != null) {
@@ -184,6 +203,7 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
 
     if (widget.resolvePlayableUrl &&
         widget.autoPlay &&
+        !_isPlaybackBlocked &&
         !_hasResolvedPlayableUrl &&
         _currentUrl.isEmpty) {
       scheduleMicrotask(() => prefetchPlayableUrl(playIfReady: true));
@@ -196,6 +216,17 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
 
   Future<void> prefetchPlayableUrl({bool playIfReady = false}) async {
     if (!mounted || _isFetchingPlayableUrl) return;
+    if (_isPlaybackBlocked) {
+      _controller?.pause();
+      _isForegroundActive = false;
+      _isPlaying = false;
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      return;
+    }
 
     if (!widget.resolvePlayableUrl) {
       _hasResolvedPlayableUrl = true;
@@ -277,12 +308,14 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
     if (mounted) {
       setState(() {
         _showControls = shouldShow;
-        _showCenterPlayPause = shouldShow;
+        _showCenterPlayPause = widget.lockedPreviewMode ? false : shouldShow;
       });
     }
 
     if (shouldShow) {
-      _showCenterPlayPauseOverlay();
+      if (!widget.lockedPreviewMode) {
+        _showCenterPlayPauseOverlay();
+      }
       _restartControlsHideTimer();
     }
   }
@@ -350,6 +383,11 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
   }
 
   void resume() {
+    if (_isPlaybackBlocked) {
+      pause();
+      return;
+    }
+
     _isForegroundActive = true;
     _isPlaying = true;
     if (_currentUrl.isEmpty) {
@@ -504,6 +542,59 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
     super.dispose();
   }
 
+  Widget _buildLockedPreviewCover() {
+    final coverUrl = widget.videoInfo.coverUrl?.trim() ?? '';
+    if (coverUrl.isEmpty) {
+      return Container(color: Colors.black);
+    }
+
+    return Positioned.fill(
+      child: Image.network(
+        coverUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => Container(color: Colors.black),
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return Container(
+            color: Colors.black,
+            alignment: Alignment.center,
+            child: const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.4,
+                color: Colors.white,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildLockedWatchNowAction() {
+    if (!widget.lockedPreviewMode || widget.onLockedWatchNowTap == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Positioned.fill(
+      child: SafeArea(
+        child: Center(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onLockedWatchNowTap,
+            child: Image.asset(
+              'assets/images/watch_now.png',
+              width: 156,
+              height: 110,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -512,7 +603,9 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (_controller != null)
+          if (widget.lockedPreviewMode)
+            _buildLockedPreviewCover()
+          else if (_controller != null)
             Positioned.fill(
               child: AliPlayerWidget(
                 _controller!,
@@ -582,8 +675,18 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
                 ),
               ),
             ),
+          if (widget.lockedPreviewMode)
+            Positioned.fill(
+              child: IgnorePointer(
+                ignoring: true,
+                child: ColoredBox(
+                  color: Colors.black.withValues(alpha: 0.28),
+                ),
+              ),
+            ),
           _buildAnimatedWatchControls(),
           _buildAnimatedCenterPlayPauseButton(),
+          _buildLockedWatchNowAction(),
           _buildLongPressSpeedHint(),
           if (widget.showDebugInfo)
             Positioned(

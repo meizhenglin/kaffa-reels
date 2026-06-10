@@ -338,12 +338,13 @@ class AuthRepository {
     final stopwatch = Stopwatch()..start();
     debugPrint('[GoogleLoginFlow] start');
     _logger.i('[AuthRepo] Google sign-in started');
-    debugPrint('[GoogleLoginFlow] launching chooser');
-    _logger.i('[AuthRepo] Launching Google account chooser');
+    debugPrint('[GoogleLoginFlow] launching account chooser (force sign-out first to show picker)');
+    _logger.i('[AuthRepo] Force sign-out then launching Google account chooser');
 
     GoogleSignInAccountClient? googleUser;
     final chooserStopwatch = Stopwatch()..start();
     try {
+      await googleSignIn.signOut();
       googleUser = await googleSignIn.signIn();
     } catch (e, stackTrace) {
       debugPrint(
@@ -550,6 +551,13 @@ class AuthRepository {
     }
 
     try {
+      await _requiredGoogleSignIn.disconnect();
+    } catch (e) {
+      signOutError ??= e;
+      _logger.w('[AuthRepo] Google disconnect failed: $e');
+    }
+
+    try {
       await _requiredGoogleSignIn.signOut();
     } catch (e) {
       signOutError ??= e;
@@ -557,6 +565,7 @@ class AuthRepository {
     }
 
     await clearCache();
+    await clearAutoLoginCredentials();
 
     if (signOutError != null) {
       _logger.w('[AuthRepo] signOut completed with non-fatal provider errors');

@@ -15,6 +15,31 @@ enum VipAccessResult {
   vipRequired,       // 需要开通 VIP
 }
 
+Future<bool> openMembershipPage(
+  BuildContext context,
+  WidgetRef ref, {
+  String redirect = '/membership',
+  bool showLoginPrompt = true,
+}) async {
+  final authState = ref.read(authProvider);
+  final isGuest = !authState.isAuthenticated || (authState.user?.isTourist ?? true);
+
+  if (isGuest) {
+    if (showLoginPrompt) {
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).membershipLoginBeforeSubscribe)),
+      );
+    }
+    await context.push('/auth/login?redirect=$redirect');
+    return false;
+  }
+
+  final result = await context.push<bool>(redirect);
+  return result == true;
+}
+
 /// 检查用户是否有权观看该短剧
 ///
 /// [drama] 要访问的短剧

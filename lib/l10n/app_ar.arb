@@ -72,6 +72,8 @@
   "membershipLoginBeforeSubscribe": "يرجى تسجيل الدخول قبل الاشتراك.",
   "membershipWebPurchaseUnsupported": "الويب لا يدعم مشتريات Google Play داخل التطبيق.",
   "membershipPurchaseOpened": "تم فتح Google Play. يرجى إكمال عملية دفع الاشتراك.",
+  "watchLockedReminderTitle": "تذكير",
+  "watchLockedReminderMessage": "أنت على وشك الانتقال لتفعيل العضوية",
   "profileLoginFirst": "يرجى تسجيل الدخول أولاً",
   "accountDeletedSuccessfully": "تم حذف الحساب بنجاح",
   "dailySigninRewardHint": "احصل على يوم VIP واحد بعد تسجيل الدخول لمدة 7 أيام متتالية",

@@ -22,102 +22,147 @@ class _ReportPageState extends ConsumerState<ReportPage> {
   ];
 
   late final TextEditingController _reportController;
+  late final ScrollController _scrollController;
+  late final FocusNode _reportFocusNode;
+  final GlobalKey _reportFieldKey = GlobalKey();
   String _selectedType = _reportTypes.first;
 
   @override
   void initState() {
     super.initState();
     _reportController = TextEditingController();
+    _scrollController = ScrollController();
+    _reportFocusNode = FocusNode()..addListener(_handleReportFocusChange);
   }
 
   @override
   void dispose() {
+    _reportFocusNode
+      ..removeListener(_handleReportFocusChange)
+      ..dispose();
+    _scrollController.dispose();
     _reportController.dispose();
     super.dispose();
   }
 
+  void _handleReportFocusChange() {
+    if (!_reportFocusNode.hasFocus) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final context = _reportFieldKey.currentContext;
+      if (context == null) return;
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        alignment: 0.2,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return GradientScaffold(
-      resizeToAvoidBottomInset: false,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  RtlBackButton(
-                    color: Colors.white,
-                    onPressed: () => context.pop(),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Complaint and Report',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  0,
-                  16,
-                  MediaQuery.of(context).viewInsets.bottom + 100,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: GradientScaffold(
+        resizeToAvoidBottomInset: false,
+        body: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
                   children: [
-                    _ReportDropdown(
-                      value: _selectedType,
-                      items: _reportTypes,
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() => _selectedType = value);
-                      },
+                    RtlBackButton(
+                      color: Colors.white,
+                      onPressed: () => context.pop(),
                     ),
-                    const SizedBox(height: 15),
+                    const SizedBox(width: 8),
                     const Text(
                       'Complaint and Report',
                       style: TextStyle(
-                        fontWeight: FontWeight.w400,
-                        fontSize: 15,
                         color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    _ReportTextArea(controller: _reportController),
-                    const SizedBox(height: 10),
-                    RichText(
-                      text: const TextSpan(
-                        style: TextStyle(
-                          fontWeight: FontWeight.w400,
-                          fontSize: 14,
-                          color: Color(0xFF999999),
-                        ),
-                        children: [
-                          TextSpan(text: 'Contact Us:'),
-                          TextSpan(text: 'gahwatv register@gahwatv.com'),
-                        ],
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              child: _SubmitButton(
-                onPressed: () {},
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+                    return AnimatedPadding(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      padding: EdgeInsets.only(bottom: keyboardInset),
+                      child: SingleChildScrollView(
+                        controller: _scrollController,
+                        keyboardDismissBehavior:
+                            ScrollViewKeyboardDismissBehavior.onDrag,
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _ReportDropdown(
+                                value: _selectedType,
+                                items: _reportTypes,
+                                onChanged: (value) {
+                                  if (value == null) return;
+                                  setState(() => _selectedType = value);
+                                },
+                              ),
+                              const SizedBox(height: 15),
+                              const Text(
+                                'Complaint and Report',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w400,
+                                  fontSize: 15,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              _ReportTextArea(
+                                fieldKey: _reportFieldKey,
+                                controller: _reportController,
+                                focusNode: _reportFocusNode,
+                              ),
+                              const SizedBox(height: 10),
+                              RichText(
+                                text: const TextSpan(
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w400,
+                                    fontSize: 14,
+                                    color: Color(0xFF999999),
+                                  ),
+                                  children: [
+                                    TextSpan(text: 'Contact Us:'),
+                                    TextSpan(text: 'gahwatv register@gahwatv.com'),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  child: _SubmitButton(
+                    onPressed: () {},
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -280,16 +325,24 @@ class _ReportDropdownState extends State<_ReportDropdown> {
 }
 
 class _ReportTextArea extends StatelessWidget {
-  const _ReportTextArea({required this.controller});
+  const _ReportTextArea({
+    required this.fieldKey,
+    required this.controller,
+    required this.focusNode,
+  });
 
+  final GlobalKey fieldKey;
   final TextEditingController controller;
+  final FocusNode focusNode;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
+      key: fieldKey,
       height: 190,
       child: TextField(
         controller: controller,
+        focusNode: focusNode,
         expands: true,
         maxLines: null,
         minLines: null,

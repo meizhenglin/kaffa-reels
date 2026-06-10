@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../providers/auth_provider.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../home/pages/main_page.dart' show currentTabIndexProvider;
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key, this.redirect});
@@ -17,6 +18,7 @@ class LoginPage extends ConsumerStatefulWidget {
 
 class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserver {
   bool _appIsInForeground = true;
+  ProviderSubscription<AuthState>? _authStateSubscription;
 
   void _showMessage(String message, {bool isError = false}) {
     if (!mounted || message.trim().isEmpty) return;
@@ -37,6 +39,9 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
 
     final target = widget.redirect;
     if (target != null && target.isNotEmpty) {
+      if (target == '/profile') {
+        ref.read(currentTabIndexProvider.notifier).state = 4;
+      }
       context.go(target);
       return;
     }
@@ -48,10 +53,30 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _authStateSubscription = ref.listenManual<AuthState>(
+      authProvider,
+      (previous, next) {
+        final errorMessage = next.errorMessage?.trim();
+        final previousErrorMessage = previous?.errorMessage?.trim();
+        final shouldShowError =
+            errorMessage != null &&
+            errorMessage.isNotEmpty &&
+            next.status == AuthStatus.error &&
+            errorMessage != previousErrorMessage;
+        if (!shouldShowError || !_appIsInForeground || !mounted) {
+          return;
+        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_appIsInForeground) return;
+          _showMessage(errorMessage, isError: true);
+        });
+      },
+    );
   }
 
   @override
   void dispose() {
+    _authStateSubscription?.close();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -185,18 +210,19 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                       .read(authProvider.notifier)
                                       .signInWithGoogle();
                                   if (!mounted || !_appIsInForeground) return;
-                                  final errorMessage = ref.read(authProvider).errorMessage;
-                                  debugPrint('[LoginPage] Google sign-in returned success=$success error=$errorMessage');
+                                  debugPrint('[LoginPage] Google sign-in returned success=$success error=${ref.read(authProvider).errorMessage}');
                                   if (success) {
                                     WidgetsBinding.instance.addPostFrameCallback((_) {
                                       _navigateAfterLogin();
                                     });
                                     return;
                                   }
-                                  _showMessage(
-                                    errorMessage ?? 'Google sign-in did not complete. Please try again.',
-                                    isError: true,
-                                  );
+                                  if (ref.read(authProvider).status != AuthStatus.error) {
+                                    _showMessage(
+                                      'Google sign-in did not complete. Please try again.',
+                                      isError: true,
+                                    );
+                                  }
                                 },
                               );
                             },

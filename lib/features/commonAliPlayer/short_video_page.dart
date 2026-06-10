@@ -10,6 +10,8 @@ import '../home/providers/last_watched_provider.dart';
 import '../../core/network/api_service.dart';
 import '../recommend/models/video_info.dart';
 import '../recommend/providers/video_action_provider.dart';
+import '../recommend/utils/drama_navigation.dart';
+import '../payment/providers/membership_provider.dart';
 import 'ali_player_preload.dart';
 import 'watch_short_video_item.dart';
 
@@ -146,6 +148,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     with WidgetsBindingObserver {
   static const String _tag = 'ShortVideoPage';
 
+  int? _pendingLockedDialogIndex;
+
   Future<void> _toggleLike(VideoInfo videoInfo) async {
     final videoId = videoInfo.videoId.toString();
     if (videoId.isEmpty || videoId == '0') return;
@@ -198,6 +202,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   String? _errorMessage;
   bool _isCurrentTabActive = false;
   ProviderSubscription<int>? _tabIndexSubscription;
+  int? _pendingLockedEpisodeIndex;
+  bool _showWatchNowOverlay = false;
 
   bool get _shouldFollowHomeTabVisibility => widget.videoId.isNotEmpty;
 
@@ -402,9 +408,15 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   void _handlePreloadPageChanged() {
     if (!widget.preload) return;
     final newIndex = _preloadPageController.page?.round() ?? 0;
-    if (_currentIndex == newIndex) return;
-    _onPageChanged(newIndex);
-    _reportViewHistory(newIndex);
+    if (newIndex == _currentIndex) return;
+
+    final previousIndex = _currentIndex;
+    if (_isEpisodeLocked(newIndex)) {
+      _guardLockedEpisode(newIndex, previousIndex: previousIndex);
+      return;
+    }
+
+    _handlePageChanged(newIndex, previousIndex: previousIndex);
   }
 
   void _onPageChanged(int newPageIndex) {
@@ -433,13 +445,23 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     _itemKeys[index].currentState?.pause();
   }
 
+  void _resumeAtIndex(int index) {
+    if (index < 0 || index >= _itemKeys.length) return;
+    _itemKeys[index].currentState?.resume();
+  }
+
+  void _pauseNearbyItems(int centerIndex) {
+    _pauseAtIndex(centerIndex - 1);
+    _pauseAtIndex(centerIndex);
+    _pauseAtIndex(centerIndex + 1);
+  }
+
   void _pauseCurrent() {
     _pauseAtIndex(_currentIndex);
   }
 
   void _resumeCurrent() {
-    if (_currentIndex < 0 || _currentIndex >= _itemKeys.length) return;
-    _itemKeys[_currentIndex].currentState?.resume();
+    _resumeAtIndex(_currentIndex);
   }
 
   void _reportViewHistory(int index) {
@@ -460,9 +482,111 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     });
   }
 
-  void _jumpToEpisode(int index) {
+  bool _isEpisodeLocked(int index) {
+    if (index < 0 || index >= videoInfoList.length) return false;
+    return videoInfoList[index].isCanPlay == 0;
+  }
+
+  Future<void> _showMembershipReminderDialog({int? lockedIndex}) async {
+    if (_pendingLockedDialogIndex == lockedIndex) return;
+    _pendingLockedDialogIndex = lockedIndex;
+
+    final l10n = AppLocalizations.of(context);
+    final shouldConfirm = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(
+            l10n.watchLockedReminderTitle,
+            textAlign: TextAlign.center,
+          ),
+          content: Text(
+            l10n.watchLockedReminderMessage,
+            textAlign: TextAlign.center,
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(l10n.common_cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(l10n.common_confirm),
+            ),
+          ],
+        );
+      },
+    );
+    _pendingLockedDialogIndex = null;
+    if (!mounted) return;
+    if (shouldConfirm == true) {
+      final purchased = await openMembershipPage(
+        context,
+        ref,
+        showLoginPrompt: false,
+      );
+      if (!mounted) return;
+      if (purchased) {
+        await ref.read(memberStateProvider.notifier).refreshStatus();
+        final retryIndex = lockedIndex ?? _pendingLockedEpisodeIndex;
+        if (retryIndex != null) {
+          _clearPendingLockedOverlay();
+          await _jumpToEpisode(retryIndex);
+        }
+      }
+      return;
+    }
+    setState(() {
+      _pendingLockedEpisodeIndex = lockedIndex ?? _pendingLockedEpisodeIndex;
+      _showWatchNowOverlay = _pendingLockedEpisodeIndex != null;
+    });
+  }
+
+  Future<bool> _guardLockedEpisode(int index, {int? previousIndex}) async {
+    if (!_isEpisodeLocked(index)) return true;
+    final sourceIndex = previousIndex ?? _currentIndex;
+    _pauseNearbyItems(sourceIndex);
+    if (_currentIndex != index) {
+      _currentIndex = index;
+      _aliPlayerPreload?.moveTo(_currentIndex);
+      _prefetchAround(_currentIndex);
+    }
+    _pauseNearbyItems(index);
+    if (mounted) {
+      setState(() {
+        _pendingLockedEpisodeIndex = index;
+        _showWatchNowOverlay = true;
+      });
+    }
+    await _showMembershipReminderDialog(lockedIndex: index);
+    return false;
+  }
+
+  void _clearPendingLockedOverlay() {
+    if (!mounted) return;
+    setState(() {
+      _pendingLockedEpisodeIndex = null;
+      _showWatchNowOverlay = false;
+    });
+  }
+
+  Future<void> _jumpToEpisode(int index) async {
     if (index < 0 || index >= videoInfoList.length) return;
     if (index == _currentIndex) return;
+
+    final previousIndex = _currentIndex;
+    if (_isEpisodeLocked(index)) {
+      if (_usePreloadMode) {
+        _preloadPageController.jumpToPage(index);
+      } else {
+        _pageController.jumpToPage(index);
+      }
+      await _guardLockedEpisode(index, previousIndex: previousIndex);
+      return;
+    }
+
+    _clearPendingLockedOverlay();
     if (_usePreloadMode) {
       _preloadPageController.jumpToPage(index);
     } else {
@@ -473,13 +597,25 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     _reportViewHistory(index);
   }
 
-  void _playNextEpisode() {
+  Future<void> _playNextEpisode() async {
     final nextIndex = _currentIndex + 1;
     if (nextIndex >= videoInfoList.length) {
       return;
     }
     if (!mounted) return;
-    _jumpToEpisode(nextIndex);
+    await _jumpToEpisode(nextIndex);
+  }
+
+  Future<void> _handlePageChanged(int index, {int? previousIndex}) async {
+    final sourceIndex = previousIndex ?? _currentIndex;
+    if (index == sourceIndex) return;
+    if (_isEpisodeLocked(index)) {
+      await _guardLockedEpisode(index, previousIndex: sourceIndex);
+      return;
+    }
+    _clearPendingLockedOverlay();
+    _onPageChanged(index);
+    _reportViewHistory(index);
   }
 
   void _showEpisodePicker() {
@@ -494,15 +630,18 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           currentIndex: _currentIndex,
           title: currentEpisode.title,
           coverUrl: currentEpisode.coverUrl,
-          onEpisodeTap: (index) {
-            final item = videoInfoList[index];
-            if (item.isCanPlay == 0) {
-              Navigator.of(sheetContext).pop();
-              context.push('/membership');
-              return;
-            }
+          onEpisodeTap: (index) async {
             Navigator.of(sheetContext).pop();
-            _jumpToEpisode(index);
+            await _jumpToEpisode(index);
+          },
+          onReportTap: () async {
+            final router = GoRouter.of(context);
+            _pauseCurrent();
+            FocusManager.instance.primaryFocus?.unfocus();
+            Navigator.of(sheetContext).pop();
+            await Future<void>.delayed(const Duration(milliseconds: 260));
+            if (!mounted) return;
+            router.push('/profile/report');
           },
         );
       },
@@ -522,6 +661,16 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   }
 
   Widget _buildDefaultTopOverlay(BuildContext context, VideoInfo videoInfo) {
+    final isLockedCurrentEpisode =
+        _showWatchNowOverlay && _pendingLockedEpisodeIndex == _currentIndex;
+    if (isLockedCurrentEpisode) {
+      return _buildTopOverlayContent(context, videoInfo);
+    }
+
+    return _buildTopOverlayContent(context, videoInfo);
+  }
+
+  Widget _buildTopOverlayContent(BuildContext context, VideoInfo videoInfo) {
     final episodeLabel = videoInfo.serialNum > 0 ? ' EP.${videoInfo.serialNum}' : '';
     return SafeArea(
       bottom: false,
@@ -625,11 +774,16 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   Widget _buildItem(BuildContext context, int index) {
     final videoItem = videoInfoList[index];
     final autoPlay = index == _currentIndex;
+    final lockedPreviewMode = _showWatchNowOverlay && index == _currentIndex;
     return WatchShortVideoItem(
       key: _itemKeys[index],
       videoInfo: videoItem,
       autoPlay: autoPlay,
       resolvePlayableUrl: false,
+      lockedPreviewMode: lockedPreviewMode,
+      onLockedWatchNowTap: lockedPreviewMode
+          ? () => _showMembershipReminderDialog(lockedIndex: index)
+          : null,
       onCompleted: _playNextEpisode,
       overlayBuilder: (ctx, vi) {
         final children = <Widget>[];
@@ -696,10 +850,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
             scrollDirection: Axis.vertical,
             itemCount: videoInfoList.length,
             itemBuilder: _buildItem,
-            onPageChanged: (index) {
-              _onPageChanged(index);
-              _reportViewHistory(index);
-            },
+            onPageChanged: _handlePageChanged,
           );
 
     if (widget.foregroundBuilder == null && widget.floatingOverlayBuilder == null) {
@@ -730,6 +881,7 @@ class _WatchEpisodeBottomSheet extends StatefulWidget {
     required this.title,
     required this.coverUrl,
     required this.onEpisodeTap,
+    required this.onReportTap,
   });
 
   final List<VideoInfo> episodes;
@@ -737,6 +889,7 @@ class _WatchEpisodeBottomSheet extends StatefulWidget {
   final String title;
   final String? coverUrl;
   final ValueChanged<int> onEpisodeTap;
+  final VoidCallback onReportTap;
 
   @override
   State<_WatchEpisodeBottomSheet> createState() => _WatchEpisodeBottomSheetState();
@@ -901,10 +1054,7 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
   Widget _buildReportButton(BuildContext context) {
     final isArabic = Directionality.of(context) == TextDirection.rtl;
     return InkWell(
-      onTap: () {
-        Navigator.of(context).pop();
-        GoRouter.of(context).push('/profile/report');
-      },
+      onTap: widget.onReportTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
         child: Row(
