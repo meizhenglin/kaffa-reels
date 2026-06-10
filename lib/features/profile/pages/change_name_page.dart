@@ -4,12 +4,20 @@ import 'package:go_router/go_router.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../core/network/api_service.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../home/pages/main_page.dart' show currentTabIndexProvider;
+import '../../auth/models/user_model.dart';
+import '../../auth/pages/photo_setting_page.dart' show RegistrationFlowContext;
 import '../../auth/providers/auth_provider.dart';
 
 class ChangeNamePage extends ConsumerStatefulWidget {
-  const ChangeNamePage({super.key, this.fromRegister = false});
+  const ChangeNamePage({
+    super.key,
+    this.fromRegister = false,
+    this.registrationContext,
+  });
 
   final bool fromRegister;
+  final RegistrationFlowContext? registrationContext;
 
   @override
   ConsumerState<ChangeNamePage> createState() => _ChangeNamePageState();
@@ -46,12 +54,60 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
     }
   }
 
+  void _goToProfileTab() {
+    ref.read(currentTabIndexProvider.notifier).state = 4;
+    context.go('/profile');
+  }
+
   @override
   void dispose() {
     _newNameController.removeListener(_handleNameChanged);
     _nameController.dispose();
     _newNameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _ensureRegistrationIdentity(RegistrationFlowContext registrationContext) async {
+    final authNotifier = ref.read(authProvider.notifier);
+    final authState = ref.read(authProvider);
+    final session = authState.registrationSession;
+    final currentUser = authState.user;
+    final expectedUserId = (session?.userId.isNotEmpty == true
+            ? session!.userId
+            : registrationContext.userId)
+        .trim();
+    final expectedEmail = (session?.email.isNotEmpty == true
+            ? session!.email
+            : registrationContext.email)
+        .trim()
+        .toLowerCase();
+
+    if (session == null) {
+      throw Exception('Registration session expired. Please register again.');
+    }
+
+    bool matchesCurrentUser(UserModel? user) {
+      if (user == null) return false;
+      final userIdMatches = expectedUserId.isNotEmpty && user.id.trim() == expectedUserId;
+      final emailMatches = expectedEmail.isNotEmpty && (user.email?.trim().toLowerCase() == expectedEmail);
+      return userIdMatches || emailMatches;
+    }
+
+    if (matchesCurrentUser(currentUser)) {
+      return;
+    }
+
+    final resp = await apiServiceProvider.getUserCenter();
+    if (!resp.isSuccess || resp.data == null) {
+      throw Exception(resp.error ?? 'Failed to verify current account');
+    }
+
+    await authNotifier.updateUserFromData(resp.data as Map<String, dynamic>);
+
+    final refreshedUser = ref.read(authProvider).user;
+    if (!matchesCurrentUser(refreshedUser)) {
+      throw Exception('Current login session does not match the newly registered account. Please log in again and retry.');
+    }
   }
 
   Future<void> _onConfirm() async {
@@ -61,6 +117,14 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
     setState(() => _isSubmitting = true);
 
     try {
+      if (widget.fromRegister) {
+        final registrationContext = widget.registrationContext;
+        if (registrationContext == null) {
+          throw Exception('Missing registration context');
+        }
+        await _ensureRegistrationIdentity(registrationContext);
+      }
+
       await ref.read(authProvider.notifier).updateNickname(newName);
 
       final resp = await apiServiceProvider.getUserCenter();
@@ -78,7 +142,10 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
         return;
       }
 
-      context.go('/profile');
+      if (widget.fromRegister) {
+        ref.read(authProvider.notifier).clearRegistrationSession();
+      }
+      _goToProfileTab();
     } catch (error) {
       if (!mounted) {
         return;
@@ -101,7 +168,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
     // 游客直接跳转登录；注册补全流程允许临时放行
     if ((auth.user == null || auth.user!.isTourist) && !widget.fromRegister) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) context.go('/auth/login');
+        if (context.mounted) context.go('/auth/login?back=/profile');
       });
       return const SizedBox.shrink();
     }
@@ -123,7 +190,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
                         return;
                       }
                       if (!didPop) {
-                        context.go('/profile');
+                        _goToProfileTab();
                       }
                     },
                     constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
@@ -170,7 +237,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
             ),
             if (widget.fromRegister) ...[
               GestureDetector(
-                onTap: () => context.go('/profile'),
+                onTap: _goToProfileTab,
                 child: Container(
                   width: double.infinity,
                   margin: const EdgeInsets.symmetric(horizontal: 15),

@@ -17,7 +17,7 @@ class PersonalInfoPage extends ConsumerWidget {
 
     if (user == null || user.isTourist) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) context.go('/auth/login');
+        if (context.mounted) context.go('/auth/login?back=/profile');
       });
       return const SizedBox.shrink();
     }

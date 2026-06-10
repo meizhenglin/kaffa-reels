@@ -4,12 +4,31 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_service.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../home/pages/main_page.dart' show currentTabIndexProvider;
+import '../../auth/models/user_model.dart';
 import '../../auth/providers/auth_provider.dart';
 
+class RegistrationFlowContext {
+  const RegistrationFlowContext({
+    required this.email,
+    required this.userId,
+    this.fromRegister = true,
+  });
+
+  final String email;
+  final String userId;
+  final bool fromRegister;
+}
+
 class PhotoSettingPage extends ConsumerStatefulWidget {
-  const PhotoSettingPage({super.key, this.fromRegister = false});
+  const PhotoSettingPage({
+    super.key,
+    this.fromRegister = false,
+    this.registrationContext,
+  });
 
   final bool fromRegister;
+  final RegistrationFlowContext? registrationContext;
 
   @override
   ConsumerState<PhotoSettingPage> createState() => _PhotoSettingPageState();
@@ -52,12 +71,62 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
     }
   }
 
+  Future<void> _ensureRegistrationIdentity(RegistrationFlowContext registrationContext) async {
+    final authNotifier = ref.read(authProvider.notifier);
+    final authState = ref.read(authProvider);
+    final session = authState.registrationSession;
+    final currentUser = authState.user;
+    final expectedUserId = (session?.userId.isNotEmpty == true
+            ? session!.userId
+            : registrationContext.userId)
+        .trim();
+    final expectedEmail = (session?.email.isNotEmpty == true
+            ? session!.email
+            : registrationContext.email)
+        .trim()
+        .toLowerCase();
+
+    if (session == null) {
+      throw Exception('Registration session expired. Please register again.');
+    }
+
+    bool matchesCurrentUser(UserModel? user) {
+      if (user == null) return false;
+      final userIdMatches = expectedUserId.isNotEmpty && user.id.trim() == expectedUserId;
+      final emailMatches = expectedEmail.isNotEmpty && (user.email?.trim().toLowerCase() == expectedEmail);
+      return userIdMatches || emailMatches;
+    }
+
+    if (matchesCurrentUser(currentUser)) {
+      return;
+    }
+
+    final resp = await apiServiceProvider.getUserCenter();
+    if (!resp.isSuccess || resp.data == null) {
+      throw Exception(resp.error ?? 'Failed to verify current account');
+    }
+
+    final userData = resp.data as Map<String, dynamic>;
+    await authNotifier.updateUserFromData(userData);
+
+    final refreshedUser = ref.read(authProvider).user;
+    if (!matchesCurrentUser(refreshedUser)) {
+      throw Exception('Current login session does not match the newly registered account. Please log in again and retry.');
+    }
+  }
+
+  void _goToProfileTab() {
+    ref.read(currentTabIndexProvider.notifier).state = 4;
+    context.go('/profile');
+  }
+
   void _onSkip() {
     if (widget.fromRegister) {
-      context.go('/change-name', extra: true);
-    } else {
-      context.go('/profile');
+      context.go('/change-name', extra: widget.registrationContext ?? true);
+      return;
     }
+    ref.read(authProvider.notifier).clearRegistrationSession();
+    _goToProfileTab();
   }
 
   Future<void> _onContinue() async {
@@ -68,6 +137,14 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
     setState(() => _isSubmitting = true);
 
     try {
+      if (widget.fromRegister) {
+        final registrationContext = widget.registrationContext;
+        if (registrationContext == null) {
+          throw Exception('Missing registration context');
+        }
+        await _ensureRegistrationIdentity(registrationContext);
+      }
+
       await ref.read(authProvider.notifier).updateAvatar(_selectedAvatar!);
 
       final resp = await apiServiceProvider.getUserCenter();
@@ -84,9 +161,9 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
       }
 
       if (widget.fromRegister) {
-        context.go('/change-name', extra: true);
+        context.go('/change-name', extra: widget.registrationContext ?? true);
       } else {
-        context.go('/profile');
+        _goToProfileTab();
       }
     } catch (error) {
       if (!mounted) {
@@ -110,7 +187,7 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
     // 游客直接跳转登录；注册补全流程允许临时放行
     if ((auth.user == null || auth.user!.isTourist) && !widget.fromRegister) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) context.go('/auth/login');
+        if (context.mounted) context.go('/auth/login?back=/profile');
       });
       return const SizedBox.shrink();
     }
@@ -132,10 +209,10 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
                           return;
                         }
                         if (!didPop) {
-                          context.go('/auth/login');
+                          _goToProfileTab();
                         }
                       } else {
-                        context.go('/profile');
+                        _goToProfileTab();
                       }
                     },
                     constraints: const BoxConstraints(minWidth: 24, minHeight: 24),

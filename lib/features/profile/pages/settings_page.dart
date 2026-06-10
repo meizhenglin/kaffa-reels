@@ -267,7 +267,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     GestureDetector(
                         onTap: () {
                         if (auth.user != null && auth.user!.isTourist) {
-                          context.push('/auth/login?redirect=/profile');
+                          context.push('/auth/login?redirect=/profile&back=/profile');
                         } else {
                           _handleLogout();
                         }

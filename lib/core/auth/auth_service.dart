@@ -112,6 +112,7 @@ class AuthService {
 
   /// 清除登录状态
   Future<void> logout() async {
+    await _storage.clearAuthToken();
     await _storage.removeToken();
     await _storage.removeUserData();
     await _storage.remove(AppConstants.userCacheKey);

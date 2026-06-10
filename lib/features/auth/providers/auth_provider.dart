@@ -28,29 +28,60 @@ enum AuthStatus {
   error,             // 认证错误
 }
 
+class RegistrationSession {
+  const RegistrationSession({
+    required this.userId,
+    required this.email,
+  });
+
+  final String userId;
+  final String email;
+
+  RegistrationSession copyWith({
+    String? userId,
+    String? email,
+  }) => RegistrationSession(
+    userId: userId ?? this.userId,
+    email: email ?? this.email,
+  );
+}
+
 /// 认证状态数据类
 class AuthState {
   const AuthState({
     this.status = AuthStatus.authenticating,
-    this.user, this.isLoading = false, this.errorMessage,
+    this.user,
+    this.isLoading = false,
+    this.errorMessage,
+    this.registrationSession,
   });
 
   final AuthStatus status;    // 当前状态
   final UserModel? user;     // 用户信息
   final bool isLoading;      // 是否加载中
   final String? errorMessage; // 错误信息
+  final RegistrationSession? registrationSession;
 
   /// 是否已登录
   bool get isAuthenticated => status == AuthStatus.authenticated && user != null;
 
   AuthState copyWith({
-    AuthStatus? status, UserModel? user, bool? isLoading,
-    String? errorMessage, bool clearUser = false, bool clearError = false,
+    AuthStatus? status,
+    UserModel? user,
+    bool? isLoading,
+    String? errorMessage,
+    RegistrationSession? registrationSession,
+    bool clearUser = false,
+    bool clearError = false,
+    bool clearRegistrationSession = false,
   }) => AuthState(
     status: status ?? this.status,
     user: clearUser ? null : (user ?? this.user),
     isLoading: isLoading ?? this.isLoading,
     errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+    registrationSession: clearRegistrationSession
+        ? null
+        : (registrationSession ?? this.registrationSession),
   );
 }
 
@@ -81,274 +112,252 @@ class AuthNotifier extends StateNotifier<AuthState> {
     });
   }
 
-  /// 初始化：检查缓存用户 + 监听 Firebase 状态变化
+  /// 初始化：检查 token 并恢复登录状态
   ///
   /// 统一认证入口：
-  /// 1. 若存在自动登录凭证，则优先恢复邮箱正式登录态；
-  /// 2. 若本地仍有后端 token，则优先按后端正式用户恢复；
-  /// 3. 若 Firebase 当前仍有第三方登录用户，再从 Firebase 恢复；
-  /// 4. 否则执行游客初始化。
+  /// 1. 有 token → 用 token 从后端获取用户信息
+  /// 2. 无 token → 进入游客模式
   ///
-  /// 注意：main.dart 不再提前做游客登录，避免启动阶段出现两套认证决策来源。
+  /// 注意：游客和正式账号共享同一套 token/userData 存储，
+  /// 区别只在于 isGuest 标记和后端返回的用户信息。
   Future<void> _init() async {
     final storage = _ref.read(storageServiceProvider);
     final authService = _ref.read(authServiceProvider);
-    final hasAutoLogin = await _repository.hasAutoLoginCredentials();
     final storedToken = await storage.getToken();
     final storedUserData = await authService.getUserData();
-    final firebaseUser = _repository.currentFirebaseUser;
 
     debugPrint(
       '[AuthNotifier] _init start '
-      'hasAutoLogin=$hasAutoLogin '
       'hasStoredToken=${storedToken != null && storedToken.isNotEmpty} '
-      'hasStoredUserData=${storedUserData != null} '
-      'firebaseCurrentUser=$firebaseUser',
+      'storedTokenPreview=${storedToken != null && storedToken.isNotEmpty ? '${storedToken.substring(0, storedToken.length > 12 ? 12 : storedToken.length)}...' : 'null'} '
+      'hasStoredUserData=${storedUserData != null}',
     );
 
-    if (hasAutoLogin) {
-      debugPrint('[AuthNotifier] auto-login credentials found, performing auto-login...');
+    if (storedToken != null && storedToken.isNotEmpty) {
+      debugPrint('[AuthNotifier] token found, fetching user info from backend...');
       state = state.copyWith(status: AuthStatus.authenticating, isLoading: true, clearError: true);
       try {
-        final user = await _repository.performAutoLogin();
-        state = state.copyWith(status: AuthStatus.authenticated, user: user, isLoading: false);
-        debugPrint('[AuthNotifier] auto-login succeeded');
-        _subscribeFirebaseAuth();
-        return;
+        final resp = await apiServiceProvider.getUserCenter();
+        if (resp.isSuccess && resp.data != null) {
+          await updateUserFromData(resp.data as Map<String, dynamic>);
+          debugPrint('[AuthNotifier] user info fetched from backend successfully');
+          return;
+        }
       } catch (e) {
-        debugPrint('[AuthNotifier] auto-login failed: $e, clearing credentials');
-        await _repository.clearAutoLoginCredentials();
-        state = state.copyWith(status: AuthStatus.unauthenticated, isLoading: false, clearUser: true);
+        debugPrint('[AuthNotifier] failed to fetch user info from backend: $e');
       }
+
+      // token 无效或当前 token 无法获取当前用户信息，直接清空并回到游客态
+      await _clearAllAuthData();
     }
 
-    final hasStoredFormalSession = await _hasRestorableFormalSession(
-      storedToken: storedToken,
-      storedUserData: storedUserData,
-      firebaseUser: firebaseUser,
-    );
-
-    if (hasStoredFormalSession) {
-      final restoredStoredUser = await _restoreStoredAuthenticatedUser(
-        storedToken: storedToken,
-        storedUserData: storedUserData,
-      );
-      if (restoredStoredUser) {
-        return;
-      }
-    }
-
-    if (firebaseUser != null) {
-      debugPrint('[AuthNotifier] falling back to Firebase authenticated user restore');
-      _subscribeFirebaseAuth();
-      await _onFirebaseAuthChanged(firebaseUser);
-      return;
-    }
-
+    // 无 token，进入游客模式
     await _enterGuestMode();
   }
 
-  Future<bool> _hasRestorableFormalSession({
-    required String? storedToken,
-    required Map<String, dynamic>? storedUserData,
-    required dynamic firebaseUser,
-  }) async {
-    final hasToken = storedToken != null && storedToken.isNotEmpty;
-    if (!hasToken || storedUserData == null) {
-      return false;
-    }
-
-    final user = UserModel.fromJson(storedUserData);
-    if (user.isTourist) {
-      return false;
-    }
-
-    final passportType = user.passportType ?? 0;
-    final hasEmailIdentity = (user.email?.trim().isNotEmpty ?? false);
-    final isFirebaseBackedIdentity = passportType == 1 || passportType == 2 || firebaseUser != null;
-    final canRestore = hasEmailIdentity || isFirebaseBackedIdentity;
-
-    debugPrint(
-      '[AuthNotifier] formal session check '
-      'hasEmailIdentity=$hasEmailIdentity '
-      'passportType=$passportType '
-      'firebaseCurrentUser=$firebaseUser '
-      'canRestore=$canRestore',
-    );
-
-    if (!canRestore) {
-      debugPrint('[AuthNotifier] stale stored formal session detected, clearing residual auth data');
-      await _clearFormalAuthPersistence();
-    }
-
-    return canRestore;
-  }
-
-  Future<bool> _restoreStoredAuthenticatedUser({
-    required String? storedToken,
-    required Map<String, dynamic>? storedUserData,
-  }) async {
-    final hasToken = storedToken != null && storedToken.isNotEmpty;
-    if (!hasToken) {
-      return false;
-    }
-
-    if (storedUserData == null) {
-      debugPrint('[AuthNotifier] stored token found but userData missing, cannot restore authenticated user');
-      return false;
-    }
-
-    final user = UserModel.fromJson(storedUserData);
-    if (user.isTourist) {
-      debugPrint('[AuthNotifier] stored token belongs to tourist identity, skip authenticated restore');
-      return false;
-    }
-
-    state = state.copyWith(
-      status: AuthStatus.authenticated,
-      user: user,
-      isLoading: false,
-      clearError: true,
-    );
-    debugPrint('[AuthNotifier] restored authenticated user from storage: ${user.userNickname}');
-    return true;
-  }
-
-  /// 订阅 Firebase Auth 状态变化（用于 Google/Apple 登录后的登出监听）
-  void _subscribeFirebaseAuth() {
-    _authSubscription?.cancel();
-    _authSubscription = _repository.authStateChanges.listen(
-      _onFirebaseAuthChanged,
-      onError: (Object e) => state = state.copyWith(
-        status: AuthStatus.error,
-        errorMessage: e.toString(),
-        isLoading: false,
-      ),
-    );
-  }
-
-  /// 初始化为游客（仅在未登录时调用，防止覆盖已有登录态）
-  ///
-  /// 这里既负责真正的 guest token 获取，也负责在游客接口失败时提供本地 guest UI fallback。
-  /// 游客/后端登录态统一只看 user_token；auth_token 仅表示 Firebase 身份，不代表后端接口已可用。
-  /// 这样可以避免 user_token 丢失但 auth_token 仍存在时，UI 与网络层判断不一致。
-  Future<void> initAsGuest() async {
-    debugPrint('[AuthNotifier] initAsGuest called, currentFirebaseUser: ${_repository.currentFirebaseUser}');
-
-    final hasRestorableFormalSession = await _hasRestorableFormalSession(
-      storedToken: await _ref.read(storageServiceProvider).getToken(),
-      storedUserData: await _ref.read(authServiceProvider).getUserData(),
-      firebaseUser: _repository.currentFirebaseUser,
-    );
-    if (hasRestorableFormalSession) {
-      final restoredStoredUser = await _restoreStoredAuthenticatedUser(
-        storedToken: await _ref.read(storageServiceProvider).getToken(),
-        storedUserData: await _ref.read(authServiceProvider).getUserData(),
-      );
-      if (restoredStoredUser) {
-        debugPrint('[AuthNotifier] initAsGuest aborted because authenticated user was restored from storage');
-        return;
-      }
-    }
-
-    final firebaseUser = _repository.currentFirebaseUser;
-    if (firebaseUser != null) {
-      debugPrint('[AuthNotifier] Firebase user exists, restoring third-party session');
-      _subscribeFirebaseAuth();
-      await _onFirebaseAuthChanged(firebaseUser);
-      return;
-    }
-
-    await _enterGuestMode();
-  }
-
-  Future<void> _enterGuestMode() async {
-    debugPrint('[AuthNotifier] no authenticated session, creating guest user and fetching guest token...');
-    final authService = _ref.read(authServiceProvider);
-    final loginResult = await authService.ensureGuestLogin();
-    final currentToken = await _ref.read(storageServiceProvider).getToken();
-    debugPrint(
-      '[AuthNotifier] guest login result: $loginResult tokenPresent=${currentToken != null && currentToken.isNotEmpty}',
-    );
-    final guestId = loginResult?.uuid ?? 'guest_${DateTime.now().millisecondsSinceEpoch}';
-    final guestUser = UserModel.guest(guestId);
-    state = state.copyWith(status: AuthStatus.authenticated, user: guestUser);
-  }
-
-  Future<void> _clearFormalAuthPersistence() async {
+  Future<void> _clearAllAuthData() async {
+    debugPrint('[AuthNotifier] clearing all auth data...');
     await _repository.clearAutoLoginCredentials();
     await _ref.read(authServiceProvider).logout();
     await _repository.signOut();
-    clearGuestLoginStatus();
+    state = state.copyWith(clearRegistrationSession: true);
+    debugPrint('[AuthNotifier] all auth data cleared');
+  }
+
+  /// 初始化为游客
+  Future<void> initAsGuest() async {
+    await _enterGuestMode();
+  }
+
+  /// 进入游客模式
+  Future<void> _enterGuestMode() async {
+    debugPrint('[AuthNotifier] entering guest mode...');
+    state = state.copyWith(status: AuthStatus.authenticating, isLoading: true, clearError: true);
+
+    final authService = _ref.read(authServiceProvider);
+    final loginResult = await authService.ensureGuestLogin();
+    final storage = _ref.read(storageServiceProvider);
+    final currentToken = await storage.getToken();
+    final hasGuestToken = currentToken != null && currentToken.isNotEmpty;
+
+    debugPrint(
+      '[AuthNotifier] guest login result: '
+      'uuid=${loginResult?.uuid} '
+      'resultTokenPresent=${loginResult?.token.isNotEmpty == true} '
+      'storedTokenPresent=$hasGuestToken',
+    );
+
+    if (!hasGuestToken) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        isLoading: false,
+        errorMessage: 'Guest login failed',
+        clearUser: true,
+      );
+      debugPrint('[AuthNotifier] failed to enter guest mode because no token was obtained');
+      return;
+    }
+
+    try {
+      final resp = await apiServiceProvider.getUserCenter();
+      if (resp.isSuccess && resp.data != null) {
+        final userData = resp.data as Map<String, dynamic>;
+        final fetchedUser = UserModel.fromJson(userData).copyWith(isGuest: false);
+        if (!fetchedUser.isTourist) {
+          await updateUserFromData(userData);
+          debugPrint(
+            '[AuthNotifier] guest fallback resolved to formal user, skip guest overwrite '
+            'userId=${fetchedUser.id}',
+          );
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('[AuthNotifier] guest mode verification failed: $e');
+    }
+
+    final currentUser = state.user;
+    if (currentUser != null && !currentUser.isTourist) {
+      debugPrint(
+        '[AuthNotifier] skip guest overwrite because formal user already active '
+        'userId=${currentUser.id}',
+      );
+      state = state.copyWith(status: AuthStatus.authenticated, isLoading: false, clearError: true);
+      return;
+    }
+
+    final guestId = loginResult?.uuid ?? 'guest_${DateTime.now().millisecondsSinceEpoch}';
+    final guestUser = UserModel.guest(guestId);
+
     state = state.copyWith(
-      status: AuthStatus.unauthenticated,
-      clearUser: true,
-      clearError: true,
+      status: AuthStatus.authenticated,
+      user: guestUser,
+      isLoading: false,
+      clearRegistrationSession: true,
+    );
+    debugPrint(
+      '[AuthNotifier] guest mode entered '
+      'userId: $guestId '
+      'tokenPresent=$hasGuestToken '
+      'isTourist=${guestUser.isTourist}',
     );
   }
 
-  /// Firebase 认证状态变化回调
-  Future<void> _onFirebaseAuthChanged(dynamic user) async {
-    debugPrint('[AuthNotifier] _onFirebaseAuthChanged user: $user, current status: ${state.status}');
-    if (user == null) {
-      final storedToken = await _ref.read(storageServiceProvider).getToken();
-      final storedUserData = await _ref.read(authServiceProvider).getUserData();
-      final restoredStoredUser = await _restoreStoredAuthenticatedUser(
-        storedToken: storedToken,
-        storedUserData: storedUserData,
-      );
-      if (restoredStoredUser) {
-        debugPrint('[AuthNotifier] Firebase user is null but backend-authenticated email user was restored from storage');
-        return;
-      }
-      // Firebase 用户登出时，清本地状态（邮箱登录/注册若仍有后端 token，会在上面被恢复）
-      state = state.copyWith(status: AuthStatus.unauthenticated, clearUser: true, isLoading: false, clearError: true);
-      return;
-    }
-    try {
-      final model = await _repository.resolveCurrentUser();
-      state = state.copyWith(status: AuthStatus.authenticated, user: model, isLoading: false, clearError: true);
-    } catch (e) {
-      state = state.copyWith(status: AuthStatus.error, errorMessage: _mapError(e), isLoading: false);
-    }
-  }
-
-  /// 检查认证状态
+  /// 检查认证状态并刷新用户信息
   Future<bool> checkAuthState() async {
     state = state.copyWith(status: AuthStatus.authenticating, isLoading: true, clearError: true);
     try {
-      final user = await _repository.resolveCurrentUser() ?? await _repository.resolveStoredUser();
-      if (user != null) {
-        state = state.copyWith(
-          status: AuthStatus.authenticated,
-          user: user,
-          isLoading: false,
-        );
+      final storage = _ref.read(storageServiceProvider);
+      final token = await storage.getToken();
+
+      if (token == null || token.isEmpty) {
+        // 无 token，进入游客模式
+        await _enterGuestMode();
+        return false;
+      }
+
+      // 有 token，从后端获取最新用户信息
+      final resp = await apiServiceProvider.getUserCenter();
+      if (resp.isSuccess && resp.data != null) {
+        await updateUserFromData(resp.data as Map<String, dynamic>);
+        return true;
       } else {
-        // 不再从缓存恢复游客；未命中正式登录态时交给后续游客初始化流程处理
-        state = state.copyWith(status: AuthStatus.unauthenticated, isLoading: false);
+        // 后端请求失败，清除 token 进入游客模式
+        await _clearAllAuthData();
+        await _enterGuestMode();
+        return false;
       }
     } catch (e) {
+      debugPrint('[AuthNotifier] checkAuthState error: $e');
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
         isLoading: false,
         errorMessage: _mapError(e),
       );
+      return false;
     }
-    return state.user != null && !state.user!.isTourist;
   }
 
   /// 邮箱登录
-  Future<bool> signInWithEmail(String email, String password) => _runAuth(() => _repository.signInWithEmail(email, password));
+  Future<bool> signInWithEmail(String email, String password) async {
+    final success = await _runAuth(() => _repository.signInWithEmail(email, password));
+    if (!success) return false;
+
+    state = state.copyWith(clearRegistrationSession: true);
+
+    try {
+      final resp = await apiServiceProvider.getUserCenter();
+      if (resp.isSuccess && resp.data != null) {
+        await updateUserFromData(resp.data as Map<String, dynamic>);
+      }
+    } catch (e) {
+      debugPrint('[AuthNotifier] signInWithEmail post-login profile refresh failed: $e');
+    }
+
+    return true;
+  }
+
+  /// 注册流程内使用的邮箱登录。
+  /// 只更新认证状态与用户信息，不承担页面跳转职责，避免与普通登录流程冲突。
+  Future<bool> signInWithEmailForRegistration(String email, String password) async {
+    final success = await _runAuth(() => _repository.signInWithEmail(email, password));
+    if (!success) return false;
+
+    final currentUser = state.user;
+    state = state.copyWith(
+      registrationSession: RegistrationSession(
+        userId: currentUser?.id ?? '',
+        email: (currentUser?.email ?? email).trim(),
+      ),
+    );
+
+    try {
+      final resp = await apiServiceProvider.getUserCenter();
+      if (resp.isSuccess && resp.data != null) {
+        await updateUserFromData(resp.data as Map<String, dynamic>);
+      }
+    } catch (e) {
+      debugPrint(
+        '[AuthNotifier] signInWithEmailForRegistration post-login profile refresh failed: $e',
+      );
+    }
+
+    return true;
+  }
 
   /// 邮箱注册
-  Future<bool> signUpWithEmail({required String email, required String password, required String username}) =>
-      _runAuth(() => _repository.signUpWithEmail(email: email, password: password, username: username));
+  Future<bool> signUpWithEmail({required String email, required String password, required String username}) async {
+    final success = await _runAuth(
+      () => _repository.signUpWithEmail(email: email, password: password, username: username),
+    );
+    if (!success) return false;
+
+    final currentUser = state.user;
+    state = state.copyWith(
+      registrationSession: RegistrationSession(
+        userId: currentUser?.id ?? '',
+        email: (currentUser?.email ?? email).trim(),
+      ),
+    );
+
+    try {
+      final resp = await apiServiceProvider.getUserCenter();
+      if (resp.isSuccess && resp.data != null) {
+        await updateUserFromData(resp.data as Map<String, dynamic>);
+      }
+    } catch (e) {
+      debugPrint('[AuthNotifier] signUpWithEmail post-login profile refresh failed: $e');
+    }
+
+    return true;
+  }
 
   /// Google 登录
   Future<bool> signInWithGoogle() async {
     final success = await _runAuth(_repository.signInWithGoogle);
     if (!success) return false;
+
+    state = state.copyWith(clearRegistrationSession: true);
 
     try {
       final resp = await apiServiceProvider.getUserCenter();
@@ -363,7 +372,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Apple 登录
-  Future<bool> signInWithApple() => _runAuth(_repository.signInWithApple);
+  Future<bool> signInWithApple() async {
+    final success = await _runAuth(_repository.signInWithApple);
+    if (!success) return false;
+
+    state = state.copyWith(clearRegistrationSession: true);
+
+    try {
+      final resp = await apiServiceProvider.getUserCenter();
+      if (resp.isSuccess && resp.data != null) {
+        await updateUserFromData(resp.data as Map<String, dynamic>);
+      }
+    } catch (e) {
+      debugPrint('[AuthNotifier] signInWithApple post-login profile refresh failed: $e');
+    }
+
+    return true;
+  }
 
   /// 发送重置密码邮件
   Future<bool> sendPasswordResetEmail(String email) async {
@@ -374,62 +399,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// 登出
   ///
-  /// 完全退出：清空所有正式登录信息，绝不从旧缓存恢复；
-  /// 随后仅重新建立游客态所需的最小状态。
+  /// 完全退出：清空所有登录信息，然后进入游客模式。
   Future<void> signOut() async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final storage = _ref.read(storageServiceProvider);
       debugPrint(
-        '[AuthNotifier.signOut] before logout '
+        '[AuthNotifier.signOut] clearing all auth data before logout '
         'userToken=${await storage.getToken()} '
-        'authToken=${await storage.getAuthTokenAsync()} '
-        'userData=${await storage.getUserData()} '
-        'autoLogin=${await storage.getAutoLogin()} '
-        'autoLoginEmail=${await storage.getAutoLoginEmail()} '
-        'currentUser=${state.user?.toJson()}',
+        'userData=${await storage.getUserData()}',
       );
 
-      state = state.copyWith(
-        status: AuthStatus.unauthenticated,
-        isLoading: true,
-        clearUser: true,
-        clearError: true,
-      );
+      // 清除所有认证数据
+      await _clearAllAuthData();
 
-      await _repository.clearAutoLoginCredentials();
-      await _ref.read(authServiceProvider).logout();
-      await _repository.signOut();
-      clearGuestLoginStatus();
+      // 进入游客模式
+      await _enterGuestMode();
 
-      debugPrint(
-        '[AuthNotifier.signOut] after clear '
-        'userToken=${await storage.getToken()} '
-        'authToken=${await storage.getAuthTokenAsync()} '
-        'userData=${await storage.getUserData()} '
-        'autoLogin=${await storage.getAutoLogin()} '
-        'autoLoginEmail=${await storage.getAutoLoginEmail()} '
-        'firebaseCurrentUser=${_repository.currentFirebaseUser}',
-      );
-
-      final authService = _ref.read(authServiceProvider);
-      final loginResult = await authService.ensureGuestLogin();
-      final currentToken = await storage.getToken();
-      final guestId = loginResult?.uuid ?? 'guest_${DateTime.now().millisecondsSinceEpoch}';
-      final guestUser = UserModel.guest(guestId);
-
-      state = state.copyWith(
-        status: AuthStatus.authenticated,
-        user: guestUser,
-        isLoading: false,
-        clearError: true,
-      );
-
-      debugPrint(
-        '[AuthNotifier.signOut] strict logout completed '
-        'guestTokenPresent=${currentToken != null && currentToken.isNotEmpty} '
-        'guestId=$guestId',
-      );
+      debugPrint('[AuthNotifier.signOut] logout completed, entered guest mode');
     } catch (e) {
       debugPrint('[AuthNotifier.signOut] error: $e');
       state = state.copyWith(
@@ -447,6 +434,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _ref.read(guestLoginProvider.notifier).state = GuestLoginStatus.initial;
   }
 
+  void clearRegistrationSession() {
+    state = state.copyWith(clearRegistrationSession: true);
+  }
+
   /// 更新头像（本地 + 后端）
   Future<void> updateAvatar(String avatarUrl) async {
     final currentUser = state.user;
@@ -460,68 +451,39 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// 从后端 /api/user/userPersonalCenter 返回的数据更新用户信息
+  ///
+  /// 登录正式账号时调用，直接使用后端返回的数据，不与旧游客数据混合。
   Future<void> updateUserFromData(Map<String, dynamic> data) async {
+    final incomingUser = UserModel.fromJson(data).copyWith(isGuest: false);
     final currentUser = state.user;
-    final rawPassportType = data['passportType'];
-    final nextPassportType = rawPassportType is int
-        ? rawPassportType
-        : int.tryParse(rawPassportType?.toString() ?? '');
-    final hasExplicitLoggedInIdentity =
-        (data['email']?.toString().trim().isNotEmpty ?? false) ||
-        (nextPassportType != null && nextPassportType != 0);
-    final currentUserIsLoggedIn = currentUser != null && !currentUser.isTourist;
-    final shouldDiscardGuestBase =
-        currentUser != null && currentUser.isTourist && hasExplicitLoggedInIdentity;
 
-    final mergedData = <String, dynamic>{
-      if (currentUser != null && !shouldDiscardGuestBase) ...currentUser.toJson(),
-      ...data,
-    };
-
-    final shouldPreserveLoggedInIdentity =
-        currentUserIsLoggedIn && !hasExplicitLoggedInIdentity;
-
-    if (hasExplicitLoggedInIdentity) {
-      mergedData['isGuest'] = false;
-    } else if (shouldPreserveLoggedInIdentity) {
-      mergedData['isGuest'] = false;
-      mergedData['email'] = currentUser.email;
-      mergedData['nickName'] = mergedData['nickName'] ?? currentUser.nickname ?? currentUser.displayName;
-      mergedData['displayName'] = mergedData['displayName'] ?? currentUser.displayName ?? currentUser.nickname;
-      mergedData['avatar'] = mergedData['avatar'] ?? currentUser.avatar ?? currentUser.photoURL;
-      mergedData['photoURL'] = mergedData['photoURL'] ?? currentUser.photoURL ?? currentUser.avatar;
-    } else if (currentUser?.isTourist ?? false) {
-      mergedData['isGuest'] = true;
+    if (currentUser != null &&
+        !currentUser.isTourist &&
+        incomingUser.isTourist &&
+        incomingUser.id != currentUser.id) {
+      debugPrint(
+        '[AuthNotifier] ignore tourist overwrite '
+        'currentId=${currentUser.id} incomingId=${incomingUser.id}',
+      );
+      state = state.copyWith(isLoading: false, clearError: true);
+      return;
     }
 
-    final currentPassportType = shouldDiscardGuestBase ? null : currentUser?.passportType;
-    final shouldPreserveLoggedInPassportType =
-        currentPassportType != null &&
-        currentPassportType != 0 &&
-        (nextPassportType == null || nextPassportType == 0);
+    await _repository.saveUserData(incomingUser.toJson());
+    await _repository.cacheUser(incomingUser);
 
-    if (shouldPreserveLoggedInPassportType) {
-      mergedData['passportType'] = currentPassportType;
-    }
-
-    mergedData['userId'] =
-        data['userId']?.toString() ??
-        data['id']?.toString() ??
-        mergedData['userId']?.toString() ??
-        mergedData['id']?.toString() ??
-        currentUser?.id ??
-        '';
-
-    final user = UserModel.fromJson(mergedData);
-    final shouldWriteUserCache = !user.isTourist;
-    if (shouldWriteUserCache) {
-      await _repository.saveUserData(user.toJson());
-      await _repository.cacheUser(user);
-    }
     state = state.copyWith(
       status: AuthStatus.authenticated,
-      user: user,
+      user: incomingUser,
       clearError: true,
+      isLoading: false,
+    );
+
+    debugPrint(
+      '[AuthNotifier] user data updated from backend: '
+      'nickname=${incomingUser.userNickname} '
+      'id=${incomingUser.id} '
+      'isTourist=${incomingUser.isTourist}',
     );
   }
 
@@ -598,24 +560,41 @@ class AuthNotifier extends StateNotifier<AuthState> {
         case 'google-sign-in-config-error':
           return 'Google sign-in configuration is invalid for this build. Please verify Firebase/Google sign-in setup.';
       }
-      return error.message;
+      return _normalizeErrorMessage(error.message);
     }
 
-    final errorString = error.toString();
-    if (errorString.contains('invalid-email')) return 'Invalid email address';
-    if (errorString.contains('user-disabled')) return 'This account has been disabled';
-    if (errorString.contains('user-not-found')) return 'No account found with this email';
-    if (errorString.contains('wrong-password')) return 'Incorrect password';
-    if (errorString.contains('email-already-in-use')) return 'Email is already registered';
-    if (errorString.contains('weak-password')) return 'Password is too weak';
-    if (errorString.contains('operation-not-allowed')) return 'This sign-in method is not enabled';
-    if (errorString.contains('invalid-credential')) return 'Invalid credentials';
-    if (errorString.contains('network-request-failed')) return 'Network error. Please check your connection';
-    if (errorString.contains('ApiException: 7') || errorString.contains('network_error')) {
+    final errorString = _normalizeErrorMessage(error.toString());
+    final normalizedLower = errorString.toLowerCase();
+
+    if (normalizedLower.contains('invalid-email')) return 'Invalid email address';
+    if (normalizedLower.contains('user-disabled')) return 'This account has been disabled';
+    if (normalizedLower.contains('user-not-found')) return 'No account found with this email';
+    if (normalizedLower.contains('wrong-password')) return 'Incorrect password';
+    if (normalizedLower.contains('email-already-in-use')) return 'Email is already registered';
+    if (normalizedLower.contains('weak-password')) return 'Password is too weak';
+    if (normalizedLower.contains('operation-not-allowed')) return 'This sign-in method is not enabled';
+    if (normalizedLower.contains('invalid-credential')) return 'Invalid credentials';
+    if (normalizedLower.contains('network-request-failed')) return 'Network error. Please check your connection';
+    if (normalizedLower.contains('token is missing')) return 'Login failed. Please try again.';
+    if (normalizedLower.contains('guest login failed')) return 'Unable to enter guest mode. Please try again.';
+    if (normalizedLower.contains('login failed')) return 'Login failed. Please check your account and password.';
+    if (normalizedLower.contains('registration failed')) return 'Registration failed. Please try again.';
+    if (normalizedLower.contains('email is already registered')) return 'Email is already registered';
+    if (normalizedLower.contains('passwords do not match')) return 'Passwords do not match';
+    if (normalizedLower.contains('apiexception: 7') || normalizedLower.contains('network_error')) {
       return 'Google sign-in could not reach Google services. Please check your network and Google Play services, then try again.';
     }
 
-    return errorString;
+    return errorString.isEmpty ? 'Something went wrong. Please try again.' : errorString;
+  }
+
+  String _normalizeErrorMessage(String message) {
+    final normalized = message
+        .replaceFirst(RegExp(r'^Exception:\s*', caseSensitive: false), '')
+        .replaceFirst(RegExp(r'^FirebaseAuthException\([^)]+\):\s*', caseSensitive: false), '')
+        .replaceFirst(RegExp(r'^\[[^\]]+\]\s*'), '')
+        .trim();
+    return normalized;
   }
 
   @override void dispose() { _authSubscription?.cancel(); super.dispose(); }

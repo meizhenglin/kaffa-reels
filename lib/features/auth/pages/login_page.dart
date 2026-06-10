@@ -8,9 +8,10 @@ import '../../../components/rtl_back_button.dart';
 import '../../home/pages/main_page.dart' show currentTabIndexProvider;
 
 class LoginPage extends ConsumerStatefulWidget {
-  const LoginPage({super.key, this.redirect});
+  const LoginPage({super.key, this.redirect, this.backTarget = '/'});
 
   final String? redirect;
+  final String backTarget;
 
   @override
   ConsumerState<LoginPage> createState() => _LoginPageState();
@@ -18,7 +19,7 @@ class LoginPage extends ConsumerStatefulWidget {
 
 class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserver {
   bool _appIsInForeground = true;
-  ProviderSubscription<AuthState>? _authStateSubscription;
+  bool _googleSignInInProgress = false;
 
   void _showMessage(String message, {bool isError = false}) {
     if (!mounted || message.trim().isEmpty) return;
@@ -38,45 +39,31 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
     if (!mounted) return;
 
     final target = widget.redirect;
-    if (target != null && target.isNotEmpty) {
-      if (target == '/profile') {
+    final shouldSelectProfileTab = (target == null || target.isEmpty || target == '/profile');
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (shouldSelectProfileTab) {
         ref.read(currentTabIndexProvider.notifier).state = 4;
       }
-      context.go(target);
-      return;
-    }
 
-    context.push('/auth/photo-setting');
+      if (target != null && target.isNotEmpty) {
+        context.go(target);
+        return;
+      }
+
+      context.go('/profile');
+    });
   }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _authStateSubscription = ref.listenManual<AuthState>(
-      authProvider,
-      (previous, next) {
-        final errorMessage = next.errorMessage?.trim();
-        final previousErrorMessage = previous?.errorMessage?.trim();
-        final shouldShowError =
-            errorMessage != null &&
-            errorMessage.isNotEmpty &&
-            next.status == AuthStatus.error &&
-            errorMessage != previousErrorMessage;
-        if (!shouldShowError || !_appIsInForeground || !mounted) {
-          return;
-        }
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || !_appIsInForeground) return;
-          _showMessage(errorMessage, isError: true);
-        });
-      },
-    );
   }
 
   @override
   void dispose() {
-    _authStateSubscription?.close();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -86,6 +73,9 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
     switch (state) {
       case AppLifecycleState.resumed:
         _appIsInForeground = true;
+        if (_googleSignInInProgress) {
+          _googleSignInInProgress = false;
+        }
         break;
       case AppLifecycleState.inactive:
       case AppLifecycleState.paused:
@@ -118,12 +108,12 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                   Row(
                     children: [
                       RtlBackButton(
-                        onPressed: () {
+                        onPressed: () async {
                           final navigator = Navigator.of(context);
-                          if (navigator.canPop()) {
-                            navigator.pop();
-                          } else {
-                            context.go('/');
+                          final didPop = await navigator.maybePop();
+                          if (!context.mounted) return;
+                          if (!didPop) {
+                            context.go(widget.backTarget);
                           }
                         },
                         color: Colors.white,
@@ -182,10 +172,15 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                             iconPath: 'assets/images/email_icon.png',
                             isLoading: false,
                             onTap: () {
-                              context.pushNamed<String>(
-                                'loginEmail',
-                                extra: widget.redirect,
-                              );
+                              final backTarget = Uri.encodeComponent('/auth/login?back=${Uri.encodeComponent(widget.backTarget)}');
+                              final redirect = widget.redirect == null
+                                  ? null
+                                  : Uri.encodeComponent(widget.redirect!);
+                              final route = StringBuffer('/auth/login/email?back=$backTarget');
+                              if (redirect != null) {
+                                route.write('&redirect=$redirect');
+                              }
+                              context.push(route.toString());
                             },
                           ),
                           const SizedBox(height: 15),
@@ -202,14 +197,16 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                 label: 'Continue with Google',
                                 isLoading: isLoading,
                                 onTap: () async {
-                                  if (!_appIsInForeground) return;
+                                  if (!_appIsInForeground || _googleSignInInProgress) return;
                                   debugPrint('[LoginPage] Google button tapped');
+                                  _googleSignInInProgress = true;
                                   ref.read(authProvider.notifier).clearError();
                                   await Future<void>.delayed(Duration.zero);
                                   final success = await ref
                                       .read(authProvider.notifier)
                                       .signInWithGoogle();
-                                  if (!mounted || !_appIsInForeground) return;
+                                  _googleSignInInProgress = false;
+                                  if (!mounted) return;
                                   debugPrint('[LoginPage] Google sign-in returned success=$success error=${ref.read(authProvider).errorMessage}');
                                   if (success) {
                                     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -217,12 +214,14 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                     });
                                     return;
                                   }
-                                  if (ref.read(authProvider).status != AuthStatus.error) {
-                                    _showMessage(
-                                      'Google sign-in did not complete. Please try again.',
-                                      isError: true,
-                                    );
+                                  final authState = ref.read(authProvider);
+                                  if (authState.status == AuthStatus.error) {
+                                    return;
                                   }
+                                  _showMessage(
+                                    'Google sign-in did not complete. Please try again.',
+                                    isError: true,
+                                  );
                                 },
                               );
                             },
@@ -262,7 +261,10 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                   ),
                   const Spacer(),
                   GestureDetector(
-                    onTap: () => context.push('/auth/register'),
+                    onTap: () {
+                      final registerBackTarget = Uri.encodeComponent('/auth/login?back=${Uri.encodeComponent(widget.backTarget)}');
+                      context.push('/auth/register/email?back=$registerBackTarget');
+                    },
                     child: Center(
                       child: RichText(
                         text: TextSpan(

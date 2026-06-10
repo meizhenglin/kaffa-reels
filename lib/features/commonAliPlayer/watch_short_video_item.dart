@@ -51,7 +51,7 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
   bool _hasPlayer = false;
   bool _isFetchingPlayableUrl = false;
   bool _isPlaying = false;
-  bool _showControls = false;
+  bool _showControls = true;
   Timer? _controlsHideTimer;
   bool _showCenterPlayPause = false;
   bool _didNotifyCompletion = false;
@@ -80,11 +80,7 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
     if (widget.autoPlay) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        setState(() {
-          _showControls = true;
-        });
         _showCenterPlayPauseOverlay();
-        _restartControlsHideTimer();
       });
     }
 
@@ -276,13 +272,6 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
 
   void _restartControlsHideTimer() {
     _controlsHideTimer?.cancel();
-    _controlsHideTimer = Timer(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      setState(() {
-        _showControls = false;
-        _showCenterPlayPause = false;
-      });
-    });
   }
 
   void _showCenterPlayPauseOverlay() {
@@ -301,23 +290,10 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
   }
 
   void _handleScreenTap() {
-    _centerPlayPauseTimer?.cancel();
-    _controlsHideTimer?.cancel();
-
-    final shouldShow = !_showControls;
-    if (mounted) {
-      setState(() {
-        _showControls = shouldShow;
-        _showCenterPlayPause = widget.lockedPreviewMode ? false : shouldShow;
-      });
+    if (widget.lockedPreviewMode) {
+      return;
     }
-
-    if (shouldShow) {
-      if (!widget.lockedPreviewMode) {
-        _showCenterPlayPauseOverlay();
-      }
-      _restartControlsHideTimer();
-    }
+    _togglePlaybackFromCenter();
   }
 
   void _togglePlaybackFromCenter() {
@@ -325,11 +301,6 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
       pause();
     } else {
       resume();
-    }
-    if (!_showControls && mounted) {
-      setState(() {
-        _showControls = true;
-      });
     }
     _showCenterPlayPauseOverlay();
     _restartControlsHideTimer();

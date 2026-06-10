@@ -4,6 +4,7 @@ import 'package:flutter_aliplayer/flutter_aliplayer.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../utils/drama_navigation.dart';
 import 'mini_player_controller.dart';
 import 'episode_selection_sheet.dart';
 
@@ -256,7 +257,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayerWidget>
         },
         onUnlockTap: () {
           Navigator.pop(ctx);
-          context.push('/membership');
+          openMembershipPage(context, ref);
         },
       ),
     );

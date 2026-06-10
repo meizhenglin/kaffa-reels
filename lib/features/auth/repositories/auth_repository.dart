@@ -263,28 +263,20 @@ class AuthRepository {
 
     final data = resp.data as Map<String, dynamic>?;
 
-    // 保存后端返回的 Token
     final token = data?['token'] as String?;
-    if (token != null) {
-      await _storage.saveToken(token);
+    if (token == null || token.isEmpty) {
+      throw Exception('Login succeeded but token is missing');
     }
+    await _storage.saveToken(token);
 
-    // 登录接口直接返回用户数据（userId、token 等）
-    final userData = data ?? <String, dynamic>{};
-
-    // 保存到 user_data（头像、昵称等展示数据）和 cached_user（完整 UserModel）
-    await _storage.saveUserData(userData);
-
-    final userId = userData['userId']?.toString() ?? userData['id']?.toString() ?? email;
-    final user = UserModel.fromJson({
-      ...userData,
+    final userId = data?['userId']?.toString() ?? data?['id']?.toString() ?? email;
+    return UserModel.fromJson({
+      ...?data,
       'userId': userId,
       'email': email.trim(),
-      'passportType': userData['passportType'] ?? 1,
+      'passportType': data?['passportType'] ?? 1,
       'isGuest': false,
     });
-    await cacheUser(user);
-    return user;
   }
 
   Future<UserModel> signUpWithEmail({
@@ -303,16 +295,16 @@ class AuthRepository {
       throw Exception(resp.error ?? 'Registration failed');
     }
 
-    // 保存后端返回的 Token
     final data = resp.data as Map<String, dynamic>?;
     final token = data?['token'] as String?;
-    if (token != null) {
+    if (token != null && token.isNotEmpty) {
       await _storage.saveToken(token);
+    } else {
+      _logger.d('[AuthRepo] registration succeeded without token, will sign in next');
     }
 
-    // 用后端数据构建用户模型（优先用后端返回的字段）
     final userId = data?['userId']?.toString() ?? data?['id']?.toString() ?? email;
-    final user = UserModel.fromJson({
+    return UserModel.fromJson({
       ...?data,
       'userId': userId,
       'email': email.trim(),
@@ -320,9 +312,6 @@ class AuthRepository {
       'passportType': data?['passportType'] ?? 1,
       'isGuest': false,
     });
-    await _storage.saveUserData(user.toJson());
-    await cacheUser(user);
-    return user;
   }
 
   Future<User> _reloadUser(User user) async {
@@ -508,7 +497,7 @@ class AuthRepository {
     }
 
     // 同步 Apple Token 到后端
-    await _syncBackendToken(() => apiServiceProvider.appleLogin(
+    final backendSynced = await _syncBackendToken(() => apiServiceProvider.appleLogin(
       identityToken: appleCredential.identityToken ?? '',
       authorizationCode: appleCredential.authorizationCode,
       fullName: [
@@ -519,6 +508,9 @@ class AuthRepository {
         if (appleCredential.familyName != null) appleCredential.familyName,
       ].join(' '),
     ));
+    if (!backendSynced) {
+      throw StateError('Apple sign-in succeeded, but backend token sync failed.');
+    }
 
     final givenName = appleCredential.givenName;
     final familyName = appleCredential.familyName;

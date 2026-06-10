@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "278933660671-f9ml2o28rin5fshq84domurq77nrr3t7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.video.storydrama",
+            "certificate_hash": "21cd459e53dfc9149c39a78f484943d97e61d7ca"
+          }
+        },
+        {
           "client_id": "278933660671-jrqbp7tau6kofqgnar97qrat346uv0kp.apps.googleusercontent.com",
           "client_type": 3
         }

@@ -12,9 +12,13 @@ import '../../../l10n/app_localizations.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../../core/network/api_service.dart';
 import '../providers/auth_provider.dart';
+import '../providers/auth_provider.dart' show AuthState;
+import 'photo_setting_page.dart' show RegistrationFlowContext;
 
 class RegisterEmailPage extends ConsumerStatefulWidget {
-  const RegisterEmailPage({super.key});
+  const RegisterEmailPage({super.key, this.backTarget = '/auth/login'});
+
+  final String backTarget;
 
   @override
   ConsumerState<RegisterEmailPage> createState() => _RegisterEmailPageState();
@@ -35,24 +39,56 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
   bool _isConfirmLoading = false;
   int _countdown = 0;
   Timer? _timer;
+  Timer? _errorClearTimer;
+  ProviderSubscription<AuthState>? _authErrorSubscription;
 
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _passwordFormKey = GlobalKey<FormState>();
 
-  Future<void> _confirmPassword() async {
-    debugPrint('[RegisterEmail] _confirmPassword called, email=${_emailController.text}');
-    if (!_passwordFormKey.currentState!.validate()) {
-      debugPrint('[RegisterEmail] form validation failed');
+  @override
+  void initState() {
+    super.initState();
+    _emailController.addListener(_clearAuthErrorOnInput);
+    _codeController.addListener(_clearAuthErrorOnInput);
+    _passwordController.addListener(_clearAuthErrorOnInput);
+    _confirmPasswordController.addListener(_clearAuthErrorOnInput);
+    _authErrorSubscription = ref.listenManual<AuthState>(
+      authProvider,
+      (previous, next) => _scheduleErrorAutoClear(next.errorMessage),
+    );
+  }
+
+  void _scheduleErrorAutoClear(String? errorMessage) {
+    _errorClearTimer?.cancel();
+    final message = errorMessage?.trim();
+    if (message == null || message.isEmpty) {
       return;
     }
+    _errorClearTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      final authState = ref.read(authProvider);
+      if (authState.errorMessage == message) {
+        ref.read(authProvider.notifier).clearError();
+      }
+    });
+  }
+
+  void _clearAuthErrorOnInput() {
+    _errorClearTimer?.cancel();
+    final authState = ref.read(authProvider);
+    if (authState.errorMessage != null && authState.errorMessage!.isNotEmpty) {
+      ref.read(authProvider.notifier).clearError();
+    }
+  }
+
+  Future<void> _confirmPassword() async {
+    if (!_passwordFormKey.currentState!.validate()) return;
     if (!_agreePolicy) {
       _policyShakeKey.currentState?.shake();
-      debugPrint('[RegisterEmail] policy not agreed');
       return;
     }
 
-    debugPrint('[RegisterEmail] starting signUpWithEmail...');
     setState(() => _isLoading = true);
 
     final success = await ref.read(authProvider.notifier).signUpWithEmail(
@@ -61,13 +97,27 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
       username: _emailController.text.split('@').first,
     );
 
-    debugPrint('[RegisterEmail] signUpWithEmail result: $success');
     if (!mounted) return;
 
     setState(() => _isLoading = false);
 
-      if (success) {
-      debugPrint('[RegisterEmail] success, fetching user info...');
+    if (success) {
+      final loginSuccess = await ref.read(authProvider.notifier).signInWithEmailForRegistration(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+      if (!mounted) return;
+      if (!loginSuccess) {
+        final errorMsg = ref.read(authProvider).errorMessage;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg ?? 'Registration succeeded, but login failed'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       try {
         final resp = await apiServiceProvider.getUserCenter();
         if (resp.isSuccess && resp.data != null) {
@@ -88,10 +138,18 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
         }
       } catch (_) {}
       if (!mounted) return;
-      context.push('/auth/photo-setting', extra: true);
+      final authState = ref.read(authProvider);
+      final registeredUser = authState.user;
+      final registrationSession = authState.registrationSession;
+      final registrationContext = RegistrationFlowContext(
+        email: registrationSession?.email ?? _emailController.text.trim(),
+        userId: registrationSession?.userId ?? registeredUser?.id ?? '',
+      );
+      debugPrint('[RegisterEmail] registration flow ready, opening photo-setting');
+      ref.read(authProvider.notifier).clearGuestLoginStatus();
+      GoRouter.of(context).go('/auth/photo-setting', extra: registrationContext);
     } else {
       final errorMsg = ref.read(authProvider).errorMessage;
-      debugPrint('[RegisterEmail] failed: $errorMsg');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(errorMsg ?? 'Registration failed'),
@@ -103,6 +161,12 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
 
   @override
   void dispose() {
+    _authErrorSubscription?.close();
+    _errorClearTimer?.cancel();
+    _emailController.removeListener(_clearAuthErrorOnInput);
+    _codeController.removeListener(_clearAuthErrorOnInput);
+    _passwordController.removeListener(_clearAuthErrorOnInput);
+    _confirmPasswordController.removeListener(_clearAuthErrorOnInput);
     _emailController.dispose();
     _codeController.dispose();
     _passwordController.dispose();
@@ -226,12 +290,8 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
                     children: [
                       RtlBackButton(
                         onPressed: () {
-                          final navigator = Navigator.of(context);
-                          if (navigator.canPop()) {
-                            navigator.pop();
-                          } else {
-                            context.push('/auth/login');
-                          }
+                          ref.read(authProvider.notifier).clearError();
+                          context.go(widget.backTarget);
                         },
                         color: Colors.white,
                         constraints: const BoxConstraints(minWidth: 20, minHeight: 20),

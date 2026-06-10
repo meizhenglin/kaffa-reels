@@ -45,8 +45,13 @@ class _MainPageState extends ConsumerState<MainPage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.navigationShell.currentIndex !=
         widget.navigationShell.currentIndex) {
-      ref.read(currentTabIndexProvider.notifier).state =
-          widget.navigationShell.currentIndex;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        ref.read(currentTabIndexProvider.notifier).state =
+            widget.navigationShell.currentIndex;
+      });
     }
   }
 

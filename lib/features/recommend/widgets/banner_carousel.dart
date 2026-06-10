@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../home/models/home_card_layout.dart';
 import '../../home/providers/last_watched_provider.dart';
 import '../models/banner.dart';
+import '../utils/drama_navigation.dart';
 
 /// ============================================================================
 /// Banner 轮播图组件
@@ -195,7 +196,7 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
                 ),
                 SizedBox(width: HomeCardLayout.bannerScaled(context, 8)),
                 _ActionButton(
-                  onTap: () => context.push('/membership'),
+                  onTap: () => openMembershipPage(context, ref),
                   isVip: true,
                   child: Image.asset(
                     'assets/images/vip_icon.png',

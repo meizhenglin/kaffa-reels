@@ -268,16 +268,7 @@ class ShortVideoItemState extends State<ShortVideoItem> {
   }
 
   void _handleScreenTap() {
-    final shouldShow = !_showCenterPlayPause;
-    _centerPlayPauseTimer?.cancel();
-    if (mounted) {
-      setState(() {
-        _showCenterPlayPause = shouldShow;
-      });
-    }
-    if (shouldShow) {
-      _showCenterPlayPauseOverlay();
-    }
+    _togglePlaybackFromCenter();
   }
 
   Widget _buildAnimatedCenterPlayPauseButton() {

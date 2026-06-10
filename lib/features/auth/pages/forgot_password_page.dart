@@ -158,7 +158,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
         ),
         const SizedBox(height: 32),
         FilledButton(
-          onPressed: () => context.go('/auth/login'),
+          onPressed: () => context.go('/auth/login?back=/auth/login/email'),
           child: Text(l10n.login),
         ),
       ],

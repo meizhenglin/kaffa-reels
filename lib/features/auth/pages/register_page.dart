@@ -8,9 +8,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../../components/rtl_back_button.dart';
 import '../../../core/network/api_service.dart';
 import '../providers/auth_provider.dart';
-import '../../../components/rtl_back_button.dart';
+import 'photo_setting_page.dart' show RegistrationFlowContext;
 
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key, this.redirect});
@@ -60,6 +61,24 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     setState(() => _isLoading = false);
 
     if (success) {
+      final loginSuccess = await ref.read(authProvider.notifier).signInWithEmailForRegistration(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+
+      if (!mounted) return;
+
+      if (!loginSuccess) {
+        final errorMsg = ref.read(authProvider).errorMessage;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg ?? 'Registration succeeded, but login failed'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       try {
         final resp = await apiServiceProvider.getUserCenter();
         if (resp.isSuccess && resp.data != null) {
@@ -83,7 +102,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       } catch (_) {}
 
       if (!mounted) return;
-      context.push('/auth/photo-setting', extra: true);
+      final registeredUser = ref.read(authProvider).user;
+      final registrationContext = RegistrationFlowContext(
+        email: _emailController.text.trim(),
+        userId: registeredUser?.id ?? '',
+      );
+      debugPrint('[RegisterPage] registration flow ready, opening photo-setting');
+      ref.read(authProvider.notifier).clearGuestLoginStatus();
+      GoRouter.of(context).go('/auth/photo-setting', extra: registrationContext);
     } else {
       final errorMsg = ref.read(authProvider).errorMessage;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -217,12 +243,16 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   Row(
                     children: [
                       RtlBackButton(
-                        onPressed: () {
+                        onPressed: () async {
+                          ref.read(authProvider.notifier).clearError();
                           final navigator = Navigator.of(context);
-                          if (navigator.canPop()) {
-                            navigator.pop();
-                          } else {
-                            context.push('/auth/login');
+                          final didPop = await navigator.maybePop();
+                          debugPrint('[RegisterPage] back pressed, didPop=$didPop currentRoute=${GoRouterState.of(context).matchedLocation}');
+                          if (!context.mounted) {
+                            return;
+                          }
+                          if (!didPop) {
+                            context.go('/auth/login');
                           }
                         },
                         color: Colors.white,

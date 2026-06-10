@@ -65,11 +65,6 @@ import '../../features/splash/pages/splash_page.dart';
 /// - 添加路由参数：在 path 中使用 :paramName 格式
 /// ============================================================================
 
-/// 需要登录才能访问的认证相关路由
-/// 【作用】当用户已登录时，访问这些路由会自动重定向到首页
-/// 【修改提示】如果添加新的认证页面，需要在这里添加路径
-const _authRoutes = ['/auth/login', '/auth/register', '/auth/forgot-password'];
-
 // ==================== 导航键定义 ====================
 /// 根导航器键（用于全屏页面，如播放器、登录等）
 final rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -106,8 +101,15 @@ final shellNavigatorProfileKey =
 /// ============================================================================
 class _RouterRefreshNotifier extends ChangeNotifier {
   _RouterRefreshNotifier(this._ref) {
-    // 监听 authProvider，当认证状态变化时通知监听器
-    _ref.listen(authProvider, (_, __) => notifyListeners());
+    // 监听 authProvider，当认证状态变化时通知监听器。
+    // 延后到微任务里通知，避免在 widget tree 正在构建时同步触发 GoRouter 刷新。
+    _ref.listen(authProvider, (_, __) {
+      Future.microtask(() {
+        if (hasListeners) {
+          notifyListeners();
+        }
+      });
+    });
   }
 
   final Ref _ref;
@@ -133,22 +135,8 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: refreshNotifier,
 
     /// 路由守卫：每次路由变化时都会执行
-    ///
-    /// 【原则】Storage 有 token → status=authenticated → 视为已登录
-    /// 只要 status=authenticated，访问 /auth/* 页面就重定向到首页
     redirect: (context, state) {
-      final auth = ref.read(authProvider);
-      final location = state.matchedLocation;
-      final isAuthRoute = _authRoutes.any(location.startsWith);
-      final isFullyLoggedIn = auth.status == AuthStatus.authenticated &&
-          auth.user != null &&
-          !auth.user!.isTourist;
-
-      // 只有真正已登录的非游客用户，访问登录/注册页时才重定向到首页
-      if (isAuthRoute && isFullyLoggedIn) {
-        return '/';
-      }
-
+      // 目前不执行任何重定向。已登录用户访问 auth 页是正常行为。
       return null;
     },
 
@@ -311,9 +299,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         path: '/auth/photo-setting',
         name: 'photo-setting',
-        builder: (context, state) => PhotoSettingPage(
-          fromRegister: state.extra as bool? ?? false,
-        ),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is RegistrationFlowContext) {
+            return PhotoSettingPage(
+              fromRegister: extra.fromRegister,
+              registrationContext: extra,
+            );
+          }
+          return PhotoSettingPage(
+            fromRegister: extra as bool? ?? false,
+          );
+        },
       ),
 
       /// 改名页面（root 路由，pop 返回正确）
@@ -321,9 +318,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         path: '/change-name',
         name: 'change-name',
-        builder: (context, state) => ChangeNamePage(
-          fromRegister: state.extra as bool? ?? false,
-        ),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is RegistrationFlowContext) {
+            return ChangeNamePage(
+              fromRegister: extra.fromRegister,
+              registrationContext: extra,
+            );
+          }
+          return ChangeNamePage(
+            fromRegister: extra as bool? ?? false,
+          );
+        },
       ),
 
       GoRoute(
@@ -382,7 +388,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'login',
         builder: (context, state) {
           final redirect = state.uri.queryParameters['redirect'];
-          return LoginPage(redirect: redirect);
+          final backTarget = state.uri.queryParameters['back'] ?? '/';
+          return LoginPage(redirect: redirect, backTarget: backTarget);
         },
         routes: [
           /// 邮箱登录页面
@@ -392,8 +399,9 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: 'email',
             name: 'loginEmail',
             builder: (context, state) {
-              final redirect = state.extra as String?;
-              return LoginEmailPage(redirect: redirect);
+              final redirect = state.uri.queryParameters['redirect'] ?? (state.extra as String?);
+              final backTarget = state.uri.queryParameters['back'] ?? '/auth/login';
+              return LoginEmailPage(redirect: redirect, backTarget: backTarget);
             },
           ),
         ],
@@ -406,7 +414,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         path: '/auth/register',
         name: 'register',
-        builder: (context, state) => const RegisterEmailPage(),
+        builder: (context, state) {
+          final backTarget = state.uri.queryParameters['back'] ?? '/auth/login';
+          return RegisterEmailPage(backTarget: backTarget);
+        },
       ),
 
       /// 邮箱注册页面
@@ -415,7 +426,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         path: '/auth/register/email',
         name: 'registerEmail',
-        builder: (context, state) => const RegisterEmailPage(),
+        builder: (context, state) {
+          final backTarget = state.uri.queryParameters['back'] ?? '/auth/login/email';
+          return RegisterEmailPage(backTarget: backTarget);
+        },
       ),
 
       /// 用户协议页面

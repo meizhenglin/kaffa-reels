@@ -8,7 +8,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/auth_provider.dart' show apiServiceProviderRef;
 import '../../home/pages/main_page.dart' show currentTabIndexProvider;
 import '../../auth/providers/auth_provider.dart'
-    show AuthState, AuthStatus, authProvider, authServiceProvider;
+    show AuthState, AuthStatus, authProvider;
 import '../../recommend/utils/drama_navigation.dart';
 import 'chat_page.dart';
 
@@ -93,6 +93,15 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
       return;
     }
 
+    final isTourist = currentUser.isTourist;
+
+    debugPrint(
+      '[ProfileTab._loadUserInfo] requesting user center '
+      'status=${authState.status} '
+      'isTourist=$isTourist '
+      'id=${currentUser.id}',
+    );
+
     try {
       final resp = await ref.read(apiServiceProviderRef).getUserCenter();
       if (resp.isSuccess && resp.data != null && mounted) {
@@ -101,19 +110,12 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
         ref.read(authProvider.notifier).updateUserFromData(userData);
         return;
       }
-      debugPrint('[ProfileTab._loadUserInfo] getUserCenter failed: success=${resp.isSuccess} data=${resp.data}');
+      debugPrint(
+        '[ProfileTab._loadUserInfo] getUserCenter failed: '
+        'success=${resp.isSuccess} data=${resp.data} isTourist=$isTourist',
+      );
     } catch (e) {
-      debugPrint('[ProfileTab._loadUserInfo] getUserCenter error: $e');
-    }
-
-    // 网络失败时降级读取 Storage 缓存（仅正式登录用户）
-    if (mounted) {
-      final authService = ref.read(authServiceProvider);
-      final userData = await authService.getUserData();
-      debugPrint('[ProfileTab._loadUserInfo] fallback storage userData=$userData');
-      if (userData != null && mounted) {
-        ref.read(authProvider.notifier).updateUserFromData(userData);
-      }
+      debugPrint('[ProfileTab._loadUserInfo] getUserCenter error: $e isTourist=$isTourist');
     }
   }
   @override
@@ -271,7 +273,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
           )
         else
           GestureDetector(
-            onTap: () => context.push('/auth/login?redirect=/profile'),
+            onTap: () => context.push('/auth/login?redirect=/profile&back=/profile'),
             child: Container(
               padding: const EdgeInsetsDirectional.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(

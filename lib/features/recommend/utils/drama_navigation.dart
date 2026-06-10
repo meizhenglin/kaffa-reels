@@ -19,6 +19,7 @@ Future<bool> openMembershipPage(
   BuildContext context,
   WidgetRef ref, {
   String redirect = '/membership',
+  String? backTarget,
   bool showLoginPrompt = true,
 }) async {
   final authState = ref.read(authProvider);
@@ -32,7 +33,8 @@ Future<bool> openMembershipPage(
         SnackBar(content: Text(AppLocalizations.of(context).membershipLoginBeforeSubscribe)),
       );
     }
-    await context.push('/auth/login?redirect=$redirect');
+    final loginBackTarget = Uri.encodeComponent(backTarget ?? GoRouterState.of(context).uri.toString());
+    await context.push('/auth/login?redirect=$redirect&back=$loginBackTarget');
     return false;
   }
 
@@ -63,6 +65,7 @@ VipAccessResult checkVipAccess({
 /// 显示 VIP 权限拒绝弹窗
 Future<void> showVipAccessDeniedDialog(
   BuildContext context,
+  WidgetRef ref,
   VipAccessResult result,
 ) async {
   final l10n = AppLocalizations.of(context);
@@ -82,9 +85,10 @@ Future<void> showVipAccessDeniedDialog(
           onPressed: () {
             Navigator.pop(ctx);
             if (isLogin) {
-              context.push('/login');
+              final backTarget = Uri.encodeComponent(GoRouterState.of(context).uri.toString());
+              context.push('/auth/login?back=$backTarget');
             } else {
-              context.push('/membership');
+              openMembershipPage(context, ref, showLoginPrompt: false);
             }
           },
           child: Text(isLogin ? l10n.login : l10n.subscribe),

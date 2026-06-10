@@ -1,20 +1,22 @@
+import 'dart:async';
+
 import 'package:email_validator/email_validator.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/providers/app_providers.dart';
 import '../../../core/providers/auth_provider.dart' show apiServiceProviderRef;
-import '../../../core/utils/app_restart.dart';
 import '../../../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
+import '../providers/auth_provider.dart' show AuthState;
 import '../../../components/rtl_back_button.dart';
 
 class LoginEmailPage extends ConsumerStatefulWidget {
-  const LoginEmailPage({super.key, this.redirect});
+  const LoginEmailPage({super.key, this.redirect, this.backTarget = '/auth/login'});
 
   final String? redirect;
+  final String backTarget;
 
   @override
   ConsumerState<LoginEmailPage> createState() => _LoginEmailPageState();
@@ -26,11 +28,42 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _autoLogin = false;
+  Timer? _errorClearTimer;
+  ProviderSubscription<AuthState>? _authErrorSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadAutoLoginSettings();
+    _emailController.addListener(_clearAuthErrorOnInput);
+    _passwordController.addListener(_clearAuthErrorOnInput);
+    _authErrorSubscription = ref.listenManual<AuthState>(
+      authProvider,
+      (previous, next) => _scheduleErrorAutoClear(next.errorMessage),
+    );
+  }
+
+  void _scheduleErrorAutoClear(String? errorMessage) {
+    _errorClearTimer?.cancel();
+    final message = errorMessage?.trim();
+    if (message == null || message.isEmpty) {
+      return;
+    }
+    _errorClearTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      final authState = ref.read(authProvider);
+      if (authState.errorMessage == message) {
+        ref.read(authProvider.notifier).clearError();
+      }
+    });
+  }
+
+  void _clearAuthErrorOnInput() {
+    _errorClearTimer?.cancel();
+    final authState = ref.read(authProvider);
+    if (authState.errorMessage != null && authState.errorMessage!.isNotEmpty) {
+      ref.read(authProvider.notifier).clearError();
+    }
   }
 
   Future<void> _loadAutoLoginSettings() async {
@@ -40,15 +73,21 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
     if (mounted) {
       setState(() {
         _autoLogin = enabled;
-        if (savedEmail != null && savedEmail.isNotEmpty) {
-          _emailController.text = savedEmail;
-        }
       });
+      if (savedEmail != null && savedEmail.isNotEmpty) {
+        _emailController.removeListener(_clearAuthErrorOnInput);
+        _emailController.text = savedEmail;
+        _emailController.addListener(_clearAuthErrorOnInput);
+      }
     }
   }
 
   @override
   void dispose() {
+    _authErrorSubscription?.close();
+    _errorClearTimer?.cancel();
+    _emailController.removeListener(_clearAuthErrorOnInput);
+    _passwordController.removeListener(_clearAuthErrorOnInput);
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -117,12 +156,7 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
       return;
     }
 
-    if (kIsWeb) {
-      router.go('/');
-      return;
-    }
-
-    await AppRestart.restart();
+    router.go('/profile');
   }
 
   @override
@@ -150,12 +184,12 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                   Row(
                     children: [
                       RtlBackButton(
-                        onPressed: () {
+                        onPressed: () async {
                           final navigator = Navigator.of(context);
-                          if (navigator.canPop()) {
-                            navigator.pop();
-                          } else {
-                            context.push('/auth/login');
+                          final didPop = await navigator.maybePop();
+                          if (!context.mounted) return;
+                          if (!didPop) {
+                            context.go(widget.backTarget);
                           }
                         },
                         color: Colors.white,
@@ -345,7 +379,11 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                   ),
                   const Spacer(),
                   GestureDetector(
-                    onTap: () => context.push('/auth/register'),
+                        onTap: () {
+                          ref.read(authProvider.notifier).clearError();
+                          final registerBackTarget = Uri.encodeComponent('/auth/login/email?back=${Uri.encodeComponent(widget.backTarget)}');
+                          context.push('/auth/register/email?back=$registerBackTarget');
+                        },
                     child: RichText(
                       text: const TextSpan(
                         text: 'Do not have StoryDrama account? ',

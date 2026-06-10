@@ -484,6 +484,10 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
   bool _isEpisodeLocked(int index) {
     if (index < 0 || index >= videoInfoList.length) return false;
+    final memberState = ref.read(memberStateProvider);
+    if (memberState.isVip && !memberState.isExpired) {
+      return false;
+    }
     return videoInfoList[index].isCanPlay == 0;
   }
 
@@ -529,9 +533,12 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       if (!mounted) return;
       if (purchased) {
         await ref.read(memberStateProvider.notifier).refreshStatus();
+        _clearPendingLockedOverlay();
+        if (mounted) {
+          setState(() {});
+        }
         final retryIndex = lockedIndex ?? _pendingLockedEpisodeIndex;
         if (retryIndex != null) {
-          _clearPendingLockedOverlay();
           await _jumpToEpisode(retryIndex);
         }
       }
@@ -625,11 +632,13 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
+        final memberState = ref.watch(memberStateProvider);
         return _WatchEpisodeBottomSheet(
           episodes: videoInfoList,
           currentIndex: _currentIndex,
           title: currentEpisode.title,
           coverUrl: currentEpisode.coverUrl,
+          isVipUnlocked: memberState.isVip && !memberState.isExpired,
           onEpisodeTap: (index) async {
             Navigator.of(sheetContext).pop();
             await _jumpToEpisode(index);
@@ -774,7 +783,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   Widget _buildItem(BuildContext context, int index) {
     final videoItem = videoInfoList[index];
     final autoPlay = index == _currentIndex;
-    final lockedPreviewMode = _showWatchNowOverlay && index == _currentIndex;
+    final lockedPreviewMode =
+        _showWatchNowOverlay && index == _currentIndex && _isEpisodeLocked(index);
     return WatchShortVideoItem(
       key: _itemKeys[index],
       videoInfo: videoItem,
@@ -880,6 +890,7 @@ class _WatchEpisodeBottomSheet extends StatefulWidget {
     required this.currentIndex,
     required this.title,
     required this.coverUrl,
+    required this.isVipUnlocked,
     required this.onEpisodeTap,
     required this.onReportTap,
   });
@@ -888,6 +899,7 @@ class _WatchEpisodeBottomSheet extends StatefulWidget {
   final int currentIndex;
   final String title;
   final String? coverUrl;
+  final bool isVipUnlocked;
   final ValueChanged<int> onEpisodeTap;
   final VoidCallback onReportTap;
 
@@ -1216,7 +1228,7 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
 
   Widget _buildEpisodeItem(VideoInfo episode, int index) {
     final isCurrent = index == widget.currentIndex;
-    final isLocked = episode.isCanPlay == 0;
+    final isLocked = !widget.isVipUnlocked && episode.isCanPlay == 0;
     final isRtl = Directionality.of(context) == TextDirection.rtl;
     return GestureDetector(
       onTap: () => widget.onEpisodeTap(index),
