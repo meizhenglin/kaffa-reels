@@ -52,9 +52,7 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
             child: BannerCarousel(
               banners: recommendState.banners.isNotEmpty
                   ? recommendState.banners
-                  : recommendState.isLoading
-                      ? [preloadBanner]
-                      : const <BannerItem>[],
+                  : [preloadBanner],
               height: HomeCardLayout.scaled(context, 540),
               onBannerTap: (banner) => _onBannerTap(banner),
               onSearchTap: () => context.push('/search'),

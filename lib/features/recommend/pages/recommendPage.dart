@@ -276,28 +276,26 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     final watchLabel = _watchLabel(l10n);
     return GestureDetector(
       onTap: _openFullscreen,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.3),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.play_circle_outline,
-              color: Colors.white,
-              size: 24,
-            ),
+      child: Container(
+        width: 68,
+        height: 32,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF8F4EFF), Color(0xFFBB44FF)],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
           ),
-          const SizedBox(height: 4),
-          Text(
-            watchLabel,
-            style: const TextStyle(color: Colors.white, fontSize: 12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          watchLabel,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
           ),
-        ],
+        ),
       ),
     );
   }
@@ -353,30 +351,31 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   }
 
   Widget _buildSideActionButton({
-    required IconData icon,
+    required String activeImage,
+    required String inactiveImage,
     required String label,
     required VoidCallback onTap,
+    bool isActive = false,
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.3),
-              shape: BoxShape.circle,
+      child: SizedBox(
+        width: 68,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              isActive ? activeImage : inactiveImage,
+              width: 44,
+              height: 44,
             ),
-            child: Icon(icon, color: Colors.white, size: 24),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white, fontSize: 12),
-          ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -407,15 +406,19 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildSideActionButton(
-              icon: isLiked ? Icons.favorite : Icons.favorite_border,
+              activeImage: 'assets/images/like_active.png',
+              inactiveImage: 'assets/images/like.png',
               label: _formatActionCount(likeCount),
               onTap: () => _toggleLike(videoInfo),
+              isActive: isLiked,
             ),
             const SizedBox(height: 16),
             _buildSideActionButton(
-              icon: isCollected ? Icons.star_rounded : Icons.star_border_rounded,
+              activeImage: 'assets/images/collection_active.png',
+              inactiveImage: 'assets/images/collection.png',
               label: _formatActionCount(collectCount),
               onTap: () => _toggleCollect(videoInfo),
+              isActive: isCollected,
             ),
             const SizedBox(height: 16),
             _buildWatchButton(l10n),

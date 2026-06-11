@@ -5,8 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../components/preload_network_image.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../home/models/home_card_layout.dart';
 import '../../home/providers/last_watched_provider.dart';
+import '../../../l10n/app_localizations.dart';
 import '../models/banner.dart';
 import '../utils/drama_navigation.dart';
 
@@ -196,7 +199,29 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
                 ),
                 SizedBox(width: HomeCardLayout.bannerScaled(context, 8)),
                 _ActionButton(
-                  onTap: () => openMembershipPage(context, ref),
+                  onTap: () {
+                    final authState = ref.read(authProvider);
+                    final isTourist = authState.user == null || authState.user!.isTourist;
+                    if (isTourist) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            AppLocalizations.of(context).loginSubtitle,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.black),
+                          ),
+                          backgroundColor: const Color(0xFFFFFFFF),
+                          duration: const Duration(seconds: 2),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+                    openMembershipPage(context, ref);
+                  },
                   isVip: true,
                   child: Image.asset(
                     'assets/images/vip_icon.png',
@@ -407,9 +432,12 @@ class _BannerImageLayer extends StatelessWidget {
   final String imageUrl;
   final bool isLoading;
 
+  /// 是否是本地资源（占位图）
+  bool get _isLocalAsset => imageUrl.startsWith('assets/') || imageUrl.isEmpty;
+
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
+    if (isLoading || _isLocalAsset) {
       return _buildPreloadBackground();
     }
 
@@ -422,26 +450,12 @@ class _BannerImageLayer extends StatelessWidget {
           _BlurredBannerBackground(imageUrl: imageUrl),
           ColoredBox(color: Colors.black.withValues(alpha: 0.18)),
           Center(
-            child: Image.network(
-              imageUrl,
-              fit: BoxFit.cover,
+            child: PreloadNetworkImage(
+              imageUrl: imageUrl,
+              preloadAsset: 'assets/images/banner_preload_bg.png',
               width: double.infinity,
               height: double.infinity,
-              alignment: Alignment.center,
-              loadingBuilder: (_, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _buildPreloadBackground(),
-                    Center(child: child),
-                  ],
-                );
-              },
-              errorBuilder: (_, __, ___) => Container(
-                color: Colors.grey.shade300,
-                child: const Icon(Icons.image_not_supported),
-              ),
+              fit: BoxFit.cover,
             ),
           ),
         ],

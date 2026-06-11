@@ -75,6 +75,16 @@ class StorageService {
     return _prefs?.getString(key);
   }
 
+  /// 保存整数到本地存储
+  Future<void> setInt(String key, int value) async {
+    await _prefs?.setInt(key, value);
+  }
+
+  /// 从本地存储读取整数
+  int getInt(String key) {
+    return _prefs?.getInt(key) ?? 0;
+  }
+
   /// 删除指定键名的存储数据
   /// [key] 要删除的存储键名
   Future<void> remove(String key) async {
@@ -513,5 +523,67 @@ class StorageService {
     await _prefs?.remove(AppConstants.autoLoginEmailKey);
     await _prefs?.remove(AppConstants.autoLoginTimestampKey);
     await _secureStorage.delete(key: AppConstants.autoLoginPasswordKey);
+  }
+
+  // ==================== 待处理支付回调 (SharedPreferences) ====================
+  /// 待处理支付的数据结构
+  static const String _pendingPaymentsKey = 'pending_google_payments';
+  /// 待处理支付过期时间（7天）
+  static const int _pendingPaymentExpireDays = 7;
+
+  /// 保存待处理的 Google 支付回调数据
+  Future<void> savePendingPayment(Map<String, dynamic> paymentData) async {
+    // 添加保存时间戳
+    final dataWithTimestamp = Map<String, dynamic>.from(paymentData);
+    dataWithTimestamp['savedAt'] = DateTime.now().millisecondsSinceEpoch;
+
+    final pendingList = await getPendingPayments();
+    pendingList.add(dataWithTimestamp);
+    await _prefs?.setString(_pendingPaymentsKey, jsonEncode(pendingList));
+    debugPrint('Saved pending payment: orderId=${paymentData['orderId']}, total pending: ${pendingList.length}');
+  }
+
+  /// 获取所有待处理的支付回调数据（自动清理过期数据）
+  Future<List<Map<String, dynamic>>> getPendingPayments() async {
+    final jsonStr = _prefs?.getString(_pendingPaymentsKey);
+    if (jsonStr == null || jsonStr.isEmpty) return [];
+    try {
+      final List<dynamic> list = jsonDecode(jsonStr);
+      final payments = list.cast<Map<String, dynamic>>();
+
+      // 清理过期数据
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final expireThreshold = _pendingPaymentExpireDays * 24 * 60 * 60 * 1000;
+      final validPayments = payments.where((p) {
+        final savedAt = p['savedAt'] as int?;
+        if (savedAt == null) return false;
+        return (now - savedAt) < expireThreshold;
+      }).toList();
+
+      // 如果有数据被清理，更新存储
+      if (validPayments.length != payments.length) {
+        await _prefs?.setString(_pendingPaymentsKey, jsonEncode(validPayments));
+        debugPrint('Cleaned up ${payments.length - validPayments.length} expired pending payments');
+      }
+
+      return validPayments;
+    } catch (e) {
+      debugPrint('Error reading pending payments: $e');
+      return [];
+    }
+  }
+
+  /// 删除指定的待处理支付
+  Future<void> removePendingPayment(String orderId) async {
+    final pendingList = await getPendingPayments();
+    pendingList.removeWhere((p) => p['orderId'] == orderId);
+    await _prefs?.setString(_pendingPaymentsKey, jsonEncode(pendingList));
+    debugPrint('Removed pending payment: orderId=$orderId, remaining: ${pendingList.length}');
+  }
+
+  /// 清除所有待处理支付
+  Future<void> clearAllPendingPayments() async {
+    await _prefs?.remove(_pendingPaymentsKey);
+    debugPrint('Cleared all pending payments');
   }
 }

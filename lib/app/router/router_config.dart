@@ -17,6 +17,7 @@ import '../../features/home/pages/home_tab.dart';
 import '../../features/home/pages/main_page.dart';
 import '../../features/home/models/navigation_item.dart';
 import '../../features/payment/pages/membership_page.dart';
+import '../../features/payment/pages/recharge_page.dart';
 import '../../features/profile/pages/profile_tab.dart';
 import '../../features/profile/pages/settings_page.dart';
 import '../../features/profile/pages/change_name_page.dart';
@@ -400,8 +401,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             name: 'loginEmail',
             builder: (context, state) {
               final redirect = state.uri.queryParameters['redirect'] ?? (state.extra as String?);
-              final backTarget = state.uri.queryParameters['back'] ?? '/auth/login';
-              return LoginEmailPage(redirect: redirect, backTarget: backTarget);
+              return LoginEmailPage(redirect: redirect);
             },
           ),
         ],
@@ -467,6 +467,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/membership',
         name: 'membership',
         builder: (context, state) => const MembershipPage(),
+      ),
+
+      /// K币充值页面
+      /// 【路径】/recharge
+      /// 【功能】显示充值套餐列表
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/recharge',
+        name: 'recharge',
+        builder: (context, state) => const RechargePage(),
       ),
 
       /// 观看历史页面

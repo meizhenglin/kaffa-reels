@@ -15,6 +15,8 @@ import '../payment/providers/membership_provider.dart';
 import 'ali_player_preload.dart';
 import 'watch_short_video_item.dart';
 
+enum VideoQuality { quality480P, quality720P, quality1080P }
+
 const bool _showWatchPlaybackDebug = false;
 
 enum _EpisodeSheetTab { episodes, content }
@@ -149,6 +151,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   static const String _tag = 'ShortVideoPage';
 
   int? _pendingLockedDialogIndex;
+  String _currentQuality = '480P';
 
   Future<void> _toggleLike(VideoInfo videoInfo) async {
     final videoId = videoInfo.videoId.toString();
@@ -188,6 +191,14 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           currentValue: currentValue,
           currentCount: currentCount,
         );
+  }
+
+  void _shareVideo() {
+    final videoInfo = videoInfoList[_currentIndex];
+    final shareCount = videoInfo.shareNum;
+    if (shareCount > 0) {
+      // TODO: implement share functionality
+    }
   }
 
   late List<VideoInfo> videoInfoList;
@@ -704,10 +715,224 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
                 ),
               ),
             ),
+            _buildQualityButton(context),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildQualityButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _showQualityPicker(context),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _currentQuality,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 2),
+            Image.asset(
+              'assets/images/hd_icon.png',
+              width: 24,
+              height: 24,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showQualityPicker(BuildContext context) {
+    final memberState = ref.read(memberStateProvider);
+    final isVip = memberState.isVip && !memberState.isExpired;
+    final screenWidth = MediaQuery.of(context).size.width;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          width: screenWidth,
+          height: 150,
+          decoration: const BoxDecoration(
+            color: Color(0xFF15161A),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(15),
+              topRight: Radius.circular(15),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 15),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'Unlock the clarity level',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            color: Color(0xFFFFFFFF),
+                          ),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () => Navigator.of(sheetContext).pop(),
+                          child: Image.asset(
+                            'assets/images/clarity_cancel_icon.png',
+                            width: 12,
+                            height: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 5, bottom: 20),
+                      child: Row(
+                        children: [
+                          _buildQualityItem('480P', true, true, sheetContext),
+                          const Spacer(),
+                          _buildQualityItem('720P', true, true, sheetContext),
+                          const Spacer(),
+                          _buildQualityItem('1080P', false, isVip, sheetContext),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildQualityItem(String label, bool isEnabled, bool isVipUnlocked, BuildContext sheetContext) {
+    return GestureDetector(
+      onTap: () {
+        if (label == '1080P' && !isVipUnlocked) {
+          Navigator.of(sheetContext).pop();
+          _showVipPurchaseDialog();
+          return;
+        }
+        if (isEnabled && isVipUnlocked) {
+          Navigator.of(sheetContext).pop();
+          setState(() {
+            _currentQuality = label;
+          });
+        }
+      },
+      child: SizedBox(
+        width: 106,
+        height: 40,
+        child: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: isVipUnlocked ? const Color(0xFF2D2E32) : null,
+            borderRadius: BorderRadius.circular(10),
+            image: isVipUnlocked
+                ? null
+                : const DecorationImage(
+                    image: AssetImage('assets/images/clarity_bg.png'),
+                    fit: BoxFit.cover,
+                  ),
+          ),
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (label == '1080P')
+                const Padding(
+                  padding: EdgeInsets.only(right: 6),
+                  child: Image(
+                    image: AssetImage('assets/images/vip_icon.png'),
+                    width: 24,
+                    height: 19,
+                  ),
+                ),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  color: isVipUnlocked ? Colors.white : const Color(0xFF3A1D00),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showVipPurchaseDialog() async {
+    final l10n = AppLocalizations.of(context);
+    final dialogContext = context;
+    final shouldConfirm = await showDialog<bool>(
+      context: dialogContext,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(
+            l10n.watchLockedReminderTitle,
+            textAlign: TextAlign.center,
+          ),
+          content: Text(
+            l10n.watchLockedReminderMessage,
+            textAlign: TextAlign.center,
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(l10n.common_cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(l10n.common_confirm),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted) return;
+    if (shouldConfirm == true) {
+      // Pause playback before opening membership page
+      _pauseCurrent();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      final purchased = await openMembershipPage(
+        context,
+        ref,
+        showLoginPrompt: false,
+      );
+      if (!mounted) return;
+      if (purchased) {
+        await ref.read(memberStateProvider.notifier).refreshStatus();
+        if (mounted) {
+          setState(() {});
+        }
+      }
+      // Resume playback when returning from membership page
+      if (mounted) {
+        _resumeCurrent();
+      }
+    }
   }
 
   Widget _buildDefaultSideOverlay(BuildContext context, VideoInfo videoInfo) {
@@ -728,20 +953,33 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildSideActionButton(
-              icon: isLiked ? Icons.favorite : Icons.favorite_border,
+            _buildSideImageButton(
+              activeImage: 'assets/images/like_active.png',
+              inactiveImage: 'assets/images/like.png',
               label: _formatActionCount(likeCount),
               onTap: () => _toggleLike(videoInfo),
+              isActive: isLiked,
             ),
             const SizedBox(height: 16),
-            _buildSideActionButton(
-              icon: isCollected ? Icons.star_rounded : Icons.star_border_rounded,
+            _buildSideImageButton(
+              activeImage: 'assets/images/collection_active.png',
+              inactiveImage: 'assets/images/collection.png',
               label: _formatActionCount(collectCount),
               onTap: () => _toggleCollect(videoInfo),
+              isActive: isCollected,
             ),
+            // TODO: 待实现分享功能
+            // const SizedBox(height: 16),
+            // _buildSideImageButton(
+            //   activeImage: 'assets/images/share.png',
+            //   inactiveImage: 'assets/images/share.png',
+            //   label: l10n.share,
+            //   onTap: _shareVideo,
+            // ),
             const SizedBox(height: 16),
-            _buildSideActionButton(
-              icon: Icons.list_alt_rounded,
+            _buildSideImageButton(
+              activeImage: 'assets/images/series.png',
+              inactiveImage: 'assets/images/series.png',
               label: l10n.episode,
               onTap: _showEpisodePicker,
             ),
@@ -751,24 +989,22 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     );
   }
 
-  Widget _buildSideActionButton({
-    required IconData icon,
+  Widget _buildSideImageButton({
+    required String activeImage,
+    required String inactiveImage,
     required String label,
     required VoidCallback onTap,
+    bool isActive = false,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
+          Image.asset(
+            isActive ? activeImage : inactiveImage,
             width: 44,
             height: 44,
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.3),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: Colors.white, size: 24),
           ),
           const SizedBox(height: 4),
           Text(

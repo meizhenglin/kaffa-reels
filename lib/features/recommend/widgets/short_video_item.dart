@@ -146,27 +146,21 @@ class ShortVideoItemState extends State<ShortVideoItem> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildActionButton(
-            icon: Icons.favorite_border,
+          _buildActionImageButton(
+            activeImage: 'assets/images/like_active.png',
+            inactiveImage: 'assets/images/like.png',
             label: 'Like',
             onTap: () {
               // TODO: implement like functionality
             },
           ),
           const SizedBox(height: 16),
-          _buildActionButton(
-            icon: Icons.comment_outlined,
-            label: 'Comment',
+          _buildActionImageButton(
+            activeImage: 'assets/images/collection_active.png',
+            inactiveImage: 'assets/images/collection.png',
+            label: 'Collect',
             onTap: () {
-              // TODO: implement comment functionality
-            },
-          ),
-          const SizedBox(height: 16),
-          _buildActionButton(
-            icon: Icons.share_outlined,
-            label: 'Share',
-            onTap: () {
-              // TODO: implement share functionality
+              // TODO: implement collect functionality
             },
           ),
         ],
@@ -174,25 +168,23 @@ class ShortVideoItemState extends State<ShortVideoItem> {
     );
   }
 
-  /// Build a single action button
-  Widget _buildActionButton({
-    required IconData icon,
+  /// Build a single action button with image
+  Widget _buildActionImageButton({
+    required String activeImage,
+    required String inactiveImage,
     required String label,
     required VoidCallback onTap,
+    bool isActive = false,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
+          Image.asset(
+            isActive ? activeImage : inactiveImage,
             width: 44,
             height: 44,
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.3),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: Colors.white, size: 24),
           ),
           const SizedBox(height: 4),
           Text(

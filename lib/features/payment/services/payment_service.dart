@@ -62,10 +62,34 @@ class PaymentService {
     required List<String> productIds,
     bool requireSubscriptionOnAndroid = false,
   }) async {
+    // Sanitize product IDs: trim whitespace, remove invisible chars
+    final sanitizedIds = productIds.map((id) {
+      final cleaned = id.replaceAll(RegExp(r'[\u0000-\u001F\u007F\u200E\u200F\u202A-\u202E\s]'), '');
+      final trimmed = cleaned.trim();
+      if (trimmed != id) {
+        debugPrint('IAP product ID sanitized: "$id" -> "$trimmed"');
+      }
+      return trimmed;
+    }).toList();
+
+    debugPrint(
+      'IAP querying ${sanitizedIds.length} product IDs: $sanitizedIds',
+    );
+
     try {
+      debugPrint('IAP queryProductDetails: about to call store API...');
       final response = await _inAppPurchase.queryProductDetails(
-        productIds.toSet(),
+        sanitizedIds.toSet(),
       );
+      debugPrint('IAP queryProductDetails: store API returned');
+
+      debugPrint('IAP queryProductDetails response:');
+      debugPrint('  - error: ${response.error}');
+      debugPrint('  - notFoundIDs count: ${response.notFoundIDs.length}');
+      if (response.notFoundIDs.isNotEmpty) {
+        debugPrint('  - notFoundIDs: ${response.notFoundIDs.join(', ')}');
+      }
+      debugPrint('  - productDetails count: ${response.productDetails.length}');
 
       if (response.error != null) {
         debugPrint('Error fetching products: ${response.error}');
@@ -83,15 +107,15 @@ class PaymentService {
             ? product.productDetails.productType
             : 'unknown';
         debugPrint(
-          'IAP product loaded: id=${product.id}, title=${product.title}, '
-          'price=${product.price}, type=$googlePlayType',
+          'IAP product loaded: id="${product.id}", title="${product.title}", '
+          'price="${product.price}", type=$googlePlayType',
         );
       }
 
       if (requireSubscriptionOnAndroid && defaultTargetPlatform == TargetPlatform.android) {
         final invalidProducts = _availableProducts.where((product) {
           return product is! GooglePlayProductDetails ||
-              product.productDetails.productType != 'subs';
+              product.productDetails.productType.toString() != 'ProductType.subs';
         }).toList();
 
         if (invalidProducts.isNotEmpty) {
@@ -112,6 +136,7 @@ class PaymentService {
       return _availableProducts;
     } catch (e) {
       debugPrint('Exception fetching products: $e');
+      debugPrint('Stack trace: $e');
       _onPurchaseError?.call('Failed to fetch products: $e');
       return [];
     }
@@ -123,7 +148,7 @@ class PaymentService {
     return [];
   }
 
-  /// Initiate a subscription purchase flow
+  /// Initiate a subscription purchase flow (non-consumable)
   Future<bool> purchase({
     required ProductDetails product,
     String? applicationUserName,
@@ -145,25 +170,16 @@ class PaymentService {
         applicationUserName: applicationUserName,
       );
 
-      final isAndroidSubscription = product is GooglePlayProductDetails &&
-          product.productDetails.productType == 'subs';
       final googlePlayType = product is GooglePlayProductDetails
           ? product.productDetails.productType
           : 'unknown';
-
       debugPrint(
-        'Starting purchase: id=${product.id}, type=$googlePlayType, '
-        'branch=${isAndroidSubscription ? 'subs' : 'inapp'}',
+        'Starting purchase: id=${product.id}, type=$googlePlayType',
       );
 
-      final success = isAndroidSubscription
-          ? await _inAppPurchase.buyConsumable(
-              purchaseParam: purchaseParam,
-              autoConsume: false,
-            )
-          : await _inAppPurchase.buyNonConsumable(
-              purchaseParam: purchaseParam,
-            );
+      final success = await _inAppPurchase.buyNonConsumable(
+        purchaseParam: purchaseParam,
+      );
 
       if (!success) {
         _onPurchaseError?.call('Failed to open Google Play purchase sheet.');
@@ -171,6 +187,48 @@ class PaymentService {
       return success;
     } catch (e) {
       debugPrint('Purchase error: $e');
+      _onPurchaseError?.call('Purchase failed: $e');
+      return false;
+    }
+  }
+
+  /// Initiate a consumable purchase flow (coins/recharges)
+  /// Consumables need to be consumed after purchase to allow repurchase
+  Future<bool> purchaseConsumable({
+    required ProductDetails product,
+    String? applicationUserName,
+  }) async {
+    if (!_isInitialized) {
+      final initialized = await initialize(
+        onPurchaseComplete: _onPurchaseComplete,
+        onPurchaseError: _onPurchaseError,
+      );
+      if (!initialized) {
+        debugPrint('PaymentService not initialized');
+        return false;
+      }
+    }
+
+    try {
+      final purchaseParam = PurchaseParam(
+        productDetails: product,
+        applicationUserName: applicationUserName,
+      );
+
+      debugPrint(
+        'Starting consumable purchase: id=${product.id}',
+      );
+
+      final success = await _inAppPurchase.buyConsumable(
+        purchaseParam: purchaseParam,
+      );
+
+      if (!success) {
+        _onPurchaseError?.call('Failed to open Google Play purchase sheet.');
+      }
+      return success;
+    } catch (e) {
+      debugPrint('Consumable purchase error: $e');
       _onPurchaseError?.call('Purchase failed: $e');
       return false;
     }
@@ -202,13 +260,22 @@ class PaymentService {
   }
 
   /// Handle purchase update from the stream
-  void _handlePurchaseUpdate(List<PurchaseDetails> purchaseDetailsList) {
+  Future<void> _handlePurchaseUpdate(List<PurchaseDetails> purchaseDetailsList) async {
     for (final purchase in purchaseDetailsList) {
       switch (purchase.status) {
         case PurchaseStatus.purchased:
         case PurchaseStatus.restored:
+          // 方案A: 先 Acknowledge，等完成后再调 API 回调
+          if (purchase.pendingCompletePurchase) {
+            try {
+              debugPrint('Acknowledging purchase before API callback: ${purchase.purchaseID}');
+              await _inAppPurchase.completePurchase(purchase);
+              debugPrint('Purchase acknowledged: ${purchase.purchaseID}');
+            } catch (e) {
+              debugPrint('Failed to acknowledge purchase: $e');
+            }
+          }
           _onPurchaseComplete?.call(purchase);
-          _completePurchase(purchase);
           break;
         case PurchaseStatus.pending:
           debugPrint('Purchase pending: ${purchase.purchaseID}');
@@ -225,15 +292,40 @@ class PaymentService {
     }
   }
 
-  /// Complete a purchase (acknowledge on Android)
-  Future<void> _completePurchase(PurchaseDetails purchase) async {
-    if (purchase.pendingCompletePurchase) {
-      try {
-        await _inAppPurchase.completePurchase(purchase);
-        debugPrint('Purchase completed: ${purchase.purchaseID}');
-      } catch (e) {
-        debugPrint('Failed to complete purchase: $e');
+  /// Consume a purchase (for consumables like coins)
+  /// This must be called after successful purchase to allow repurchasing
+  Future<bool> consumePurchase(PurchaseDetails purchase) async {
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      debugPrint('Consume only supported on Android');
+      return false;
+    }
+
+    try {
+      final androidAddition = _inAppPurchase.getPlatformAddition<
+          InAppPurchaseAndroidPlatformAddition>();
+      await androidAddition.consumePurchase(purchase);
+      debugPrint('Purchase consumed: ${purchase.purchaseID}');
+      return true;
+    } catch (e) {
+      debugPrint('Failed to consume purchase: $e');
+      return false;
+    }
+  }
+
+  /// Handle consumable purchase: consume then notify callback
+  /// For consumables (payConfigType=1), consume after successful purchase
+  Future<bool> handleConsumablePurchase(PurchaseDetails purchase) async {
+    try {
+      // Consume the purchase to allow future purchases
+      final consumed = await consumePurchase(purchase);
+      if (!consumed) {
+        debugPrint('Failed to consume purchase: ${purchase.purchaseID}');
+        return false;
       }
+      return true;
+    } catch (e) {
+      debugPrint('Error handling consumable purchase: $e');
+      return false;
     }
   }
 

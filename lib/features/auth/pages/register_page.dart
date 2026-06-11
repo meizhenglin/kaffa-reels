@@ -12,6 +12,7 @@ import '../../../components/rtl_back_button.dart';
 import '../../../core/network/api_service.dart';
 import '../providers/auth_provider.dart';
 import 'photo_setting_page.dart' show RegistrationFlowContext;
+import '../../payment/providers/membership_provider.dart' show memberStateProvider;
 
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key, this.redirect});
@@ -109,6 +110,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       );
       debugPrint('[RegisterPage] registration flow ready, opening photo-setting');
       ref.read(authProvider.notifier).clearGuestLoginStatus();
+
+      // Refresh member status after registration/login
+      ref.read(memberStateProvider.notifier).refreshStatus();
+
       GoRouter.of(context).go('/auth/photo-setting', extra: registrationContext);
     } else {
       final errorMsg = ref.read(authProvider).errorMessage;

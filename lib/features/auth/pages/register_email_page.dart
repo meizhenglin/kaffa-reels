@@ -14,6 +14,7 @@ import '../../../core/network/api_service.dart';
 import '../providers/auth_provider.dart';
 import '../providers/auth_provider.dart' show AuthState;
 import 'photo_setting_page.dart' show RegistrationFlowContext;
+import '../../payment/providers/membership_provider.dart' show memberStateProvider;
 
 class RegisterEmailPage extends ConsumerStatefulWidget {
   const RegisterEmailPage({super.key, this.backTarget = '/auth/login'});
@@ -147,6 +148,10 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
       );
       debugPrint('[RegisterEmail] registration flow ready, opening photo-setting');
       ref.read(authProvider.notifier).clearGuestLoginStatus();
+
+      // Refresh member status after registration/login
+      ref.read(memberStateProvider.notifier).refreshStatus();
+
       GoRouter.of(context).go('/auth/photo-setting', extra: registrationContext);
     } else {
       final errorMsg = ref.read(authProvider).errorMessage;

@@ -27,6 +27,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   static const Color _membershipBottomColor = Color(0xFF121212);
   int _selectedIndex = 0;
   bool _isBootstrappingProducts = true;
+  bool _isCheckingPendingPayments = true;
 
   @override
   void initState() {
@@ -43,6 +44,14 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       }
     });
     Future.microtask(() async {
+      // 检查并重试待处理的支付回调
+      await ref.read(memberStateProvider.notifier).checkAndRetryPendingPayments();
+      if (mounted) {
+        setState(() {
+          _isCheckingPendingPayments = false;
+        });
+      }
+
       ref.read(membershipDramaProvider.notifier).load();
       await ref.read(membershipProductsProvider.notifier).loadVipProducts();
       if (mounted) {
@@ -127,14 +136,14 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     final success = await memberNotifier.purchase(
       selectedProduct: product,
     );
-    if (success && mounted) {
+    if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(l10n.membershipPurchaseOpened),
         ),
       );
-      context.pop(true);
     }
+    // Don't pop here - wait for purchaseStream callback to handle result
   }
 
   @override
@@ -158,6 +167,29 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       return _buildActiveView(l10n, memberState, products);
     }
 
+    // 检查待处理支付时的加载状态
+    if (_isCheckingPendingPayments) {
+      return GradientScaffold(
+        bottomBackgroundColor: _membershipBottomColor,
+        body: Container(
+          color: _membershipBottomColor,
+          child: const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: Colors.white),
+                SizedBox(height: 16),
+                Text(
+                  'Checking payment status...',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return GradientScaffold(
       bottomBackgroundColor: _membershipBottomColor,
       bottomNavigationBar:
@@ -177,6 +209,8 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
                   _buildVipOptions(l10n, products, membershipProductsState.isLoading),
                   _buildDramaSection(recommendState),
                   _buildBenefitsSection(l10n),
+                  // TODO: 下版本开启 K 币充值功能
+                  // _buildRechargeSection(context),
                   _buildBottomSpacer(context),
                 ],
               ],
@@ -459,7 +493,68 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
   }
 
-  /// 5. 底部支付按钮
+  /// 5. K币充值入口
+  Widget _buildRechargeSection(BuildContext context) {
+    return Container(
+      color: const Color(0xFF121212),
+      padding: const EdgeInsets.fromLTRB(15, 16, 15, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Recharge Coins',
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: () => context.push('/recharge'),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.amber.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.monetization_on, color: Colors.amber, size: 32),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Get Coins',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Watch premium content',
+                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, color: Colors.amber, size: 16),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 6. 底部支付按钮
   Widget _buildBottomPayButton(
     AppLocalizations l10n,
     MemberState memberState,

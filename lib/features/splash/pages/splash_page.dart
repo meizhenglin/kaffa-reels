@@ -65,13 +65,41 @@ class _SplashPageState extends ConsumerState<SplashPage> with SingleTickerProvid
   Future<void> _initializeAndNavigate() async {
     debugPrint('[Splash] _initializeAndNavigate start');
 
+    // Listen for auth state changes
+    ref.listenManual(authProvider, (previous, next) {
+      debugPrint('[Splash] auth state changed: ${next.status}');
+      if (_isAuthReady(next)) {
+        _navigateToHomeWhenReady();
+      } else if (next.status == AuthStatus.unauthenticated) {
+        // Allow entering app even if auth fails (e.g., network error)
+        debugPrint('[Splash] auth unauthenticated, allowing entry to app');
+        _navigateToHomeWhenReady();
+      }
+    });
+
     final auth = ref.read(authProvider);
     if (_isAuthReady(auth)) {
       await _navigateToHomeWhenReady();
       return;
     }
 
-    debugPrint('[Splash] waiting for auth initialization to finish before navigating');
+    // If auth is still in progress, wait with timeout
+    if (auth.status == AuthStatus.authenticating) {
+      debugPrint('[Splash] waiting for auth initialization...');
+      // Wait up to 10 seconds for auth to complete
+      await Future.delayed(const Duration(seconds: 10));
+      if (!_navigated && mounted) {
+        debugPrint('[Splash] auth timeout, navigating to home anyway');
+        _navigateToHomeWhenReady();
+      }
+    } else {
+      // If auth failed or unauthenticated, allow entry
+      debugPrint('[Splash] auth status: ${auth.status}, allowing entry');
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (!_navigated && mounted) {
+        _navigateToHomeWhenReady();
+      }
+    }
   }
 
   bool _isAuthReady(AuthState auth) {

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../home/pages/main_page.dart' show currentTabIndexProvider;
+import '../../payment/providers/membership_provider.dart' show memberStateProvider;
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key, this.redirect, this.backTarget = '/'});
@@ -43,6 +44,10 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+
+      // Refresh member status after login
+      ref.read(memberStateProvider.notifier).refreshStatus();
+
       if (shouldSelectProfileTab) {
         ref.read(currentTabIndexProvider.notifier).state = 4;
       }
