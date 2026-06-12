@@ -22,20 +22,6 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
   bool _appIsInForeground = true;
   bool _googleSignInInProgress = false;
 
-  void _showMessage(String message, {bool isError = false}) {
-    if (!mounted || message.trim().isEmpty) return;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: isError ? const Color(0xFFD64545) : const Color(0xFF2E7D32),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-  }
-
   void _navigateAfterLogin() {
     if (!mounted) return;
 
@@ -205,28 +191,158 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                   if (!_appIsInForeground || _googleSignInInProgress) return;
                                   debugPrint('[LoginPage] Google button tapped');
                                   _googleSignInInProgress = true;
+
+                                  // Show loading dialog
+                                  showDialog(
+                                    context: context,
+                                    barrierDismissible: false,
+                                    barrierColor: Colors.black54,
+                                    builder: (context) => WillPopScope(
+                                      onWillPop: () async => false,
+                                      child: Center(
+                                        child: ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                            minWidth: 120,
+                                            maxWidth: 150,
+                                            minHeight: 100,
+                                            maxHeight: 100,
+                                          ),
+                                          child: Container(
+                                            height: 100,
+                                            alignment: Alignment.center,
+                                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const SizedBox(
+                                                  width: 28,
+                                                  height: 28,
+                                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                                ),
+                                                const SizedBox(height: 8),
+                                                const Text(
+                                                  'Signing in...',
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+
                                   ref.read(authProvider.notifier).clearError();
                                   await Future<void>.delayed(Duration.zero);
                                   final success = await ref
                                       .read(authProvider.notifier)
                                       .signInWithGoogle();
                                   _googleSignInInProgress = false;
-                                  if (!mounted) return;
+
                                   debugPrint('[LoginPage] Google sign-in returned success=$success error=${ref.read(authProvider).errorMessage}');
+
+                                  if (!mounted) return;
+
                                   if (success) {
-                                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                                      _navigateAfterLogin();
+                                    // Close loading dialog
+                                    Navigator.of(context, rootNavigator: true).pop();
+                                    // Show success dialog - auto close and navigate after 1 second
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      builder: (dialogContext) => AlertDialog(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: 36,
+                                              height: 36,
+                                              decoration: const BoxDecoration(
+                                                color: Color(0xFF4CAF50),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.check,
+                                                color: Colors.white,
+                                                size: 20,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 10),
+                                            const Text(
+                                              'Login Successful!',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                    // Auto close and navigate after 1 second
+                                    Future.delayed(const Duration(seconds: 1), () {
+                                      if (mounted) {
+                                        Navigator.of(context, rootNavigator: true).pop();
+                                        _navigateAfterLogin();
+                                      }
                                     });
                                     return;
                                   }
-                                  final authState = ref.read(authProvider);
-                                  if (authState.status == AuthStatus.error) {
-                                    return;
-                                  }
-                                  _showMessage(
-                                    'Google sign-in did not complete. Please try again.',
-                                    isError: true,
+
+                                  // Close loading dialog
+                                  Navigator.of(context, rootNavigator: true).pop();
+
+                                  // Show error dialog - auto close after 2 seconds
+                                  final errorMsg = ref.read(authProvider).errorMessage ?? 'Login failed. Please try again.';
+                                  showDialog(
+                                    context: context,
+                                    barrierDismissible: false,
+                                    builder: (dialogContext) => AlertDialog(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 36,
+                                            height: 36,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFFE53935),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.close,
+                                              color: Colors.white,
+                                              size: 20,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 10),
+                                          Text(
+                                            errorMsg,
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(fontSize: 13),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   );
+                                  // Auto close after 2 seconds
+                                  Future.delayed(const Duration(seconds: 2), () {
+                                    if (mounted && Navigator.canPop(context)) {
+                                      Navigator.of(context, rootNavigator: true).pop();
+                                    }
+                                  });
                                 },
                               );
                             },
@@ -244,17 +360,156 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                   isLoading: isLoading,
                                   isApple: true,
                                   onTap: () async {
+                                    if (!_appIsInForeground) return;
+
+                                    // Show loading dialog
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      barrierColor: Colors.black54,
+                                      builder: (context) => WillPopScope(
+                                        onWillPop: () async => false,
+                                        child: Center(
+                                          child: ConstrainedBox(
+                                            constraints: const BoxConstraints(
+                                              minWidth: 120,
+                                              maxWidth: 150,
+                                            ),
+                                            child: Container(
+                                              height: 100,
+                                              alignment: Alignment.center,
+                                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const SizedBox(
+                                                    width: 28,
+                                                    height: 28,
+                                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  const Text(
+                                                    'Signing in...',
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight: FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+
                                     ref
                                         .read(authProvider.notifier)
                                         .clearError();
+                                    await Future<void>.delayed(Duration.zero);
                                     final success = await ref
                                         .read(authProvider.notifier)
                                         .signInWithApple();
+
+                                    if (!mounted) return;
+
                                     if (success) {
-                                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                                        _navigateAfterLogin();
+                                      // Close loading dialog
+                                      Navigator.of(context, rootNavigator: true).pop();
+                                      // Show success dialog - auto close and navigate after 1 second
+                                      showDialog(
+                                        context: context,
+                                        barrierDismissible: false,
+                                        builder: (dialogContext) => AlertDialog(
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          content: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                width: 36,
+                                                height: 36,
+                                                decoration: const BoxDecoration(
+                                                  color: Color(0xFF4CAF50),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.check,
+                                                  color: Colors.white,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 10),
+                                              const Text(
+                                                'Login Successful!',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                      // Auto close and navigate after 1 second
+                                      Future.delayed(const Duration(seconds: 1), () {
+                                        if (mounted) {
+                                          Navigator.of(context, rootNavigator: true).pop();
+                                          _navigateAfterLogin();
+                                        }
                                       });
+                                      return;
                                     }
+
+                                    // Close loading dialog
+                                    Navigator.of(context, rootNavigator: true).pop();
+
+                                    // Show error dialog - auto close after 2 seconds
+                                    final errorMsg = ref.read(authProvider).errorMessage ?? 'Login failed. Please try again.';
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      builder: (dialogContext) => AlertDialog(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: 36,
+                                              height: 36,
+                                              decoration: const BoxDecoration(
+                                                color: Color(0xFFE53935),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.close,
+                                                color: Colors.white,
+                                                size: 20,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 10),
+                                            Text(
+                                              errorMsg,
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(fontSize: 13),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                    // Auto close after 2 seconds
+                                    Future.delayed(const Duration(seconds: 2), () {
+                                      if (mounted && Navigator.canPop(context)) {
+                                        Navigator.of(context, rootNavigator: true).pop();
+                                      }
+                                    });
                                   },
                                 );
                               },
@@ -411,22 +666,25 @@ class _GoogleSignInButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: label,
+      enabled: !isLoading,
       child: GestureDetector(
         onTap: isLoading ? null : onTap,
         child: Container(
           width: double.infinity,
           height: 50,
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isLoading ? Colors.grey.shade200 : Colors.white,
             borderRadius: BorderRadius.circular(30),
             border: Border.all(color: const Color(0xFFDADCE0)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x14000000),
-                blurRadius: 6,
-                offset: Offset(0, 2),
-              ),
-            ],
+            boxShadow: isLoading
+                ? null
+                : const [
+                    BoxShadow(
+                      color: Color(0x14000000),
+                      blurRadius: 6,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -454,32 +712,15 @@ class _GoogleSignInButton extends StatelessWidget {
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Opacity(
-                        opacity: isLoading ? 0 : 1,
-                        child: Text(
-                          label,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Color(0xFF1F1F1F),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.1,
-                          ),
-                        ),
-                      ),
-                      if (isLoading)
-                        const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Color(0xFF1F1F1F),
-                          ),
-                        ),
-                    ],
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: isLoading ? const Color(0xFFAAAAAA) : const Color(0xFF1F1F1F),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.1,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 46),

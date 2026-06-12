@@ -98,65 +98,139 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
     if (!_formKey.currentState!.validate()) return;
 
     ref.read(authProvider.notifier).clearError();
-    final wasMounted = mounted;
-    final router = GoRouter.of(context);
 
+    await Future<void>.delayed(Duration.zero);
     final success = await ref.read(authProvider.notifier).signInWithEmail(
           _emailController.text.trim(),
           _passwordController.text,
         );
 
-    if (!success) {
-      debugPrint('[LoginEmail] signInWithEmail returned false');
-      return;
-    }
+    if (!mounted) return;
 
-    debugPrint('[LoginEmail] signInWithEmail success, saving credentials...');
+    if (success) {
+      debugPrint('[LoginEmail] signInWithEmail success, saving credentials...');
 
-    try {
-      final resp = await ref.read(apiServiceProviderRef).getUserCenter();
-      if (resp.isSuccess && resp.data != null) {
-        final userData = resp.data as Map<String, dynamic>;
-        ref.read(authProvider.notifier).updateUserFromData(userData);
-        debugPrint('[LoginEmail] getUserCenter success: $userData');
-      } else {
-        debugPrint(
-          '[LoginEmail] getUserCenter failed: '
-          'success=${resp.isSuccess} data=${resp.data} error=${resp.error}',
-        );
+      try {
+        final resp = await ref.read(apiServiceProviderRef).getUserCenter();
+        if (resp.isSuccess && resp.data != null) {
+          final userData = resp.data as Map<String, dynamic>;
+          ref.read(authProvider.notifier).updateUserFromData(userData);
+          debugPrint('[LoginEmail] getUserCenter success: $userData');
+        } else {
+          debugPrint(
+            '[LoginEmail] getUserCenter failed: '
+            'success=${resp.isSuccess} data=${resp.data} error=${resp.error}',
+          );
+        }
+      } catch (e) {
+        debugPrint('[LoginEmail] getUserCenter error: $e');
       }
-    } catch (e) {
-      debugPrint('[LoginEmail] getUserCenter error: $e');
-    }
 
-    // 保存或清除自动登录凭证
-    final storage = ref.read(storageServiceProvider);
-    if (_autoLogin) {
-      await storage.saveAutoLogin(true);
-      await storage.saveAutoLoginEmail(_emailController.text.trim());
-      await storage.saveAutoLoginPassword(_passwordController.text);
-      await storage.saveAutoLoginTimestamp();
-    } else {
-      await storage.saveAutoLogin(false);
-      await storage.clearAutoLoginCredentials();
-    }
+      // 保存或清除自动登录凭证
+      final storage = ref.read(storageServiceProvider);
+      if (_autoLogin) {
+        await storage.saveAutoLogin(true);
+        await storage.saveAutoLoginEmail(_emailController.text.trim());
+        await storage.saveAutoLoginPassword(_passwordController.text);
+        await storage.saveAutoLoginTimestamp();
+      } else {
+        await storage.saveAutoLogin(false);
+        await storage.clearAutoLoginCredentials();
+      }
 
-    debugPrint('[LoginEmail] credentials saved, wasMounted=$wasMounted, navigating...');
-
-    // 再次检查 mounted，因为所有 await 都结束后状态可能已改变
-    if (!wasMounted) {
-      debugPrint('[LoginEmail] no longer mounted after awaits, skip navigation');
+      // Show success dialog - auto close and navigate after 1 second
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF4CAF50),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Login Successful!',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      // Auto close and navigate after 1 second
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
+          // Navigate based on redirect or default to profile
+          final target = widget.redirect;
+          if (target != null && target.isNotEmpty) {
+            GoRouter.of(context).go(target);
+          } else {
+            GoRouter.of(context).go('/profile');
+          }
+        }
+      });
       return;
     }
 
-    // 登录成功后按平台处理；如果外部显式传了 redirect，则优先按 redirect 跳转
-    final target = widget.redirect;
-    if (target != null && target.isNotEmpty) {
-      router.go(target);
-      return;
-    }
-
-    router.go('/profile');
+    // Show error dialog - auto close after 2 seconds
+    final errorMsg = ref.read(authProvider).errorMessage ?? 'Login failed. Please try again.';
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                color: Color(0xFFE53935),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.close,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              errorMsg,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+    // Auto close after 2 seconds
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+    });
   }
 
   @override
@@ -286,24 +360,6 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                           ),
                         ),
                         const SizedBox(height: 40),
-                        if (auth.errorMessage != null) ...[
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              auth.errorMessage!,
-                              style: const TextStyle(
-                                color: Color(0xFFFF6B6B),
-                                fontSize: 13,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
                         GestureDetector(
                           onTap: auth.isLoading ? null : _submit,
                           child: Container(

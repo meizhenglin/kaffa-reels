@@ -289,6 +289,21 @@ class StorageService {
 
   static const String _keyVideoProgress = 'video_progress';
 
+  // ==================== 剧集播放位置记录 (SharedPreferences) ====================
+  /// 保存剧集的最后播放集号
+  /// [videoId] 剧集 ID
+  /// [episodesNum] 集号（传给 API 的 episodesNum）
+  Future<void> saveLastEpisodesNum(String videoId, int episodesNum) async {
+    await _prefs?.setInt('last_episodes_num_$videoId', episodesNum);
+  }
+
+  /// 读取剧集的最后播放集号
+  /// [videoId] 剧集 ID
+  /// 返回集号，未找到返回 0
+  int getLastEpisodesNum(String videoId) {
+    return _prefs?.getInt('last_episodes_num_$videoId') ?? 0;
+  }
+
   // ==================== 观看历史记录 (SharedPreferences) ====================
   /// 添加内容到观看历史
   /// [item] 要添加的内容数据，必须包含 'id' 字段
