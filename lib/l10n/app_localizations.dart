@@ -1208,6 +1208,12 @@ abstract class AppLocalizations {
   /// **'Google Play opened. Please complete the subscription payment.'**
   String get membershipPurchaseOpened;
 
+  /// No description provided for @membershipItemAlreadyOwned.
+  ///
+  /// In en, this message translates to:
+  /// **'You already own this subscription.'**
+  String get membershipItemAlreadyOwned;
+
   /// No description provided for @watchLockedReminderTitle.
   ///
   /// In en, this message translates to:

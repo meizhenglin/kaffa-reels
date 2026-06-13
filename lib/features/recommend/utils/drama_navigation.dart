@@ -48,16 +48,20 @@ Future<bool> openMembershipPage(
 /// [drama] 要访问的短剧
 /// [authState] 当前认证状态
 /// [memberState] 当前会员状态
+/// [ref] WidgetRef 用于读取 provider
 VipAccessResult checkVipAccess({
   required Drama drama,
   required AuthState authState,
   required MemberState memberState,
+  required WidgetRef ref,
 }) {
   if (!drama.isVipOnly) return VipAccessResult.granted;
   if (!authState.isAuthenticated || authState.user?.isGuest == true) {
     return VipAccessResult.loginRequired;
   }
-  if (!memberState.isVip || memberState.isExpired) {
+  // Check VIP status using featureAccessProvider
+  final isVip = ref.read(featureAccessProvider(Feature.premiumContent));
+  if (!isVip) {
     return VipAccessResult.vipRequired;
   }
   return VipAccessResult.granted;

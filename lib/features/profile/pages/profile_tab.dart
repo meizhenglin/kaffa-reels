@@ -341,8 +341,12 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
   }
 
   Widget _buildVipBanner(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final auth = ref.watch(authProvider);
     final user = auth.user;
+    final isLoggedIn = user != null && !user.isTourist;
+    final isVip = user != null && user.membershipExpiryDate != null && !user.isTourist && DateTime.now().isBefore(user.membershipExpiryDate!);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -373,7 +377,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  AppLocalizations.of(context).vipMember,
+                  l10n.vipMember,
                   style: const TextStyle(
                     color: Color(0xFF3A1D00),
                     fontSize: 15,
@@ -382,15 +386,15 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  user != null && !user.isTourist
+                  isVip
                       ? 'Validity Period：${_formatDate(user.membershipExpiryDate)}'
-                      : AppLocalizations.of(context).vipSubtitle,
+                      : l10n.vipSubtitle,
                   style: const TextStyle(color: Color(0xFF3A1D00), fontSize: 12),
                 ),
               ],
             ),
           ),
-          if (user == null || user.isTourist)
+          if (!isLoggedIn)
             GestureDetector(
               onTap: () {
                 final messenger = ScaffoldMessenger.of(context);
@@ -398,7 +402,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                 messenger.showSnackBar(
                   SnackBar(
                     content: Text(
-                      AppLocalizations.of(context).loginSubtitle,
+                      l10n.loginSubtitle,
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.black),
                     ),
@@ -418,7 +422,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                   ),
                 ),
                 child: Text(
-                  AppLocalizations.of(context).activate,
+                  l10n.activate,
                   style: const TextStyle(
                     color: Color(0xFFFFEDC6),
                     fontSize: 13,
@@ -438,9 +442,9 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                     image: AssetImage('assets/images/activate_bg.png'),
                   ),
                 ),
-                child: const Text(
-                  'Renewal',
-                  style: TextStyle(
+                child: Text(
+                  isVip ? 'Renewal' : l10n.activate,
+                  style: const TextStyle(
                     color: Color(0xFFFFEDC6),
                     fontSize: 13,
                     fontWeight: FontWeight.bold,

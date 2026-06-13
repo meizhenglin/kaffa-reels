@@ -577,6 +577,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Google Play opened. Please complete the subscription payment.';
 
   @override
+  String get membershipItemAlreadyOwned => 'You already own this subscription.';
+
+  @override
   String get watchLockedReminderTitle => 'Reminder';
 
   @override

@@ -5,6 +5,7 @@ import '../../../app/providers/app_providers.dart';
 import '../../../core/providers/auth_provider.dart' show GuestLoginStatus, guestLoginProvider, authServiceProvider, apiServiceProviderRef;
 import '../../../core/constants/app_constants.dart';
 import '../../../core/network/api_service.dart';
+import '../../payment/providers/membership_provider.dart';
 import '../models/user_model.dart';
 import '../repositories/auth_repository.dart';
 
@@ -147,7 +148,36 @@ class AuthNotifier extends StateNotifier<AuthState> {
         debugPrint('[AuthNotifier] failed to fetch user info from backend: $e');
       }
 
-      // token 无效或当前 token 无法获取当前用户信息，直接清空并回到游客态
+      // API 调用失败时，不要直接清除数据
+      // 检查 Firebase Auth 是否有用户（热重载时 Firebase Auth 状态可能还在）
+      final firebaseUser = _repository.currentFirebaseUser;
+      if (firebaseUser != null) {
+        debugPrint('[AuthNotifier] Firebase user still logged in, trying to refresh...');
+        try {
+          await _repository.refreshIdToken(forceRefresh: true);
+          final resp = await apiServiceProvider.getUserCenter();
+          if (resp.isSuccess && resp.data != null) {
+            await updateUserFromData(resp.data as Map<String, dynamic>);
+            debugPrint('[AuthNotifier] user info fetched after token refresh');
+            return;
+          }
+        } catch (e) {
+          debugPrint('[AuthNotifier] failed to refresh and fetch user info: $e');
+        }
+        // Firebase Auth 有用户但无法恢复登录，保留 Firebase 状态
+        final userModel = await _repository.getUserModelFromFirebaseUser();
+        if (userModel != null) {
+          state = state.copyWith(
+            status: AuthStatus.authenticated,
+            user: userModel,
+            isLoading: false,
+          );
+          debugPrint('[AuthNotifier] restored user from Firebase (API unavailable)');
+          return;
+        }
+      }
+
+      // Firebase 也没有用户，清除所有数据进入游客态
       await _clearAllAuthData();
     }
 
@@ -160,6 +190,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await _repository.clearAutoLoginCredentials();
     await _ref.read(authServiceProvider).logout();
     await _repository.signOut();
+
+    // Clear VIP/membership state for the old account
+    try {
+      await _ref.read(memberStateProvider.notifier).clearAll();
+    } catch (_) {}
+
     state = state.copyWith(clearRegistrationSession: true);
     debugPrint('[AuthNotifier] all auth data cleared');
   }
@@ -484,6 +520,39 @@ class AuthNotifier extends StateNotifier<AuthState> {
       'nickname=${incomingUser.userNickname} '
       'id=${incomingUser.id} '
       'isTourist=${incomingUser.isTourist}',
+    );
+  }
+
+  /// 从后端刷新用户信息（用于订阅购买后更新 VIP 到期时间）
+  Future<void> refreshUserInfo() async {
+    if (state.user == null || state.user!.isTourist) return;
+
+    try {
+      final resp = await apiServiceProvider.getUserCenter();
+      if (resp.isSuccess && resp.data != null) {
+        await updateUserFromData(resp.data as Map<String, dynamic>);
+        debugPrint('[AuthNotifier] refreshUserInfo succeeded');
+      } else {
+        debugPrint('[AuthNotifier] refreshUserInfo failed: ${resp.error}');
+      }
+    } catch (e) {
+      debugPrint('[AuthNotifier] refreshUserInfo error: $e');
+    }
+  }
+
+  /// 直接更新用户信息（不经过后端，用于本地状态同步）
+  void updateUserDirectly(UserModel user) {
+    state = state.copyWith(
+      status: AuthStatus.authenticated,
+      user: user,
+      clearError: true,
+      isLoading: false,
+    );
+    debugPrint(
+      '[AuthNotifier] user data updated directly: '
+      'nickname=${user.userNickname} '
+      'id=${user.id} '
+      'membershipExpiryDate=${user.membershipExpiryDate}',
     );
   }
 

@@ -239,66 +239,43 @@ class RechargeProductsNotifier extends StateNotifier<RechargeProductsState> {
   }
 }
 
-/// Member subscription state
+/// Member subscription state - simplified to only track purchase token
 class MemberState {
   const MemberState({
-    this.isVip = false,
-    this.expireDate,
-    this.subscriptionType,
+    this.purchaseToken,
     this.isLoading = false,
     this.errorMessage,
-    this.isRestoring = false,
     this.pendingOrderId,
     this.pendingProductId,
     this.pendingSubscriptionType,
   });
 
-  final bool isVip;
-  final DateTime? expireDate;
-  final String? subscriptionType;
+  final String? purchaseToken;
   final bool isLoading;
   final String? errorMessage;
-  final bool isRestoring;
   final String? pendingOrderId;
   final String? pendingProductId;
   final String? pendingSubscriptionType;
 
   MemberState copyWith({
-    bool? isVip,
-    DateTime? expireDate,
-    String? subscriptionType,
+    String? purchaseToken,
     bool? isLoading,
     String? errorMessage,
-    bool? isRestoring,
     String? pendingOrderId,
     String? pendingProductId,
     String? pendingSubscriptionType,
     bool clearPendingOrder = false,
   }) {
     return MemberState(
-      isVip: isVip ?? this.isVip,
-      expireDate: expireDate ?? this.expireDate,
-      subscriptionType: subscriptionType ?? this.subscriptionType,
+      purchaseToken: clearPendingOrder ? null : (purchaseToken ?? this.purchaseToken),
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
-      isRestoring: isRestoring ?? this.isRestoring,
       pendingOrderId: clearPendingOrder ? null : (pendingOrderId ?? this.pendingOrderId),
       pendingProductId: clearPendingOrder ? null : (pendingProductId ?? this.pendingProductId),
       pendingSubscriptionType: clearPendingOrder
           ? null
           : (pendingSubscriptionType ?? this.pendingSubscriptionType),
     );
-  }
-
-  bool get isExpired {
-    if (expireDate == null) return !isVip;
-    return DateTime.now().isAfter(expireDate!);
-  }
-
-  int? get daysRemaining {
-    if (expireDate == null) return null;
-    final diff = expireDate!.difference(DateTime.now()).inDays;
-    return diff > 0 ? diff : 0;
   }
 }
 
@@ -359,53 +336,27 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
   Future<void> initialize() async {
     _receiptService.initialize(baseUrl: 'https://api.your-domain.com');
 
+    // Set user ID for purchase association
+    final userId = _storage.getString('user_id');
+    _paymentService.setUserId(userId);
+
     await _paymentService.initialize(
       onPurchaseComplete: _handlePurchaseComplete,
       onPurchaseError: _handlePurchaseError,
     );
 
-    await _loadCachedState();
-    await _syncWithBackend();
+    // Load cached purchase token (only thing we persist locally)
+    final token = _storage.getString('purchase_token');
+    if (token != null && token.isNotEmpty) {
+      state = state.copyWith(purchaseToken: token);
+    }
+
+    // Check and retry pending payments
+    await checkAndRetryPendingPayments();
   }
 
   Future<void> refreshStatus() async {
-    await _loadCachedState();
-    await _syncWithBackend();
-  }
-
-  Future<void> _loadCachedState() async {
-    final isVip = _storage.getString('is_vip') == 'true';
-    final expireStr = _storage.getString('vip_expire_date');
-    final type = _storage.getString('subscription_type');
-
-    state = state.copyWith(
-      isVip: isVip,
-      expireDate: expireStr != null ? DateTime.tryParse(expireStr) : null,
-      subscriptionType: type,
-    );
-
-    if (state.isExpired) {
-      await _clearVipStatus();
-    }
-  }
-
-  Future<void> _syncWithBackend() async {
-    final userId = _resolveUserId();
-    if (userId == null || userId.isEmpty) return;
-
-    final status = await _receiptService.checkSubscriptionStatus(
-      userId: userId,
-    );
-
-    if (status != null && status.isActive) {
-      await _updateVipStatus(
-        isVip: true,
-        expireDate: status.expireDate,
-        type: status.type,
-      );
-    } else if (!state.isVip || state.isExpired) {
-      await _clearVipStatus();
-    }
+    await checkAndRetryPendingPayments();
   }
 
   Future<void> _handlePurchaseComplete(PurchaseDetails purchase) async {
@@ -474,13 +425,10 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         retryCount++;
       }
 
-      final productType = state.pendingSubscriptionType ?? _inferTypeFromProductId(productId);
       if (confirmed) {
-        await _updateVipStatus(
-          isVip: true,
-          expireDate: DateTime.now().add(Duration(days: _getDaysForType(productType))),
-          type: productType,
-        );
+        await _updateVipStatus(purchaseToken: purchaseToken);
+        // Invalidate isVipProvider to force refresh
+        _ref.invalidate(isVipProvider);
         state = state.copyWith(clearPendingOrder: true);
       } else {
         state = state.copyWith(
@@ -576,19 +524,13 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     }
   }
 
-  /// 刷新VIP状态
+  /// 刷新VIP状态 - just reload purchase token
   Future<void> _refreshVipStatus() async {
     state = state.copyWith(isLoading: true);
     try {
-      await Future.delayed(const Duration(milliseconds: 500));
-      final isVip = _storage.getString('is_vip') == 'true';
-      final expireDateStr = _storage.getString('vip_expire_date');
-      final subscriptionType = _storage.getString('subscription_type');
-
+      final purchaseToken = _storage.getString('purchase_token');
       state = state.copyWith(
-        isVip: isVip,
-        expireDate: expireDateStr != null ? DateTime.tryParse(expireDateStr) : null,
-        subscriptionType: subscriptionType,
+        purchaseToken: purchaseToken,
         isLoading: false,
       );
     } catch (e) {
@@ -605,65 +547,62 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
   }
 
   Future<void> _updateVipStatus({
-    required bool isVip,
-    DateTime? expireDate,
-    String? type,
+    required String purchaseToken,
   }) async {
     state = state.copyWith(
-      isVip: isVip,
-      expireDate: expireDate,
-      subscriptionType: type,
+      purchaseToken: purchaseToken,
       isLoading: false,
       errorMessage: null,
     );
 
-    await _storage.setString('is_vip', isVip.toString());
-    if (expireDate != null) {
-      await _storage.setString('vip_expire_date', expireDate.toIso8601String());
-    } else {
-      await _storage.remove('vip_expire_date');
+    // Only persist the purchase token (needed for backend verification)
+    await _storage.setString('purchase_token', purchaseToken);
+
+    // Refresh auth user info so profile page shows updated VIP expiry date
+    try {
+      await _ref.read(authProvider.notifier).refreshUserInfo();
+    } catch (e) {
+      debugPrint('[MemberStateNotifier] refreshUserInfo failed: $e');
     }
-    if (type != null && type.isNotEmpty) {
-      await _storage.setString('subscription_type', type);
-    } else {
-      await _storage.remove('subscription_type');
-    }
+  }
+
+  String? getPurchaseToken() {
+    return _storage.getString('purchase_token');
   }
 
   Future<void> _clearVipStatus() async {
-    state = state.copyWith(
-      isVip: false,
-      expireDate: null,
-      subscriptionType: null,
-      isLoading: false,
-      errorMessage: null,
-    );
+    state = const MemberState();
 
-    await _storage.remove('is_vip');
-    await _storage.remove('vip_expire_date');
-    await _storage.remove('subscription_type');
+    // Only clear the purchase token
+    await _storage.remove('purchase_token');
+  }
+
+  /// Clear all VIP/membership data (called on logout)
+  Future<void> clearAll() async {
+    await _clearVipStatus();
+    state = state.copyWith(clearPendingOrder: true);
   }
 
   Future<bool> restorePurchases() async {
-    state = state.copyWith(isRestoring: true, errorMessage: null);
+    state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
       final success = await _paymentService.restorePurchases();
       if (!success) {
         state = state.copyWith(
-          isRestoring: false,
+          isLoading: false,
           errorMessage: 'Failed to restore purchases',
         );
         return false;
       }
 
       await Future.delayed(const Duration(seconds: 2));
-      state = state.copyWith(isRestoring: false);
+      state = state.copyWith(isLoading: false);
       return success;
     } catch (e) {
       debugPrint('Error restoring purchases: $e');
       state = state.copyWith(
-        isRestoring: false,
+        isLoading: false,
         errorMessage: 'Failed to restore purchases',
       );
       return false;
@@ -677,10 +616,35 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
       case Feature.hdQuality:
       case Feature.offlineDownload:
       case Feature.earlyAccess:
-        return state.isVip && !state.isExpired;
+        // Check if user has active subscription via Google Play
+        return _hasActiveSubscription();
       case Feature.trialContent:
         return true;
     }
+  }
+
+  bool _hasActiveSubscription() {
+    // Check if we have a purchase token - that means user has purchased before
+    // The actual validity is verified by Google Play query
+    return state.purchaseToken != null;
+  }
+
+  /// Check if user is VIP by querying Google Play
+  Future<bool> checkIsVip() async {
+    if (state.purchaseToken == null) return false;
+
+    try {
+      final purchases = await _paymentService.queryExistingPurchases();
+      for (final purchase in purchases) {
+        if (purchase.status == PurchaseStatus.purchased ||
+            purchase.status == PurchaseStatus.restored) {
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('[checkIsVip] queryExistingPurchases error: $e');
+    }
+    return false;
   }
 
   Future<List<ProductDetails>> getProducts(List<SubscriptionProduct> products) async {
@@ -754,6 +718,15 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         pendingSubscriptionType: selectedProduct.id,
       );
 
+      // 查询并缓存现有订阅（用于升级/降级）
+      final purchases = await _paymentService.queryExistingPurchases();
+      debugPrint('[IAP] queryExistingPurchases returned: ${purchases.length} purchases');
+      for (final p in purchases) {
+        debugPrint('  - ${p.productID}: ${p.status}');
+      }
+
+      // 如果 Google Play 查询不到购买但服务器有订阅，说明是同一商品续费
+      // Google Play 会自动处理，不传 oldPurchaseDetails 也没问题
       final success = await _paymentService.purchase(
         product: productDetails,
         applicationUserName: _resolveUserId(),
@@ -779,26 +752,6 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
 
   String? _resolveUserId() {
     return _storage.getString('user_id');
-  }
-
-  String _inferTypeFromProductId(String productId) {
-    if (productId.contains('yearly') || productId.contains('year')) {
-      return 'yearly';
-    } else if (productId.contains('quarterly') || productId.contains('quarter')) {
-      return 'quarterly';
-    }
-    return 'monthly';
-  }
-
-  int _getDaysForType(String type) {
-    switch (type) {
-      case 'yearly':
-        return 365;
-      case 'quarterly':
-        return 90;
-      default:
-        return 30;
-    }
   }
 
   @override
@@ -915,17 +868,18 @@ class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> 
           return product;
         }
 
-        final storePrice = storeProduct.price.trim();
-        final originalPrice = product.originalPrice.trim();
-        final nextOriginalPrice =
-            originalPrice.isEmpty || originalPrice == storePrice ? product.price : product.originalPrice;
+        // Register the mapping from subscriptionType to productId
+        if (product.id.isNotEmpty) {
+          _paymentService.registerSubscriptionProduct(
+            product.id,
+            storeProduct.id,
+          );
+          debugPrint('Registered subscription mapping: ${product.id} -> ${storeProduct.id}');
+        }
 
-        return product.copyWith(
-          price: storePrice,
-          priceCn: storePrice,
-          originalPrice: nextOriginalPrice,
-          originalPriceCn: nextOriginalPrice,
-        );
+        // For display: keep API's price and originalPrice as-is.
+        // Store price is only used for the purchase transaction, not for UI display.
+        return product;
       }).toList();
     } catch (e) {
       debugPrint('Failed to sync store prices: $e');
@@ -964,7 +918,47 @@ extension FeatureExt on Feature {
 }
 
 final featureAccessProvider = Provider.family<bool, Feature>((ref, feature) {
+  final isVip = ref.watch(isVipProvider).valueOrNull ?? false;
+  return isVip || feature == Feature.trialContent;
+});
+
+/// Provider that checks actual VIP status
+/// Checks both Google Play purchases AND backend VIP status
+final isVipProvider = FutureProvider<bool>((ref) async {
   final memberState = ref.watch(memberStateProvider);
-  return memberState.isVip && !memberState.isExpired ||
-      feature == Feature.trialContent;
+
+  // If we have a purchase token, verify with Google Play
+  if (memberState.purchaseToken != null) {
+    try {
+      final purchases = await PaymentService.instance.queryExistingPurchases();
+      for (final purchase in purchases) {
+        if (purchase.status == PurchaseStatus.purchased ||
+            purchase.status == PurchaseStatus.restored) {
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('[isVipProvider] queryExistingPurchases error: $e');
+    }
+  }
+
+  // Also check backend VIP status via userPersonalCenter API
+  try {
+    final apiService = ApiService(
+      dioClient: ref.read(dioClientProvider),
+      storage: ref.read(storageServiceProvider),
+    );
+    final response = await apiService.getUserCenter();
+    if (response.code == 0 && response.data != null) {
+      final isVip = response.data['isVip'] ?? response.data['is_vip'] ?? 0;
+      debugPrint('[isVipProvider] backend isVip: $isVip');
+      if (isVip == 1 || isVip == true) {
+        return true;
+      }
+    }
+  } catch (e) {
+    debugPrint('[isVipProvider] backend check error: $e');
+  }
+
+  return false;
 });

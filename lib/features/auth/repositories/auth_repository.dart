@@ -86,6 +86,13 @@ class AuthRepository {
     return token;
   }
 
+  /// Get UserModel from current Firebase user (public method for hot reload recovery)
+  Future<UserModel?> getUserModelFromFirebaseUser() async {
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    return _userModelFromFirebaseUser(user, refreshFirebaseIdToken: false);
+  }
+
   Future<UserModel> _userModelFromFirebaseUser(User user, {bool refreshFirebaseIdToken = true}) async {
     if (refreshFirebaseIdToken) {
       await refreshIdToken();

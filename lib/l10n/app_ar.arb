@@ -155,5 +155,6 @@
   "profileLoginFirst": "يرجى تسجيل الدخول أولاً",
   "accountDeletedSuccessfully": "تم حذف الحساب بنجاح",
   "dailySigninRewardHint": "احصل على يوم VIP واحد بعد تسجيل الدخول لمدة 7 أيام متتالية",
-  "gotIt": "حسنًا"
+  "gotIt": "حسنًا",
+  "membershipItemAlreadyOwned": "أنت تمتلك هذا الاشتراك بالفعل."
 }

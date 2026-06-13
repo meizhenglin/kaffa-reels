@@ -237,8 +237,9 @@ class RechargeGoodsConfigItem extends Equatable {
     String readString(List<String> keys) {
       for (final key in keys) {
         final value = json[key];
-        if (value != null && value.toString().trim().isNotEmpty) {
-          return value.toString().trim();
+        final str = value?.toString().trim();
+        if (str != null && str.isNotEmpty && str.toLowerCase() != 'null') {
+          return str;
         }
       }
       return '';
@@ -437,10 +438,10 @@ class SubscriptionProducts {
         priceCn: _formatPrice(item.price),
         originalPrice: item.originalPrice.isNotEmpty
             ? _formatPrice(item.originalPrice)
-            : _formatPrice(item.price),
+            : '',
         originalPriceCn: item.originalPrice.isNotEmpty
             ? _formatPrice(item.originalPrice)
-            : _formatPrice(item.price),
+            : '',
         benefits: _buildBenefits(type),
         displayName: item.goodsName.isNotEmpty ? item.goodsName : null,
         isPopular: index == 0,

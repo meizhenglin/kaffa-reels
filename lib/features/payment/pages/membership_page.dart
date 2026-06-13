@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import '../../../core/utils/localized_badge_assets.dart';
 import '../../../components/preload_network_image.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
@@ -11,6 +12,7 @@ import '../../recommend/utils/drama_navigation.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../payment/models/subscription_product.dart';
 import '../../payment/providers/membership_provider.dart';
+import '../../payment/services/payment_service.dart';
 import '../../../components/rtl_back_button.dart';
 
 class MembershipPage extends ConsumerStatefulWidget {
@@ -40,9 +42,29 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
           message.isNotEmpty &&
           message != previous?.errorMessage &&
           mounted) {
+        // Map special error codes to localized messages
+        String displayMessage = message;
+        if (message == 'itemAlreadyOwned') {
+          final l10n = AppLocalizations.of(context);
+          displayMessage = l10n.membershipItemAlreadyOwned;
+        }
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(message)));
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                displayMessage,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.black),
+              ),
+              backgroundColor: const Color(0xFFFFFFFF),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
       }
     });
     Future.microtask(() async {
@@ -81,6 +103,24 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     context.go('/profile');
   }
 
+  /// 检查产品是否已拥有
+  Future<bool> _checkIfProductAlreadyOwned(SubscriptionProduct product) async {
+    try {
+      final paymentService = PaymentService.instance;
+      final purchases = await paymentService.queryExistingPurchases();
+      for (final purchase in purchases) {
+        if ((purchase.status == PurchaseStatus.purchased ||
+                purchase.status == PurchaseStatus.restored) &&
+            purchase.productID == product.id) {
+          return true;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking existing purchases: $e');
+    }
+    return false;
+  }
+
   Future<void> _handlePurchase(SubscriptionProduct product) async {
     final l10n = AppLocalizations.of(context);
     final authState = ref.read(authProvider);
@@ -90,6 +130,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       return;
     }
 
+    // 显示购买确认对话框
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -129,6 +170,29 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
 
     if (confirmed != true) return;
 
+    // 检查是否已拥有此订阅
+    final isAlreadyOwned = await _checkIfProductAlreadyOwned(product);
+    if (isAlreadyOwned && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              l10n.membershipItemAlreadyOwned,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.black),
+            ),
+            backgroundColor: const Color(0xFFFFFFFF),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      return;
+    }
+
     if (kIsWeb) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -154,6 +218,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
 
   @override
   Widget build(BuildContext context) {
+    print('>>>>>>>>>>>>> MembershipPage.build() CALLED <<<<<<<<<<<<');
     final l10n = AppLocalizations.of(context);
     final recommendState = ref.watch(membershipDramaProvider);
     final memberState = ref.watch(memberStateProvider);
@@ -164,14 +229,18 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         : const <SubscriptionProduct>[];
     final isInitialProductsLoading = _isBootstrappingProducts ||
         (membershipProductsState.isLoading && !membershipProductsState.hasLoaded);
+    
+    // DEBUG - show VIP status in console
+    final isVipAsync = ref.watch(isVipProvider);
+    final isVipDebug = isVipAsync.valueOrNull ?? false;
+    print('[MembershipPage] isLoading: ${membershipProductsState.isLoading}, hasProducts: $hasProducts, isVip: $isVipDebug');
 
     if (_selectedIndex >= products.length && products.isNotEmpty) {
       _selectedIndex = 0;
     }
 
-    if (memberState.isVip && !memberState.isExpired) {
-      return _buildActiveView(l10n, memberState, products);
-    }
+    // Note: Don't block purchase flow for VIP users - they can still buy to upgrade/downgrade
+    // Google Play handles the logic automatically
 
     // 检查待处理支付时的加载状态
     if (_isCheckingPendingPayments) {
@@ -196,41 +265,53 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       );
     }
 
+    debugPrint('[MembershipPage] build called. isInitialProductsLoading: $isInitialProductsLoading, products.length: ${products.length}');
+
     return GradientScaffold(
       bottomBackgroundColor: _membershipBottomColor,
       bottomNavigationBar:
           isInitialProductsLoading ? null : _buildBottomPayButton(l10n, memberState, products),
-      body: Stack(
-        children: [
-          const Positioned.fill(
-            child: ColoredBox(color: _membershipBottomColor),
-          ),
-          SingleChildScrollView(
-            child: Column(
-              children: [
-                _buildTopImage(),
-                if (isInitialProductsLoading)
-                  _buildInitialProductsLoadingState(context)
-                else ...[
-                  _buildVipOptions(l10n, products, membershipProductsState.isLoading),
-                  _buildDramaSection(recommendState),
-                  _buildBenefitsSection(l10n),
-                  // TODO: 下版本开启 K 币充值功能
-                  // _buildRechargeSection(context),
-                  _buildBottomSpacer(context),
-                ],
-              ],
-            ),
-          ),
-          PositionedDirectional(
-            top: MediaQuery.of(context).padding.top + 8,
-            start: 8,
-            child: RtlBackButton(
-              onPressed: _handleBack,
-              color: Colors.white,
-            ),
-          ),
-        ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Stack(
+            children: [
+              const Positioned.fill(
+                child: ColoredBox(color: _membershipBottomColor),
+              ),
+              Positioned.fill(
+                child: Column(
+                  children: [
+                    _buildTopImage(),
+                    Expanded(
+                      child: isInitialProductsLoading
+                          ? _buildInitialProductsLoadingState(context)
+                          : SingleChildScrollView(
+                              child: Column(
+                                children: [
+                                  _buildVipOptions(l10n, products, membershipProductsState.isLoading),
+                                  _buildDramaSection(recommendState),
+                                  _buildBenefitsSection(l10n),
+                                  // TODO: 下版本开启 K 币充值功能
+                                  // _buildRechargeSection(context),
+                                  _buildBottomSpacer(context),
+                                ],
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              PositionedDirectional(
+                top: MediaQuery.of(context).padding.top + 8,
+                start: 8,
+                child: RtlBackButton(
+                  onPressed: _handleBack,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -329,15 +410,53 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     }
   }
 
+  String _localizedProductTitleById(AppLocalizations l10n, String productId) {
+    final name = productId.toLowerCase();
+    if (name.contains('year')) {
+      return l10n.membership_yearly;
+    }
+    if (name.contains('quarter')) {
+      return l10n.membership_quarterly;
+    }
+    if (name.contains('month')) {
+      return l10n.membership_monthly;
+    }
+    return productId;
+  }
+
+  /// 通过产品ID或goodsCode查找订阅产品
+  SubscriptionProduct? _findProductById(String productIdOrCode) {
+    final membershipProductsState = ref.read(membershipProductsProvider);
+    final products = membershipProductsState.products;
+
+    // 先尝试精确匹配 id（productId）
+    for (final product in products) {
+      if (product.googlePlayId == productIdOrCode ||
+          product.appStoreId == productIdOrCode ||
+          product.id == productIdOrCode) {
+        return product;
+      }
+    }
+
+    // 再尝试匹配 goodsCode
+    for (final product in products) {
+      final productId = PaymentService.instance.getProductIdForType(product.id);
+      if (productId == productIdOrCode) {
+        return product;
+      }
+    }
+
+    return null;
+  }
+
   /// 3. 剧卡片横向滚动区：高 137
   Widget _buildInitialProductsLoadingState(BuildContext context) {
     final viewportHeight = MediaQuery.of(context).size.height;
     final topPadding = MediaQuery.of(context).padding.top;
-    final loadingHeight = (viewportHeight - 379 - topPadding).clamp(260.0, double.infinity);
 
     return SizedBox(
       width: double.infinity,
-      height: loadingHeight,
+      height: viewportHeight - topPadding,
       child: const ColoredBox(
         color: Color(0xFF121212),
         child: Center(
@@ -348,11 +467,24 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   }
 
   Widget _buildDramaSection(MembershipDramaState recommendState) {
+    // DEBUG: 打印所有相关信息
+    print('==========================================');
+    print('[_buildDramaSection CALLED]');
+    print('status: ${recommendState.status}');
+    print('vipZone.length: ${recommendState.vipZone.length}');
+    print('topRecommend.length: ${recommendState.topRecommend.length}');
+    if (recommendState.vipZone.isNotEmpty) {
+      print('FIRST VIP: ${recommendState.vipZone.first.title}');
+      print('FIRST VIP cover: ${recommendState.vipZone.first.coverUrl}');
+    }
+    print('==========================================');
+    
     final dramas = recommendState.vipZone.isNotEmpty
         ? recommendState.vipZone
         : recommendState.topRecommend;
     final displayDramas = dramas.take(3).toList();
     final showSkeletonCards = displayDramas.isEmpty;
+    print('[_buildDramaSection] displayDramas.length: ${displayDramas.length}, showSkeletonCards: $showSkeletonCards');
 
     return Container(
       height: 137,
@@ -628,21 +760,33 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   Widget _buildActiveView(
     AppLocalizations l10n,
     MemberState memberState,
-    List<SubscriptionProduct> products,
-  ) {
+    List<SubscriptionProduct> products, {
+    bool isInitialProductsLoading = false,
+  }) {
+    final recommendState = ref.watch(membershipDramaProvider);
     return GradientScaffold(
       bottomBackgroundColor: _membershipBottomColor,
-      bottomNavigationBar: _buildBottomPayButton(l10n, memberState, products),
+      bottomNavigationBar: isInitialProductsLoading ? null : _buildBottomPayButton(l10n, memberState, products),
       body: Stack(
         children: [
-          SingleChildScrollView(
+          Positioned.fill(
             child: Column(
               children: [
                 _buildTopImage(),
-                _buildVipOptions(l10n, products, false),
-                _buildActiveInfo(memberState, l10n),
-                _buildBenefitsSection(l10n),
-                _buildBottomSpacer(context),
+                Expanded(
+                  child: isInitialProductsLoading
+                      ? _buildInitialProductsLoadingState(context)
+                      : SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              _buildVipOptions(l10n, products, false),
+                              _buildDramaSection(recommendState),
+                              _buildBenefitsSection(l10n),
+                              _buildBottomSpacer(context),
+                            ],
+                          ),
+                        ),
+                ),
               ],
             ),
           ),
@@ -659,40 +803,31 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
   }
 
-  Widget _buildActiveInfo(MemberState memberState, AppLocalizations l10n) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 15),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFD700), Color(0xFFFF8C00)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          const Icon(Icons.workspace_premium, size: 48, color: Colors.white),
-          const SizedBox(height: 8),
-          Text(
-            'You are a VIP Member!',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Expires: ${_formatDate(memberState.expireDate)}  •  ${memberState.daysRemaining ?? 0} days left',
-            style: TextStyle(
-              color: Colors.white.withAlpha(204),
-              fontSize: 13,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Widget _buildActiveInfo(MemberState memberState, AppLocalizations l10n) {
+  //   return Container(
+  //     margin: const EdgeInsets.symmetric(horizontal: 15),
+  //     padding: const EdgeInsets.all(16),
+  //     decoration: BoxDecoration(
+  //       gradient: const LinearGradient(
+  //         colors: [Color(0xFFFFD700), Color(0xFFFF8C00)],
+  //       ),
+  //       borderRadius: BorderRadius.circular(16),
+  //     ),
+  //     child: Column(
+  //       children: [
+  //         const Icon(Icons.workspace_premium, size: 48, color: Colors.white),
+  //         const SizedBox(height: 4),
+  //         Text(
+  //           'Expires: ${_formatDate(memberState.expireDate)}  •  ${memberState.daysRemaining ?? 0} days left',
+  //           style: TextStyle(
+  //             color: Colors.white.withAlpha(204),
+  //             fontSize: 13,
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   String _formatDate(DateTime? date) {
     if (date == null) return 'N/A';
@@ -872,20 +1007,23 @@ class _DramaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('[_DramaCard] coverUrl: $_coverUrl, drama.title: ${drama.title}');
     return GestureDetector(
       onTap: onTap,
       child: LayoutBuilder(
-        builder: (context, constraints) => Stack(
-          clipBehavior: Clip.none,
-          children: [
-            PreloadNetworkImage(
-              imageUrl: _coverUrl,
-              preloadAsset: 'assets/images/small_preload_bg.png',
-              width: constraints.maxWidth,
-              height: constraints.maxHeight,
-              fit: BoxFit.cover,
-              borderRadius: BorderRadius.circular(10),
-            ),
+        builder: (context, constraints) {
+          debugPrint('[_DramaCard] constraints: ${constraints.maxWidth}x${constraints.maxHeight}');
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              PreloadNetworkImage(
+                imageUrl: _coverUrl,
+                preloadAsset: 'assets/images/small_preload_bg.png',
+                width: constraints.maxWidth,
+                height: constraints.maxHeight,
+                fit: BoxFit.cover,
+                borderRadius: BorderRadius.circular(10),
+              ),
             if (drama.videoAccessType == 1)
               PositionedDirectional(
                 top: 0,
@@ -896,8 +1034,9 @@ class _DramaCard extends StatelessWidget {
                   height: 18,
                 ),
               ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }

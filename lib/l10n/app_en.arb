@@ -192,6 +192,7 @@
   "membershipLoginBeforeSubscribe": "Please log in before subscribing.",
   "membershipWebPurchaseUnsupported": "Web does not support Google Play in-app purchases.",
   "membershipPurchaseOpened": "Google Play opened. Please complete the subscription payment.",
+  "membershipItemAlreadyOwned": "You already own this subscription.",
   "watchLockedReminderTitle": "Reminder",
   "watchLockedReminderMessage": "About to jump to activate membership",
   "profileLoginFirst": "Please log in first",

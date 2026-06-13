@@ -504,8 +504,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
   bool _isEpisodeLocked(int index) {
     if (index < 0 || index >= videoInfoList.length) return false;
-    final memberState = ref.read(memberStateProvider);
-    if (memberState.isVip && !memberState.isExpired) {
+    // Use the featureAccessProvider which checks VIP status from Google Play
+    final hasPremium = ref.watch(featureAccessProvider(Feature.premiumContent));
+    if (hasPremium) {
       return false;
     }
     return videoInfoList[index].isCanPlay == 0;
@@ -652,13 +653,12 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        final memberState = ref.watch(memberStateProvider);
         return _WatchEpisodeBottomSheet(
           episodes: videoInfoList,
           currentIndex: _currentIndex,
           title: currentEpisode.title,
           coverUrl: currentEpisode.coverUrl,
-          isVipUnlocked: memberState.isVip && !memberState.isExpired,
+          isVipUnlocked: ref.watch(featureAccessProvider(Feature.premiumContent)),
           onEpisodeTap: (index) async {
             Navigator.of(sheetContext).pop();
             await _jumpToEpisode(index);
@@ -760,8 +760,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   }
 
   void _showQualityPicker(BuildContext context) {
-    final memberState = ref.read(memberStateProvider);
-    final isVip = memberState.isVip && !memberState.isExpired;
+    final hasPremium = ref.watch(featureAccessProvider(Feature.hdQuality));
+    final isVip = hasPremium;
     final screenWidth = MediaQuery.of(context).size.width;
 
     showModalBottomSheet<void>(

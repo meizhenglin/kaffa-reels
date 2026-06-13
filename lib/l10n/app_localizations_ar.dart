@@ -579,6 +579,9 @@ class AppLocalizationsAr extends AppLocalizations {
       'تم فتح Google Play. يرجى إكمال عملية دفع الاشتراك.';
 
   @override
+  String get membershipItemAlreadyOwned => 'أنت تمتلك هذا الاشتراك بالفعل.';
+
+  @override
   String get watchLockedReminderTitle => 'تذكير';
 
   @override

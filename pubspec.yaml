@@ -65,8 +65,8 @@ dependencies:
   preload_page_view: ^0.2.0
 
   # Payment & Subscription
-  in_app_purchase: ^3.2.0
-  in_app_purchase_android: ^0.3.0
+  in_app_purchase: ^3.3.0
+  in_app_purchase_android: ^0.5.1
   flutter_html: ^3.0.0
 
 dev_dependencies:
