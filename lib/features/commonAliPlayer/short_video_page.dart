@@ -152,7 +152,6 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   static const String _tag = 'ShortVideoPage';
 
   int? _pendingLockedDialogIndex;
-  int? _pendingEpisodesNum;
   String _currentQuality = '480P';
 
   Future<void> _toggleLike(VideoInfo videoInfo) async {
@@ -226,14 +225,6 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-
-    // 如果传入的 initialIndex 为 0 且没有指定 seedVideo，尝试从本地存储读取上次播放的集号
-    if (widget.initialIndex == 0 && widget.seedVideo == null) {
-      final savedEpisodesNum = StorageService().getLastEpisodesNum(widget.videoId);
-      if (savedEpisodesNum > 0) {
-        _pendingEpisodesNum = savedEpisodesNum;
-      }
-    }
 
     if (_usePreloadMode) {
       _preloadPageController = PreloadPageController(initialPage: _currentIndex);
@@ -319,12 +310,10 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
       final dirData = dirResp.data as Map<String, dynamic>;
       final videoEpisodes = dirData['videoEpisodes'] as int? ?? 10;
-      // 使用上次播放的集号，或者默认为 1
-      final episodesNum = _pendingEpisodesNum ?? 1;
 
       final playResp = await apiServiceProvider.getVideoListByVideoId(
         videoId: widget.videoId,
-        episodesNum: episodesNum,
+        episodesNum: 1,
         pageSize: videoEpisodes,
       );
       if (!playResp.isSuccess || playResp.data is! List) {
@@ -350,7 +339,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
       videoInfoList = videos;
       final seedEpisodeId = widget.seedVideo?.id ?? 0;
-      final seedSerialNum = widget.seedVideo?.serialNum ?? (_pendingEpisodesNum ?? 0);
+      final savedEpisodesNum = StorageService().getLastEpisodesNum(widget.videoId);
+      final seedSerialNum = widget.seedVideo?.serialNum ?? savedEpisodesNum;
       final resolvedInitialIndex = seedEpisodeId > 0
           ? videoInfoList.indexWhere((item) => item.id == seedEpisodeId)
           : seedSerialNum > 0
@@ -446,11 +436,11 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
     debugPrint('[$_tag]${'-' * 30}[index][$_currentIndex->$newPageIndex]');
 
-    // 保存当前集号到本地存储（用于下次进入时传给 API）
-    if (_currentIndex < videoInfoList.length) {
-      final currentSerialNum = videoInfoList[_currentIndex].serialNum;
-      if (currentSerialNum > 0) {
-        StorageService().saveLastEpisodesNum(widget.videoId, currentSerialNum);
+    // 保存切换后的集号到本地存储
+    if (newPageIndex < videoInfoList.length) {
+      final newSerialNum = videoInfoList[newPageIndex].serialNum;
+      if (newSerialNum > 0) {
+        StorageService().saveLastEpisodesNum(widget.videoId, newSerialNum);
       }
     }
 

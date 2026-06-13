@@ -466,7 +466,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         path: '/membership',
         name: 'membership',
-        builder: (context, state) => const MembershipPage(),
+        builder: (context, state) {
+          final backTarget = state.uri.queryParameters['back'];
+          return MembershipPage(backTarget: backTarget);
+        },
       ),
 
       /// K币充值页面

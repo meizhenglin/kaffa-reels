@@ -14,7 +14,9 @@ import '../../payment/providers/membership_provider.dart';
 import '../../../components/rtl_back_button.dart';
 
 class MembershipPage extends ConsumerStatefulWidget {
-  const MembershipPage({super.key});
+  const MembershipPage({super.key, this.backTarget});
+
+  final String? backTarget;
 
   @override
   ConsumerState<MembershipPage> createState() => _MembershipPageState();
@@ -63,6 +65,10 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   }
 
   void _handleBack() {
+    if (widget.backTarget != null && widget.backTarget!.isNotEmpty) {
+      context.go(widget.backTarget!);
+      return;
+    }
     if (context.canPop()) {
       context.pop();
       return;

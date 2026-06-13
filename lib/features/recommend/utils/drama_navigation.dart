@@ -38,7 +38,8 @@ Future<bool> openMembershipPage(
     return false;
   }
 
-  final result = await context.push<bool>(redirect);
+  final back = backTarget != null ? '?back=${Uri.encodeComponent(backTarget)}' : '';
+  final result = await context.push<bool>('$redirect$back');
   return result == true;
 }
 
