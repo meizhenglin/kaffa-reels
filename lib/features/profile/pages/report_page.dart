@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../../core/network/api_service.dart' show apiServiceProvider;
+import '../../auth/providers/auth_provider.dart';
 
 class ReportPage extends ConsumerStatefulWidget {
   const ReportPage({super.key});
@@ -14,7 +16,6 @@ class ReportPage extends ConsumerStatefulWidget {
 
 class _ReportPageState extends ConsumerState<ReportPage> {
   static const List<String> _reportTypes = [
-    'Choose Type',
     'Content issue',
     'Playback problem',
     'Copyright concern',
@@ -26,6 +27,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
   late final FocusNode _reportFocusNode;
   final GlobalKey _reportFieldKey = GlobalKey();
   String _selectedType = _reportTypes.first;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -58,6 +60,50 @@ class _ReportPageState extends ConsumerState<ReportPage> {
         alignment: 0.2,
       );
     });
+  }
+
+  Future<void> _submitReport() async {
+    if (_isSubmitting) return;
+
+    final content = _reportController.text.trim();
+    if (content.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your feedback')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final auth = ref.read(authProvider);
+      final userId = auth.user?.id ?? '';
+
+      await apiServiceProvider.request(
+        '/api/feedback/userAddFeedBack',
+        method: 'POST',
+        data: {
+          'userId': userId,
+          'userFeedbackType': _selectedType,
+          'userFeedbackContent': content,
+        },
+      );
+
+      if (mounted) {
+        context.pop();
+      }
+    } catch (e) {
+      debugPrint('[ReportPage] submit failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to submit feedback')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   @override
@@ -157,7 +203,8 @@ class _ReportPageState extends ConsumerState<ReportPage> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                   child: _SubmitButton(
-                    onPressed: () {},
+                    onPressed: _submitReport,
+                    isLoading: _isSubmitting,
                   ),
                 ),
               ),
@@ -381,9 +428,10 @@ class _ReportTextArea extends StatelessWidget {
 }
 
 class _SubmitButton extends StatelessWidget {
-  const _SubmitButton({required this.onPressed});
+  const _SubmitButton({required this.onPressed, required this.isLoading});
 
   final VoidCallback onPressed;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -392,20 +440,20 @@ class _SubmitButton extends StatelessWidget {
       height: 42,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFF8F4EFF),
+          color: isLoading ? const Color(0xFF6B6B6B) : const Color(0xFF8F4EFF),
           borderRadius: BorderRadius.circular(21),
         ),
         child: TextButton(
-          onPressed: onPressed,
+          onPressed: isLoading ? null : onPressed,
           style: TextButton.styleFrom(
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(21),
             ),
           ),
-          child: const Text(
-            'Submit Report',
-            style: TextStyle(
+          child: Text(
+            isLoading ? 'Submitting...' : 'Submit Report',
+            style: const TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 16,
               color: Colors.white,
