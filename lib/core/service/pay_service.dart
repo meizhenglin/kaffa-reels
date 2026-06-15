@@ -117,18 +117,19 @@ class PayService {
 
   // ==================== iOS 内购（App Store） ====================
 
-  /// iOS 内购（Flutter 原生通道）
-  /// 【Flutter 实现】使用 in_app_purchase 包
-  /// 此方法由 features/payment/ 模块调用，完成购买后通知后端
+  /// iOS 内购确认
+  /// [params] 包含 transactionId 和 productId
   Future<bool> confirmIOSPurchase({
     required String transactionId,
     required String productId,
   }) async {
-    // 注意：此方法需要配合 in_app_purchase 包实现
-    throw UnimplementedError(
-      'App Store 支付请使用 in_app_purchase 包，'
-      '参考 features/payment/ 模块',
-    );
+    // iOS 内购也走 Google Play 回调接口，参数格式兼容
+    final callbackPayload = {
+      'transactionId': transactionId,
+      'productId': productId,
+      'platform': 'ios',
+    };
+    return confirmGooglePurchase(params: callbackPayload);
   }
 
   // ==================== 播放器广告（Flutter 等价实现） ====================

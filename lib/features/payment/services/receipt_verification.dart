@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 
 /// Service for verifying purchase receipts with the backend
 /// 
@@ -36,11 +34,9 @@ class ReceiptVerificationService {
     // Add interceptors for logging and auth
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) {
-        debugPrint('Receipt API Request: ${options.method} ${options.path}');
         return handler.next(options);
       },
       onError: (error, handler) {
-        debugPrint('Receipt API Error: ${error.message}');
         return handler.next(error);
       },
     ));
@@ -78,8 +74,6 @@ class ReceiptVerificationService {
         message: 'Server returned status ${response.statusCode}',
       );
     } on DioException catch (e) {
-      debugPrint('Receipt verification failed: ${e.message}');
-      
       if (e.type == DioExceptionType.connectionError ||
           e.type == DioExceptionType.connectionTimeout) {
         return ReceiptVerificationResult.failure(
@@ -97,10 +91,9 @@ class ReceiptVerificationService {
       }
 
       return ReceiptVerificationResult.failure(
-        message: 'Verification failed: ${e.message}',
+        message: 'Verification failed',
       );
     } catch (e) {
-      debugPrint('Unexpected error in receipt verification: $e');
       return ReceiptVerificationResult.failure(
         message: 'An unexpected error occurred',
       );
@@ -128,8 +121,7 @@ class ReceiptVerificationService {
       }
 
       return null;
-    } on DioException catch (e) {
-      debugPrint('Failed to check subscription status: ${e.message}');
+    } catch (_) {
       return null;
     }
   }
@@ -158,7 +150,6 @@ class ReceiptVerificationService {
 
       return response.statusCode == 200;
     } on DioException catch (e) {
-      debugPrint('Failed to cancel subscription: ${e.message}');
       return false;
     }
   }
@@ -189,7 +180,6 @@ class ReceiptVerificationService {
       );
     } catch (e) {
       // Non-critical, don't throw
-      debugPrint('Failed to report event: $e');
     }
   }
 }

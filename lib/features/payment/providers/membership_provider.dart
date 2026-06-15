@@ -37,7 +37,6 @@ class RechargePurchaseHandler {
     );
 
     if (products.isEmpty) {
-      debugPrint('Product not found: ${product.googlePlayId}');
       pendingProduct = null;
       return false;
     }
@@ -57,7 +56,6 @@ class RechargePurchaseHandler {
   /// Handle successful consumable purchase
   Future<bool> handlePurchaseSuccess(PurchaseDetails purchase) async {
     if (pendingProduct == null) {
-      debugPrint('No pending recharge product');
       return false;
     }
 
@@ -69,7 +67,6 @@ class RechargePurchaseHandler {
     // Consume the purchase
     final consumed = await paymentService.handleConsumablePurchase(purchase);
     if (!consumed) {
-      debugPrint('Failed to consume purchase');
       return false;
     }
 
@@ -92,9 +89,7 @@ class RechargePurchaseHandler {
       );
 
       if (response.isSuccess) {
-        debugPrint('Recharge callback successful');
-
-        // Parse and update coin balance from response
+        // Recharge callback successful - parse coin amount from response
         final responseData = response.data;
         if (responseData is Map) {
           final coinAmount = responseData['coinAmount'] ??
@@ -104,11 +99,9 @@ class RechargePurchaseHandler {
           await coinNotifier.addCoins(coinAmount as int);
         }
         return true;
-      } else {
-        debugPrint('Recharge callback failed: ${response.error}');
       }
     } catch (e) {
-      debugPrint('Error calling recharge callback: $e');
+      // Silently handle callback errors
     }
 
     return false;
@@ -215,7 +208,6 @@ class RechargeProductsNotifier extends StateNotifier<RechargeProductsState> {
         );
       }
     } catch (e) {
-      debugPrint('Error loading recharge products: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Error loading products',
@@ -359,6 +351,11 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     await checkAndRetryPendingPayments();
   }
 
+  /// 清理待处理订单状态（用户取消购买时调用）
+  void clearPendingOrder() {
+    state = state.copyWith(clearPendingOrder: true);
+  }
+
   Future<void> _handlePurchaseComplete(PurchaseDetails purchase) async {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
@@ -405,7 +402,6 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         if (retryCount > 0) {
           // 指数退避: 2s, 4s, 8s
           final delay = Duration(seconds: (2 << (retryCount - 1)));
-          debugPrint('Retrying Google Pay callback, attempt $retryCount/$maxRetries, waiting $delay');
           await Future.delayed(delay);
         }
 
@@ -413,12 +409,9 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
           confirmed = await _payService.confirmGooglePurchase(
             params: callbackPayload,
           );
-          debugPrint('Google Pay callback result: confirmed=$confirmed, attempt=${retryCount + 1}');
         } catch (e) {
-          debugPrint('Google Pay callback error: $e, attempt=${retryCount + 1}');
           if (retryCount == maxRetries - 1) {
             // 最后一次重试也失败了，保存到本地待处理
-            debugPrint('All retries failed, saving pending payment');
             await _savePendingPayment(callbackPayload);
           }
         }
@@ -437,7 +430,6 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         );
       }
     } catch (e) {
-      debugPrint('Error handling purchase completion: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Failed to process purchase',
@@ -455,7 +447,6 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     // 检查是否已登录
     final authState = _ref.read(authProvider);
     if (!authState.isAuthenticated || (authState.user?.isTourist ?? true)) {
-      debugPrint('User not logged in, skipping pending payments retry');
       state = state.copyWith(isLoading: false);
       return;
     }
@@ -465,12 +456,9 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     try {
       final pendingPayments = await _storage.getPendingPayments();
       if (pendingPayments.isEmpty) {
-        debugPrint('No pending payments to retry');
         state = state.copyWith(isLoading: false);
         return;
       }
-
-      debugPrint('Found ${pendingPayments.length} pending payments, retrying...');
 
       final successfulOrderIds = <String>[];
 
@@ -483,24 +471,17 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         // 重试3次，指数退避
         for (int attempt = 1; attempt <= 3; attempt++) {
           try {
-            debugPrint('Retrying pending payment: orderId=$orderId, attempt=$attempt');
             success = await _payService.confirmGooglePurchase(params: payment);
             if (success) {
-              debugPrint('Pending payment succeeded: orderId=$orderId');
               successfulOrderIds.add(orderId);
               break;
             }
           } catch (e) {
-            debugPrint('Retry failed for orderId=$orderId, attempt=$attempt: $e');
             if (attempt < 3) {
               final delay = Duration(seconds: (2 << (attempt - 1)));
               await Future.delayed(delay);
             }
           }
-        }
-
-        if (!success) {
-          debugPrint('Pending payment permanently failed: orderId=$orderId');
         }
       }
 
@@ -509,9 +490,6 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         await _storage.removePendingPayment(orderId);
       }
 
-      final remaining = await _storage.getPendingPayments();
-      debugPrint('Pending payments retry complete. Remaining: ${remaining.length}');
-
       // 如果有支付成功了，刷新VIP状态
       if (successfulOrderIds.isNotEmpty) {
         await _refreshVipStatus();
@@ -519,7 +497,6 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         state = state.copyWith(isLoading: false);
       }
     } catch (e) {
-      debugPrint('Error checking pending payments: $e');
       state = state.copyWith(isLoading: false);
     }
   }
@@ -534,7 +511,6 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         isLoading: false,
       );
     } catch (e) {
-      debugPrint('Error refreshing VIP status: $e');
       state = state.copyWith(isLoading: false);
     }
   }
@@ -562,7 +538,7 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     try {
       await _ref.read(authProvider.notifier).refreshUserInfo();
     } catch (e) {
-      debugPrint('[MemberStateNotifier] refreshUserInfo failed: $e');
+      // Silently handle refresh errors
     }
   }
 
@@ -600,7 +576,6 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
       state = state.copyWith(isLoading: false);
       return success;
     } catch (e) {
-      debugPrint('Error restoring purchases: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: 'Failed to restore purchases',
@@ -642,7 +617,7 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         }
       }
     } catch (e) {
-      debugPrint('[checkIsVip] queryExistingPurchases error: $e');
+      // Silently handle query errors
     }
     return false;
   }
@@ -652,8 +627,6 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         .map((p) => p.getProductId(_paymentService.currentPlatform).trim())
         .where((id) => id.isNotEmpty)
         .toList();
-
-    debugPrint('IAP getProducts: querying $productIds');
 
     return _paymentService.getProducts(
       productIds: productIds,
@@ -681,13 +654,7 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
       final products = await getProducts([selectedProduct]);
       final platformProductId = selectedProduct.getProductId(_paymentService.currentPlatform).trim();
 
-      debugPrint(
-        'IAP purchase flow: platformProductId="$platformProductId", '
-        'requestedProductIds=[${[selectedProduct].map((p) => p.getProductId(_paymentService.currentPlatform).trim()).join(', ')}]',
-      );
-
       if (products.isEmpty) {
-        debugPrint('IAP purchase error: storeProducts list is EMPTY for product IDs: [${[selectedProduct].map((p) => p.getProductId(_paymentService.currentPlatform).trim()).join(', ')}]');
         state = state.copyWith(
           isLoading: false,
           errorMessage: 'Subscription product is unavailable or not configured as subs in Google Play.',
@@ -719,11 +686,7 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
       );
 
       // 查询并缓存现有订阅（用于升级/降级）
-      final purchases = await _paymentService.queryExistingPurchases();
-      debugPrint('[IAP] queryExistingPurchases returned: ${purchases.length} purchases');
-      for (final p in purchases) {
-        debugPrint('  - ${p.productID}: ${p.status}');
-      }
+      await _paymentService.queryExistingPurchases();
 
       // 如果 Google Play 查询不到购买但服务器有订阅，说明是同一商品续费
       // Google Play 会自动处理，不传 oldPurchaseDetails 也没问题
@@ -740,7 +703,6 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
       }
       return success;
     } catch (e) {
-      debugPrint('Error creating order: $e');
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
@@ -795,7 +757,6 @@ class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> 
         clearError: true,
       );
     } catch (e) {
-      debugPrint('Failed to load vip products: $e');
       state = state.copyWith(
         isLoading: false,
         products: const [],
@@ -834,27 +795,12 @@ class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> 
 
       final sanitizedIds = rawIds.map((id) => id.trim()).toList();
 
-      debugPrint(
-        'IAP _syncStorePrices: querying ${sanitizedIds.length} product IDs, '
-        'rawIds=$rawIds',
-      );
-
       final storeProducts = await _paymentService.getProducts(
         productIds: sanitizedIds,
         requireSubscriptionOnAndroid: defaultTargetPlatform == TargetPlatform.android,
       );
 
-      debugPrint(
-        'IAP _syncStorePrices: received ${storeProducts.length} store products',
-      );
-
       if (storeProducts.isEmpty) {
-        debugPrint(
-          'IAP _syncStorePrices: WARNING - store returned 0 products. '
-          'This usually means: (1) product IDs not configured in Play Console, '
-          '(2) product IDs have extra spaces, or (3) Google Play Billing Library '
-          'version mismatch. Check build.gradle.kts for Billing Library version.',
-        );
         return baseProducts;
       }
 
@@ -874,7 +820,6 @@ class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> 
             product.id,
             storeProduct.id,
           );
-          debugPrint('Registered subscription mapping: ${product.id} -> ${storeProduct.id}');
         }
 
         // For display: keep API's price and originalPrice as-is.
@@ -882,7 +827,6 @@ class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> 
         return product;
       }).toList();
     } catch (e) {
-      debugPrint('Failed to sync store prices: $e');
       return baseProducts;
     }
   }
@@ -938,7 +882,7 @@ final isVipProvider = FutureProvider<bool>((ref) async {
         }
       }
     } catch (e) {
-      debugPrint('[isVipProvider] queryExistingPurchases error: $e');
+      // Silently handle query errors
     }
   }
 
@@ -951,13 +895,12 @@ final isVipProvider = FutureProvider<bool>((ref) async {
     final response = await apiService.getUserCenter();
     if (response.code == 0 && response.data != null) {
       final isVip = response.data['isVip'] ?? response.data['is_vip'] ?? 0;
-      debugPrint('[isVipProvider] backend isVip: $isVip');
       if (isVip == 1 || isVip == true) {
         return true;
       }
     }
   } catch (e) {
-    debugPrint('[isVipProvider] backend check error: $e');
+    // Silently handle backend errors
   }
 
   return false;

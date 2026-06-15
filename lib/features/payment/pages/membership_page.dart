@@ -116,7 +116,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         }
       }
     } catch (e) {
-      debugPrint('Error checking existing purchases: $e');
+      // Silently handle error
     }
     return false;
   }
@@ -168,33 +168,47 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true) {
+      // 用户取消，清理可能残留的待处理订单状态
+      ref.read(memberStateProvider.notifier).clearPendingOrder();
+      return;
+    }
+
+    // 显示加载状态
+    _isPurchasing = true;
+    if (mounted) setState(() {});
 
     // 检查是否已拥有此订阅
     final isAlreadyOwned = await _checkIfProductAlreadyOwned(product);
-    if (isAlreadyOwned && mounted) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            content: Text(
-              l10n.membershipItemAlreadyOwned,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.black),
+    if (isAlreadyOwned) {
+      _isPurchasing = false;
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                l10n.membershipItemAlreadyOwned,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.black),
+              ),
+              backgroundColor: const Color(0xFFFFFFFF),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-            backgroundColor: const Color(0xFFFFFFFF),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
+          );
+      }
       return;
     }
 
     if (kIsWeb) {
+      _isPurchasing = false;
       if (mounted) {
+        setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.membershipWebPurchaseUnsupported)),
         );
@@ -206,6 +220,10 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     final success = await memberNotifier.purchase(
       selectedProduct: product,
     );
+
+    _isPurchasing = false;
+    if (mounted) setState(() {});
+
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -213,12 +231,12 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         ),
       );
     }
-    // Don't pop here - wait for purchaseStream callback to handle result
   }
+
+  bool _isPurchasing = false;
 
   @override
   Widget build(BuildContext context) {
-    print('>>>>>>>>>>>>> MembershipPage.build() CALLED <<<<<<<<<<<<');
     final l10n = AppLocalizations.of(context);
     final recommendState = ref.watch(membershipDramaProvider);
     final memberState = ref.watch(memberStateProvider);
@@ -229,11 +247,6 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         : const <SubscriptionProduct>[];
     final isInitialProductsLoading = _isBootstrappingProducts ||
         (membershipProductsState.isLoading && !membershipProductsState.hasLoaded);
-    
-    // DEBUG - show VIP status in console
-    final isVipAsync = ref.watch(isVipProvider);
-    final isVipDebug = isVipAsync.valueOrNull ?? false;
-    print('[MembershipPage] isLoading: ${membershipProductsState.isLoading}, hasProducts: $hasProducts, isVip: $isVipDebug');
 
     if (_selectedIndex >= products.length && products.isNotEmpty) {
       _selectedIndex = 0;
@@ -264,8 +277,6 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         ),
       );
     }
-
-    debugPrint('[MembershipPage] build called. isInitialProductsLoading: $isInitialProductsLoading, products.length: ${products.length}');
 
     return GradientScaffold(
       bottomBackgroundColor: _membershipBottomColor,
@@ -467,24 +478,10 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   }
 
   Widget _buildDramaSection(MembershipDramaState recommendState) {
-    // DEBUG: 打印所有相关信息
-    print('==========================================');
-    print('[_buildDramaSection CALLED]');
-    print('status: ${recommendState.status}');
-    print('vipZone.length: ${recommendState.vipZone.length}');
-    print('topRecommend.length: ${recommendState.topRecommend.length}');
-    if (recommendState.vipZone.isNotEmpty) {
-      print('FIRST VIP: ${recommendState.vipZone.first.title}');
-      print('FIRST VIP cover: ${recommendState.vipZone.first.coverUrl}');
-    }
-    print('==========================================');
-    
     final dramas = recommendState.vipZone.isNotEmpty
         ? recommendState.vipZone
         : recommendState.topRecommend;
     final displayDramas = dramas.take(3).toList();
-    final showSkeletonCards = displayDramas.isEmpty;
-    print('[_buildDramaSection] displayDramas.length: ${displayDramas.length}, showSkeletonCards: $showSkeletonCards');
 
     return Container(
       height: 137,
@@ -506,7 +503,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
                         memberState: ref.watch(memberStateProvider),
                       ),
                     )
-                  : _DramaCardPlaceholder(showImage: showSkeletonCards),
+                  : _DramaCardPlaceholder(),
             ),
           );
         }),
@@ -1007,12 +1004,10 @@ class _DramaCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('[_DramaCard] coverUrl: $_coverUrl, drama.title: ${drama.title}');
     return GestureDetector(
       onTap: onTap,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          debugPrint('[_DramaCard] constraints: ${constraints.maxWidth}x${constraints.maxHeight}');
           return Stack(
             clipBehavior: Clip.none,
             children: [

@@ -20,6 +20,10 @@ class PaymentService {
   // Cached products
   List<ProductDetails> _availableProducts = [];
 
+  // Cached purchases for quick lookup
+  List<PurchaseDetails> _cachedPurchases = [];
+  DateTime? _lastPurchaseQueryTime;
+
   /// Initialize the payment service
   Future<bool> initialize({
     Function(PurchaseDetails)? onPurchaseComplete,
@@ -33,7 +37,6 @@ class PaymentService {
     try {
       final isAvailable = await _inAppPurchase.isAvailable();
       if (!isAvailable) {
-        debugPrint('In-app purchases not available');
         _onPurchaseError?.call('Google Play billing is not available on this device.');
         return false;
       }
@@ -42,16 +45,13 @@ class PaymentService {
       _subscription ??= _inAppPurchase.purchaseStream.listen(
         _handlePurchaseUpdate,
         onError: (error) {
-          debugPrint('Purchase stream error: $error');
           _onPurchaseError?.call('Purchase stream error: $error');
         },
       );
 
       _isInitialized = true;
-      debugPrint('PaymentService initialized successfully');
       return true;
     } catch (e) {
-      debugPrint('Failed to initialize payment service: $e');
       _onPurchaseError?.call('Failed to initialize billing: $e');
       return false;
     }
@@ -65,52 +65,20 @@ class PaymentService {
     // Sanitize product IDs: trim whitespace, remove invisible chars
     final sanitizedIds = productIds.map((id) {
       final cleaned = id.replaceAll(RegExp(r'[\u0000-\u001F\u007F\u200E\u200F\u202A-\u202E\s]'), '');
-      final trimmed = cleaned.trim();
-      if (trimmed != id) {
-        debugPrint('IAP product ID sanitized: "$id" -> "$trimmed"');
-      }
-      return trimmed;
+      return cleaned.trim();
     }).toList();
 
-    debugPrint(
-      'IAP querying ${sanitizedIds.length} product IDs: $sanitizedIds',
-    );
-
     try {
-      debugPrint('IAP queryProductDetails: about to call store API...');
       final response = await _inAppPurchase.queryProductDetails(
         sanitizedIds.toSet(),
       );
-      debugPrint('IAP queryProductDetails: store API returned');
-
-      debugPrint('IAP queryProductDetails response:');
-      debugPrint('  - error: ${response.error}');
-      debugPrint('  - notFoundIDs count: ${response.notFoundIDs.length}');
-      if (response.notFoundIDs.isNotEmpty) {
-        debugPrint('  - notFoundIDs: ${response.notFoundIDs.join(', ')}');
-      }
-      debugPrint('  - productDetails count: ${response.productDetails.length}');
 
       if (response.error != null) {
-        debugPrint('Error fetching products: ${response.error}');
         _onPurchaseError?.call(response.error!.message);
         return [];
       }
 
-      if (response.notFoundIDs.isNotEmpty) {
-        debugPrint('Products not found: ${response.notFoundIDs.join(', ')}');
-      }
-
       _availableProducts = response.productDetails;
-      for (final product in _availableProducts) {
-        final googlePlayType = product is GooglePlayProductDetails
-            ? product.productDetails.productType
-            : 'unknown';
-        debugPrint(
-          'IAP product loaded: id="${product.id}", title="${product.title}", '
-          'price="${product.price}", type=$googlePlayType',
-        );
-      }
 
       if (requireSubscriptionOnAndroid && defaultTargetPlatform == TargetPlatform.android) {
         final invalidProducts = _availableProducts.where((product) {
@@ -127,7 +95,6 @@ class PaymentService {
           }).join(', ');
           final message =
               'Google Play products must be subscriptions (subs), but got: $invalidSummary';
-          debugPrint(message);
           _onPurchaseError?.call(message);
           return [];
         }
@@ -135,8 +102,6 @@ class PaymentService {
 
       return _availableProducts;
     } catch (e) {
-      debugPrint('Exception fetching products: $e');
-      debugPrint('Stack trace: $e');
       _onPurchaseError?.call('Failed to fetch products: $e');
       return [];
     }
@@ -163,7 +128,6 @@ class PaymentService {
         onPurchaseError: _onPurchaseError,
       );
       if (!initialized) {
-        debugPrint('PaymentService not initialized');
         return false;
       }
     }
@@ -173,10 +137,6 @@ class PaymentService {
 
       // Auto-find cached purchase for upgrade/downgrade
       PurchaseDetails? cachedOldPurchase = oldPurchaseDetails;
-      debugPrint('[PaymentService.purchase] _pastPurchases.length=${_pastPurchases.length}');
-      for (final p in _pastPurchases) {
-        debugPrint('  cached: ${p.productID}: ${p.status}');
-      }
       
       if (isAndroid && cachedOldPurchase == null) {
         // First try cached purchases
@@ -186,7 +146,6 @@ class PaymentService {
                 purchase.status == PurchaseStatus.restored) {
               if (purchase.productID != product.id) {
                 cachedOldPurchase = purchase;
-                debugPrint('[PaymentService.purchase] Found cached purchase for upgrade: ${purchase.productID}');
                 break;
               }
             }
@@ -195,31 +154,25 @@ class PaymentService {
         
         // If no cached purchase found and this is a different product, query directly
         if (cachedOldPurchase == null) {
-          debugPrint('[PaymentService.purchase] No suitable cached purchase, querying directly...');
           try {
             final androidAddition = _inAppPurchase.getPlatformAddition<
                 InAppPurchaseAndroidPlatformAddition>();
             final response = await androidAddition.queryPastPurchases(
               applicationUserName: _resolveUserId(),
             );
-            debugPrint('[PaymentService.purchase] Direct query found ${response.pastPurchases.length} purchases');
             for (final p in response.pastPurchases) {
-              debugPrint('  - ${p.productID}: ${p.status}');
               cachePastPurchase(p); // Cache for future use
               if (cachedOldPurchase == null &&
                   p.productID != product.id &&
                   (p.status == PurchaseStatus.purchased || p.status == PurchaseStatus.restored)) {
                 cachedOldPurchase = p;
-                debugPrint('[PaymentService.purchase] Selected for upgrade: ${p.productID}');
               }
             }
           } catch (e) {
-            debugPrint('[PaymentService.purchase] Direct query error: $e');
+            // Silently handle query errors
           }
         }
       }
-
-      debugPrint('[PaymentService.purchase] product=${product.id}, oldPurchase=${cachedOldPurchase?.productID ?? 'none'}');
 
       if (isAndroid && cachedOldPurchase != null) {
         final googlePlayDetails = product as GooglePlayProductDetails;
@@ -235,26 +188,11 @@ class PaymentService {
           changeSubscriptionParam: changeSubscriptionParam,
         );
 
-        debugPrint(
-          'Starting subscription upgrade/downgrade: id=${product.id}, '
-          'oldPurchaseId=${cachedOldPurchase.purchaseID}, mode=$replacementMode, '
-          'oldProductId=${cachedOldPurchase.productID}',
-        );
-
         try {
-          final success = await _inAppPurchase.buyNonConsumable(
+          return await _inAppPurchase.buyNonConsumable(
             purchaseParam: purchaseParam,
           );
-
-          if (!success) {
-            debugPrint('buyNonConsumable returned false - Google Play may have shown error dialog');
-            _onPurchaseError?.call('Failed to open Google Play purchase sheet.');
-          } else {
-            debugPrint('buyNonConsumable returned true - purchase flow started');
-          }
-          return success;
         } catch (e) {
-          debugPrint('Exception during buyNonConsumable: $e');
           _onPurchaseError?.call('Purchase failed: $e');
           return false;
         }
@@ -264,24 +202,11 @@ class PaymentService {
           applicationUserName: applicationUserName,
         );
 
-        final googlePlayType = product is GooglePlayProductDetails
-            ? product.productDetails.productType
-            : 'unknown';
-        debugPrint(
-          'Starting purchase: id=${product.id}, type=$googlePlayType',
-        );
-
-        final success = await _inAppPurchase.buyNonConsumable(
+        return await _inAppPurchase.buyNonConsumable(
           purchaseParam: purchaseParam,
         );
-
-        if (!success) {
-          _onPurchaseError?.call('Failed to open Google Play purchase sheet.');
-        }
-        return success;
       }
     } catch (e) {
-      debugPrint('Purchase error: $e');
       _onPurchaseError?.call('Purchase failed: $e');
       return false;
     }
@@ -364,7 +289,6 @@ class PaymentService {
         onPurchaseError: _onPurchaseError,
       );
       if (!initialized) {
-        debugPrint('PaymentService not initialized');
         return false;
       }
     }
@@ -375,20 +299,10 @@ class PaymentService {
         applicationUserName: applicationUserName,
       );
 
-      debugPrint(
-        'Starting consumable purchase: id=${product.id}',
-      );
-
-      final success = await _inAppPurchase.buyConsumable(
+      return await _inAppPurchase.buyConsumable(
         purchaseParam: purchaseParam,
       );
-
-      if (!success) {
-        _onPurchaseError?.call('Failed to open Google Play purchase sheet.');
-      }
-      return success;
     } catch (e) {
-      debugPrint('Consumable purchase error: $e');
       _onPurchaseError?.call('Purchase failed: $e');
       return false;
     }
@@ -402,7 +316,6 @@ class PaymentService {
         onPurchaseError: _onPurchaseError,
       );
       if (!initialized) {
-        debugPrint('PaymentService not initialized');
         return false;
       }
     }
@@ -414,7 +327,6 @@ class PaymentService {
       );
       return true;
     } catch (e) {
-      debugPrint('Restore purchases error: $e');
       _onPurchaseError?.call('Restore failed: $e');
       return false;
     }
@@ -422,7 +334,16 @@ class PaymentService {
 
   /// Query existing purchases from Google Play (for upgrade/downgrade)
   /// Returns list of active purchases that can be used for subscription changes
-  Future<List<PurchaseDetails>> queryExistingPurchases() async {
+  /// Uses a 30-second cache to avoid excessive queries
+  Future<List<PurchaseDetails>> queryExistingPurchases({bool forceRefresh = false}) async {
+    // Return cached results if within cache TTL (30 seconds)
+    if (!forceRefresh &&
+        _cachedPurchases.isNotEmpty &&
+        _lastPurchaseQueryTime != null &&
+        DateTime.now().difference(_lastPurchaseQueryTime!).inSeconds < 30) {
+      return _cachedPurchases;
+    }
+
     if (!_isInitialized) {
       await initialize(
         onPurchaseComplete: _onPurchaseComplete,
@@ -440,22 +361,20 @@ class PaymentService {
       );
 
       if (response.error != null) {
-        debugPrint('queryExistingPurchases error: ${response.error}');
-        return [];
+        return _cachedPurchases.isNotEmpty ? _cachedPurchases : [];
       }
 
-      debugPrint('[queryExistingPurchases] Found ${response.pastPurchases.length} past purchases');
+      // Update cache
+      _cachedPurchases = response.pastPurchases;
+      _lastPurchaseQueryTime = DateTime.now();
 
       for (final purchase in response.pastPurchases) {
-        // Cache each purchase for later use in upgrades
         cachePastPurchase(purchase);
-        debugPrint('  - ${purchase.productID}: ${purchase.status}');
       }
 
       return response.pastPurchases;
     } catch (e) {
-      debugPrint('queryExistingPurchases error: $e');
-      return [];
+      return _cachedPurchases.isNotEmpty ? _cachedPurchases : [];
     }
   }
 
@@ -471,32 +390,20 @@ class PaymentService {
           // 方案A: 先 Acknowledge，等完成后再调 API 回调
           if (purchase.pendingCompletePurchase) {
             try {
-              debugPrint('Acknowledging purchase before API callback: ${purchase.purchaseID}');
               await _inAppPurchase.completePurchase(purchase);
-              debugPrint('Purchase acknowledged: ${purchase.purchaseID}');
             } catch (e) {
-              debugPrint('Failed to acknowledge purchase: $e');
+              // Silently handle acknowledge errors
             }
           }
           _onPurchaseComplete?.call(purchase);
           break;
         case PurchaseStatus.pending:
-          debugPrint('Purchase pending: ${purchase.purchaseID}');
+          // Purchase is pending, no action needed
           break;
         case PurchaseStatus.canceled:
-          debugPrint('Purchase canceled: ${purchase.purchaseID}');
           _onPurchaseError?.call('Purchase was canceled');
           break;
         case PurchaseStatus.error:
-          debugPrint('========== PURCHASE ERROR DETAILS ==========');
-          debugPrint('Purchase error code: ${purchase.error?.code}');
-          debugPrint('Purchase error message: ${purchase.error?.message}');
-          debugPrint('Purchase error source: ${purchase.error?.source}');
-          debugPrint('Purchase error details: ${purchase.error?.details}');
-          debugPrint('Product ID: ${purchase.productID}');
-          debugPrint('Purchase ID: ${purchase.purchaseID}');
-          debugPrint('============================================');
-          
           // Map Google Play error codes to user-friendly messages
           final errorMsg = purchase.error?.message ?? '';
           final userFriendlyMsg = _mapPurchaseErrorToUserMessage(errorMsg);
@@ -538,7 +445,6 @@ class PaymentService {
   /// This must be called after successful purchase to allow repurchasing
   Future<bool> consumePurchase(PurchaseDetails purchase) async {
     if (defaultTargetPlatform != TargetPlatform.android) {
-      debugPrint('Consume only supported on Android');
       return false;
     }
 
@@ -546,10 +452,8 @@ class PaymentService {
       final androidAddition = _inAppPurchase.getPlatformAddition<
           InAppPurchaseAndroidPlatformAddition>();
       await androidAddition.consumePurchase(purchase);
-      debugPrint('Purchase consumed: ${purchase.purchaseID}');
       return true;
     } catch (e) {
-      debugPrint('Failed to consume purchase: $e');
       return false;
     }
   }
@@ -561,12 +465,10 @@ class PaymentService {
       // Consume the purchase to allow future purchases
       final consumed = await consumePurchase(purchase);
       if (!consumed) {
-        debugPrint('Failed to consume purchase: ${purchase.purchaseID}');
         return false;
       }
       return true;
     } catch (e) {
-      debugPrint('Error handling consumable purchase: $e');
       return false;
     }
   }

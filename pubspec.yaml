@@ -2,7 +2,7 @@ name: qahwa_tv
 description: "QahwaTV App - A short drama streaming application for Arabic region."
 publish_to: 'none'
 
-version: 1.0.0+11
+version: 1.0.0+13
 
 environment:
   sdk: ^3.12.0  # 改成 3.12.0 
