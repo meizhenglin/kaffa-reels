@@ -57,6 +57,7 @@ class VideoInfo {
       title: (json['title'] as String?) ?? (json['videoName'] as String?) ?? '',
       content: (json['content'] as String?) ??
           (json['description'] as String?) ??
+          (json['videoIntroduce'] as String?) ??
           (json['videoDesc'] as String?) ??
           (json['videoDescription'] as String?) ??
           (json['introduction'] as String?) ??

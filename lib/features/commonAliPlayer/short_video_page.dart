@@ -12,6 +12,7 @@ import '../../core/storage/storage_service.dart';
 import '../recommend/models/video_info.dart';
 import '../recommend/providers/video_action_provider.dart';
 import '../recommend/utils/drama_navigation.dart';
+import '../auth/providers/auth_provider.dart';
 import '../payment/providers/membership_provider.dart';
 import 'ali_player_preload.dart';
 import 'watch_short_video_item.dart';
@@ -310,6 +311,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
       final dirData = dirResp.data as Map<String, dynamic>;
       final videoEpisodes = dirData['videoEpisodes'] as int? ?? 10;
+      final videoIntroduce = (dirData['videoIntroduce'] as String?)?.trim() ?? '';
 
       final playResp = await apiServiceProvider.getVideoListByVideoId(
         videoId: widget.videoId,
@@ -324,9 +326,15 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       final videos = (playResp.data as List)
           .whereType<Map>()
           .map(
-            (item) => VideoInfo.fromJson(
-              Map<String, dynamic>.from(item).cast<String, dynamic>(),
-            ),
+            (item) {
+              final episode = VideoInfo.fromJson(
+                Map<String, dynamic>.from(item).cast<String, dynamic>(),
+              );
+              if (episode.content.isEmpty && videoIntroduce.isNotEmpty) {
+                return episode.copyWith(content: videoIntroduce);
+              }
+              return episode;
+            },
           )
           .where((item) => item.videoUrl.isNotEmpty)
           .toList()
@@ -553,7 +561,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       );
       if (!mounted) return;
       if (purchased) {
-        await ref.read(memberStateProvider.notifier).refreshStatus();
+        await ref.read(authProvider.notifier).refreshUserInfo();
         _clearPendingLockedOverlay();
         if (mounted) {
           setState(() {});
@@ -813,12 +821,13 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
                     child: Padding(
                       padding: const EdgeInsets.only(top: 5, bottom: 20),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          _buildQualityItem('480P', true, true, sheetContext),
+                          _buildQualityItem('480P', true, sheetContext),
                           const Spacer(),
-                          _buildQualityItem('720P', true, true, sheetContext),
+                          _buildQualityItem('720P', true, sheetContext),
                           const Spacer(),
-                          _buildQualityItem('1080P', false, isVip, sheetContext),
+                          _buildQualityItem('1080P', isVip, sheetContext),
                         ],
                       ),
                     ),
@@ -832,15 +841,17 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     );
   }
 
-  Widget _buildQualityItem(String label, bool isEnabled, bool isVipUnlocked, BuildContext sheetContext) {
+  Widget _buildQualityItem(String label, bool isVipUnlocked, BuildContext sheetContext) {
+    final is1080 = label == '1080P';
+    final canTap = !is1080 || isVipUnlocked;
     return GestureDetector(
       onTap: () {
-        if (label == '1080P' && !isVipUnlocked) {
+        if (is1080 && !isVipUnlocked) {
           Navigator.of(sheetContext).pop();
           _showVipPurchaseDialog();
           return;
         }
-        if (isEnabled && isVipUnlocked) {
+        if (canTap) {
           Navigator.of(sheetContext).pop();
           setState(() {
             _currentQuality = label;
@@ -853,20 +864,20 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         child: Container(
           height: 40,
           decoration: BoxDecoration(
-            color: isVipUnlocked ? const Color(0xFF2D2E32) : null,
+            color: is1080 ? null : const Color(0xFF2D2E32),
             borderRadius: BorderRadius.circular(10),
-            image: isVipUnlocked
-                ? null
-                : const DecorationImage(
+            image: is1080
+                ? const DecorationImage(
                     image: AssetImage('assets/images/clarity_bg.png'),
                     fit: BoxFit.cover,
-                  ),
+                  )
+                : null,
           ),
           alignment: Alignment.center,
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (label == '1080P')
+              if (is1080)
                 const Padding(
                   padding: EdgeInsets.only(right: 6),
                   child: Image(
@@ -880,7 +891,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
                 style: TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 15,
-                  color: isVipUnlocked ? Colors.white : const Color(0xFF3A1D00),
+                  color: is1080 ? const Color(0xFF3A1D00) : Colors.white,
                 ),
               ),
             ],
@@ -932,7 +943,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       );
       if (!mounted) return;
       if (purchased) {
-        await ref.read(memberStateProvider.notifier).refreshStatus();
+        // Refresh user info so isVipProvider picks up the new VIP status
+        await ref.read(authProvider.notifier).refreshUserInfo();
         if (mounted) {
           setState(() {});
         }
@@ -1040,6 +1052,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           ? () => _showMembershipReminderDialog(lockedIndex: index)
           : null,
       onCompleted: _playNextEpisode,
+      quality: _currentQuality,
       overlayBuilder: (ctx, vi) {
         final children = <Widget>[];
         if (widget.showDefaultSideOverlay) {
@@ -1259,41 +1272,41 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
         Expanded(
           child: SizedBox(
             height: 114,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 72),
-                  child: Text(
-                    widget.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
+            child: Center(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 Text(
-                  subtitle,
+                  widget.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontWeight: FontWeight.w500,
                     fontSize: 13,
                     color: Color(0xFF999999),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 4),
                 Text(
                   currentEpisode.serialNum > 0
                       ? '${widget.title} EP.${currentEpisode.serialNum}'
                       : '${widget.title} EP.${widget.currentIndex + 1}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
@@ -1301,6 +1314,7 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
                   ),
                 ),
               ],
+            ),
             ),
           ),
         ),

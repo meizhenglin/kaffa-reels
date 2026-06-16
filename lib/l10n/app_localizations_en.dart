@@ -473,7 +473,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get membership_benefits_unlockEpisodes => 'Unlock all VIP episodes';
 
   @override
-  String get membership_benefits_watchHd => 'Watch in 1080p/1440p HD';
+  String get membership_benefits_watchHd => 'Watch in 1080p HD';
 
   @override
   String get membership_benefits_singleDevice =>
@@ -485,6 +485,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get membership_benefits_tipContent =>
       'During the subscription period, you can access all VIP series unlimited times.';
+
+  @override
+  String get membership_benefits_planNoteMonthly =>
+      'VIP Monthly Card covers all Member Benefits for Monthly.';
+
+  @override
+  String get membership_benefits_planNoteQuarterly =>
+      'VIP Season Pass covers all Member Benefits for Quarterly.';
+
+  @override
+  String get membership_benefits_planNoteYearly =>
+      'VIP Annual covers all Member Benefits for Yearly.';
 
   @override
   String get logoutTitle => 'Log out';

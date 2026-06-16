@@ -1013,7 +1013,7 @@ abstract class AppLocalizations {
   /// No description provided for @membership_benefits_watchHd.
   ///
   /// In en, this message translates to:
-  /// **'Watch in 1080p/1440p HD'**
+  /// **'Watch in 1080p HD'**
   String get membership_benefits_watchHd;
 
   /// No description provided for @membership_benefits_singleDevice.
@@ -1033,6 +1033,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'During the subscription period, you can access all VIP series unlimited times.'**
   String get membership_benefits_tipContent;
+
+  /// No description provided for @membership_benefits_planNoteMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'VIP Monthly Card covers all Member Benefits for Monthly.'**
+  String get membership_benefits_planNoteMonthly;
+
+  /// No description provided for @membership_benefits_planNoteQuarterly.
+  ///
+  /// In en, this message translates to:
+  /// **'VIP Season Pass covers all Member Benefits for Quarterly.'**
+  String get membership_benefits_planNoteQuarterly;
+
+  /// No description provided for @membership_benefits_planNoteYearly.
+  ///
+  /// In en, this message translates to:
+  /// **'VIP Annual covers all Member Benefits for Yearly.'**
+  String get membership_benefits_planNoteYearly;
 
   /// No description provided for @logoutTitle.
   ///

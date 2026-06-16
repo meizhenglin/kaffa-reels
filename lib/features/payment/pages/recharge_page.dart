@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
-import '../providers/membership_provider.dart';
+import '../providers/recharge_provider.dart';
 
 /// Recharge coins page (K币充值)
 class RechargePage extends ConsumerStatefulWidget {

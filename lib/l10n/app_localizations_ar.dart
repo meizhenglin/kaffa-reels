@@ -475,7 +475,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get membership_benefits_unlockEpisodes => 'فتح جميع حلقات VIP';
 
   @override
-  String get membership_benefits_watchHd => 'المشاهدة بدقة 1080p/1440p HD';
+  String get membership_benefits_watchHd => 'المشاهدة بدقة 1080p HD';
 
   @override
   String get membership_benefits_singleDevice =>
@@ -487,6 +487,18 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get membership_benefits_tipContent =>
       'خلال فترة الاشتراك، يمكنك الوصول إلى جميع مسلسلات VIP بعدد غير محدود من المرات.';
+
+  @override
+  String get membership_benefits_planNoteMonthly =>
+      'تغطي بطاقة VIP الشهرية جميع مزايا العضوية لمدة شهر.';
+
+  @override
+  String get membership_benefits_planNoteQuarterly =>
+      'تغطي VIP مرور الموسم جميع مزايا العضوية لمدة موسم.';
+
+  @override
+  String get membership_benefits_planNoteYearly =>
+      'تغطي VIP السنوي جميع مزايا العضوية لمدة سنة.';
 
   @override
   String get logoutTitle => 'تسجيل الخروج';

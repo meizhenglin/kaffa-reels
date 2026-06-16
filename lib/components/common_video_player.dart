@@ -748,12 +748,16 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
           if (!mounted || !purchased) return;
 
           await ref.read(memberStateProvider.notifier).refreshStatus();
+          // Refresh user info so authProvider (and isVipProvider) picks up the new VIP status
+          await ref.read(authProvider.notifier).refreshUserInfo();
           if (!mounted) return;
 
-          final refreshedMemberState = ref.read(memberStateProvider);
+          final user = ref.read(authProvider).user;
+          final isVip = user != null && !user.isGuest && user.isVip &&
+              (user.vipExpireDate == null || user.vipExpireDate!.isAfter(DateTime.now()));
           if (widget.currentIndex >= 0 && widget.currentIndex < widget.allEpisodes.length) {
             final currentEpisode = widget.allEpisodes[widget.currentIndex];
-            if (currentEpisode.isUnlocked || (refreshedMemberState.isVip && !refreshedMemberState.isExpired)) {
+            if (currentEpisode.isUnlocked || isVip) {
               widget.onEpisodeChanged?.call(widget.currentIndex);
             }
           }
@@ -790,8 +794,12 @@ class _CommonEpisodeSheet extends StatelessWidget {
         authState == null || !authState!.isAuthenticated || authState!.user?.isGuest == true;
     if (isGuest) return true;
 
-    final needsVip = memberState == null || !memberState!.isVip || memberState!.isExpired;
-    return needsVip;
+    final user = authState?.user;
+    final isVip = user != null &&
+        !user.isGuest &&
+        user.isVip &&
+        (user.vipExpireDate == null || user.vipExpireDate!.isAfter(DateTime.now()));
+    return !isVip;
   }
 
   @override

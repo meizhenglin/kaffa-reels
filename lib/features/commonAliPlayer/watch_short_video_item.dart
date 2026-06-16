@@ -16,6 +16,7 @@ class WatchShortVideoItem extends StatefulWidget {
   final Widget Function(BuildContext context, VideoInfo videoInfo)? topOverlayBuilder;
   final bool showDebugInfo;
   final VoidCallback? onCompleted;
+  final String quality; // '480P', '720P', '1080P'
 
   const WatchShortVideoItem({
     super.key,
@@ -28,6 +29,7 @@ class WatchShortVideoItem extends StatefulWidget {
     this.topOverlayBuilder,
     this.showDebugInfo = false,
     this.onCompleted,
+    this.quality = '480P',
   });
 
   @override
@@ -61,16 +63,30 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
 
   AliPlayerWidgetController? get controller => _controller;
 
+  String _getUrlForQuality(String quality) {
+    switch (quality) {
+      case '1080P':
+        // 1080P -> videoUrlTwo (vipEpisodesUrl1440)
+        return widget.videoInfo.videoUrlTwo ?? widget.videoInfo.videoUrl;
+      case '720P':
+        // 720P -> videoUrlOne (vipEpisodesUrl1080)
+        return widget.videoInfo.videoUrlOne ?? widget.videoInfo.videoUrl;
+      case '480P':
+      default:
+        return widget.videoInfo.videoUrl;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _currentUrl = widget.videoInfo.videoUrl;
+    _currentUrl = _getUrlForQuality(widget.quality);
     _hasResolvedPlayableUrl = !widget.resolvePlayableUrl || _currentUrl.isNotEmpty;
     _isForegroundActive = widget.autoPlay;
     _isLoading = widget.autoPlay && _currentUrl.isNotEmpty;
 
     debugPrint(
-      '[$_tag][initState] id=${widget.videoInfo.id} autoPlay=${widget.autoPlay} resolve=${widget.resolvePlayableUrl}',
+      '[$_tag][initState] id=${widget.videoInfo.id} autoPlay=${widget.autoPlay} resolve=${widget.resolvePlayableUrl} quality=${widget.quality} url=$_currentUrl',
     );
 
     if (_currentUrl.isNotEmpty && widget.autoPlay && !_isPlaybackBlocked) {
@@ -90,38 +106,42 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
   }
 
   void _configurePlayer(String url, {required bool autoPlay}) {
-    final hadController = _controller != null;
-    if (!hadController) {
+    final bool isFirstInit = _controller == null;
+    if (isFirstInit) {
       _controller = AliPlayerWidgetController(context);
       _controller!.playStateNotifier.addListener(_handlePlayStateChanged);
-      _controller!.strategyManager
-        ..register(FirstFrameStrategy(
-          onPrepared: (cost) {
-            _lastPrepareCostMs = cost.inMilliseconds;
-            debugPrint(
-              '[$_tag][strategy][prepared] id=${widget.videoInfo.id} costMs=$_lastPrepareCostMs url=$url',
-            );
-          },
-          onFirstFrame: (cost) {
-            _lastFirstFrameCostMs = cost.inMilliseconds;
-            debugPrint(
-              '[$_tag][strategy][firstFrame] id=${widget.videoInfo.id} costMs=$_lastFirstFrameCostMs url=$url',
-            );
-            if (!mounted || !_hasPlayer) return;
-            setState(() {
-              _isLoading = false;
-            });
-          },
-        ))
-        ..register(StutterDetectStrategy(
-          onStutterDetected: (info) {
-            _lastStutterInfo = info;
-            debugPrint(
-              '[$_tag][strategy][stutter] id=${widget.videoInfo.id} count=${info.stutterCount} totalMs=${info.totalStutterDuration.inMilliseconds} rate=${info.stutterRate.toStringAsFixed(4)} url=$url',
-            );
-          },
-        ));
     }
+    // Always register strategies (they get replaced if already registered)
+    final stateMounted = mounted;
+    _controller!.strategyManager
+      ..register(FirstFrameStrategy(
+        onPrepared: (cost) {
+          _lastPrepareCostMs = cost.inMilliseconds;
+          debugPrint(
+            '[$_tag][strategy][prepared] id=${widget.videoInfo.id} costMs=$_lastPrepareCostMs url=$url mounted=$stateMounted',
+          );
+          setState(() {
+            _isLoading = false;
+          });
+        },
+        onFirstFrame: (cost) {
+          _lastFirstFrameCostMs = cost.inMilliseconds;
+          debugPrint(
+            '[$_tag][strategy][firstFrame] id=${widget.videoInfo.id} costMs=$_lastFirstFrameCostMs url=$url mounted=$stateMounted',
+          );
+          setState(() {
+            _isLoading = false;
+          });
+        },
+      ))
+      ..register(StutterDetectStrategy(
+        onStutterDetected: (info) {
+          _lastStutterInfo = info;
+          debugPrint(
+            '[$_tag][strategy][stutter] id=${widget.videoInfo.id} count=${info.stutterCount} totalMs=${info.totalStutterDuration.inMilliseconds} rate=${info.stutterRate.toStringAsFixed(4)} url=$url',
+          );
+        },
+      ));
     _hasPlayer = true;
     _isLoading = autoPlay && url.isNotEmpty;
 
@@ -141,11 +161,18 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
 
   void _handlePlayStateChanged() {
     final playState = _controller?.playStateNotifier.value;
+    debugPrint('[$_tag][playState] state=$playState loading=$_isLoading');
     if (playState == _completedStateCode) {
       if (_didNotifyCompletion) return;
       _didNotifyCompletion = true;
       widget.onCompleted?.call();
       return;
+    }
+    // Close loading when video starts playing (any non-completed state)
+    if (_isLoading) {
+      setState(() {
+        _isLoading = false;
+      });
     }
     _didNotifyCompletion = false;
   }
@@ -153,6 +180,22 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
   @override
   void didUpdateWidget(covariant WatchShortVideoItem oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    debugPrint('[$_tag][didUpdateWidget] quality: ${oldWidget.quality} -> ${widget.quality} _hasPlayer=$_hasPlayer');
+
+    // Handle quality change - reload video with new URL
+    if (widget.quality != oldWidget.quality) {
+      final newUrl = _getUrlForQuality(widget.quality);
+      debugPrint('[$_tag][qualityChange] from=${oldWidget.quality} to=${widget.quality} newUrl=$newUrl currentUrl=$_currentUrl');
+      _currentUrl = newUrl;
+      _isLoading = true;
+      debugPrint('[$_tag][qualityChange] _hasPlayer=$_hasPlayer _isPlaybackBlocked=$_isPlaybackBlocked');
+      if (_hasPlayer && !_isPlaybackBlocked) {
+        debugPrint('[$_tag][qualityChange] calling _configurePlayer');
+        _configurePlayer(_currentUrl, autoPlay: _isPlaying);
+      }
+      if (mounted) setState(() {});
+    }
 
     if (widget.lockedPreviewMode != oldWidget.lockedPreviewMode) {
       if (widget.lockedPreviewMode) {

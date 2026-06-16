@@ -282,47 +282,37 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       bottomBackgroundColor: _membershipBottomColor,
       bottomNavigationBar:
           isInitialProductsLoading ? null : _buildBottomPayButton(l10n, memberState, products),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          return Stack(
-            children: [
-              const Positioned.fill(
-                child: ColoredBox(color: _membershipBottomColor),
-              ),
-              Positioned.fill(
-                child: Column(
-                  children: [
-                    _buildTopImage(),
-                    Expanded(
-                      child: isInitialProductsLoading
-                          ? _buildInitialProductsLoadingState(context)
-                          : SingleChildScrollView(
-                              child: Column(
-                                children: [
-                                  _buildVipOptions(l10n, products, membershipProductsState.isLoading),
-                                  _buildDramaSection(recommendState),
-                                  _buildBenefitsSection(l10n),
-                                  // TODO: 下版本开启 K 币充值功能
-                                  // _buildRechargeSection(context),
-                                  _buildBottomSpacer(context),
-                                ],
-                              ),
-                            ),
+      body: Stack(
+        children: [
+          const Positioned.fill(
+            child: ColoredBox(color: _membershipBottomColor),
+          ),
+          Positioned.fill(
+            child: isInitialProductsLoading
+                ? _buildInitialProductsLoadingState(context)
+                : SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        _buildTopImage(),
+                        _buildVipOptions(l10n, products, membershipProductsState.isLoading),
+                        _buildDramaSection(recommendState),
+                        _buildBenefitsSection(l10n, products),
+                        // TODO: 下版本开启 K 币充值功能
+                        // _buildRechargeSection(context),
+                        _buildBottomSpacer(context),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              PositionedDirectional(
-                top: MediaQuery.of(context).padding.top + 8,
-                start: 8,
-                child: RtlBackButton(
-                  onPressed: _handleBack,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          );
-        },
+                  ),
+          ),
+          PositionedDirectional(
+            top: MediaQuery.of(context).padding.top + 8,
+            start: 8,
+            child: RtlBackButton(
+              onPressed: _handleBack,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -512,11 +502,16 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   }
 
   /// 4. Member Benefits 介绍
-  Widget _buildBenefitsSection(AppLocalizations l10n) {
+  Widget _buildBenefitsSection(AppLocalizations l10n, List<SubscriptionProduct> products) {
     final benefits = [
       l10n.membership_benefits_unlockEpisodes,
       l10n.membership_benefits_watchHd,
       l10n.membership_benefits_singleDevice,
+    ];
+    final planNotes = _planNoteEntries(l10n).toList();
+    final items = [
+      ...benefits,
+      ...planNotes,
     ];
 
     return Container(
@@ -582,11 +577,11 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
             ],
           ),
           const SizedBox(height: 10),
-          ...List.generate(benefits.length, (index) {
+          ...List.generate(items.length, (index) {
             return Padding(
-              padding: EdgeInsets.only(bottom: index == benefits.length - 1 ? 0 : 8),
+              padding: EdgeInsets.only(bottom: index == items.length - 1 ? 0 : 8),
               child: Text(
-                '${index + 1}、${benefits[index]}',
+                '${index + 1}、${items[index]}',
                 style: const TextStyle(
                   fontWeight: FontWeight.w400,
                   fontSize: 13,
@@ -599,14 +594,14 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
           Text(
             l10n.membership_benefits_tipsLabel,
             style: const TextStyle(
-              fontWeight: FontWeight.w400,
-              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
               color: Colors.white,
             ),
           ),
           const SizedBox(height: 4),
           Text(
-            '1、${l10n.membership_benefits_tipContent}',
+            l10n.membership_benefits_tipContent,
             style: const TextStyle(
               fontWeight: FontWeight.w400,
               fontSize: 13,
@@ -616,6 +611,12 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         ],
       ),
     );
+  }
+
+  Iterable<String> _planNoteEntries(AppLocalizations l10n) sync* {
+    yield l10n.membership_benefits_planNoteMonthly;
+    yield l10n.membership_benefits_planNoteQuarterly;
+    yield l10n.membership_benefits_planNoteYearly;
   }
 
   Widget _buildBottomSpacer(BuildContext context) {
@@ -778,7 +779,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
                             children: [
                               _buildVipOptions(l10n, products, false),
                               _buildDramaSection(recommendState),
-                              _buildBenefitsSection(l10n),
+                              _buildBenefitsSection(l10n, products),
                               _buildBottomSpacer(context),
                             ],
                           ),

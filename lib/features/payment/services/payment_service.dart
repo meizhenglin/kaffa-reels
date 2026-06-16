@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
-import 'package:in_app_purchase_android/billing_client_wrappers.dart' show ReplacementMode;
+import 'package:in_app_purchase_android/billing_client_wrappers.dart' show ProductType, ReplacementMode;
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Local storage helper for caching purchase state
@@ -82,22 +82,42 @@ class PaymentService {
 
       if (requireSubscriptionOnAndroid && defaultTargetPlatform == TargetPlatform.android) {
         final invalidProducts = _availableProducts.where((product) {
-          return product is! GooglePlayProductDetails ||
-              product.productDetails.productType.toString() != 'ProductType.subs';
+          if (product is! GooglePlayProductDetails) {
+            return true;
+          }
+
+          final productType = product.productDetails.productType;
+          return productType != ProductType.subs;
         }).toList();
 
-        if (invalidProducts.isNotEmpty) {
-          final invalidSummary = invalidProducts.map((product) {
-            final type = product is GooglePlayProductDetails
-                ? product.productDetails.productType
-                : 'unknown';
-            return '${product.id}($type)';
-          }).join(', ');
-          final message =
-              'Google Play products must be subscriptions (subs), but got: $invalidSummary';
-          _onPurchaseError?.call(message);
-          return [];
+        if (invalidProducts.isEmpty) {
+          return _availableProducts;
         }
+
+        final subscriptionProducts = _availableProducts.where((product) {
+          if (product is! GooglePlayProductDetails) {
+            return false;
+          }
+
+          final productType = product.productDetails.productType;
+          return productType == ProductType.subs;
+        }).toList();
+
+        if (subscriptionProducts.isNotEmpty) {
+          _availableProducts = subscriptionProducts;
+          return _availableProducts;
+        }
+
+        final invalidSummary = invalidProducts.map((product) {
+          final type = product is GooglePlayProductDetails
+              ? product.productDetails.productType
+              : 'unknown';
+          return '${product.id}($type)';
+        }).join(', ');
+        final message =
+            'Google Play products must be subscriptions (subs), but got: $invalidSummary';
+        _onPurchaseError?.call(message);
+        return [];
       }
 
       return _availableProducts;
