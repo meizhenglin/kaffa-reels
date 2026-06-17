@@ -1226,6 +1226,24 @@ abstract class AppLocalizations {
   /// **'Google Play opened. Please complete the subscription payment.'**
   String get membershipPurchaseOpened;
 
+  /// No description provided for @membershipSubscriptionActivatedMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Congratulations on subscribing to the monthly card!'**
+  String get membershipSubscriptionActivatedMonthly;
+
+  /// No description provided for @membershipSubscriptionActivatedQuarterly.
+  ///
+  /// In en, this message translates to:
+  /// **'Congratulations on subscribing to the season pass!'**
+  String get membershipSubscriptionActivatedQuarterly;
+
+  /// No description provided for @membershipSubscriptionActivatedYearly.
+  ///
+  /// In en, this message translates to:
+  /// **'Congratulations on subscribing to the annual pass!'**
+  String get membershipSubscriptionActivatedYearly;
+
   /// No description provided for @membershipItemAlreadyOwned.
   ///
   /// In en, this message translates to:

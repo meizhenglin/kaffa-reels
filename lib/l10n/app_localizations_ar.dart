@@ -591,6 +591,18 @@ class AppLocalizationsAr extends AppLocalizations {
       'تم فتح Google Play. يرجى إكمال عملية دفع الاشتراك.';
 
   @override
+  String get membershipSubscriptionActivatedMonthly =>
+      'تهانينا على اشتراك بطاقة الشهرية!';
+
+  @override
+  String get membershipSubscriptionActivatedQuarterly =>
+      'تهانينا على اشتراك بطاقة الموسمية!';
+
+  @override
+  String get membershipSubscriptionActivatedYearly =>
+      'تهانينا على اشتراك البطاقة السنوية!';
+
+  @override
   String get membershipItemAlreadyOwned => 'أنت تمتلك هذا الاشتراك بالفعل.';
 
   @override

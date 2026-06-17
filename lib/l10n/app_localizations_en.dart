@@ -589,6 +589,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'Google Play opened. Please complete the subscription payment.';
 
   @override
+  String get membershipSubscriptionActivatedMonthly =>
+      'Congratulations on subscribing to the monthly card!';
+
+  @override
+  String get membershipSubscriptionActivatedQuarterly =>
+      'Congratulations on subscribing to the season pass!';
+
+  @override
+  String get membershipSubscriptionActivatedYearly =>
+      'Congratulations on subscribing to the annual pass!';
+
+  @override
   String get membershipItemAlreadyOwned => 'You already own this subscription.';
 
   @override

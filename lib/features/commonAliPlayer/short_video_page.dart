@@ -561,10 +561,15 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       );
       if (!mounted) return;
       if (purchased) {
+        await ref.read(memberStateProvider.notifier).refreshStatus();
         await ref.read(authProvider.notifier).refreshUserInfo();
         _clearPendingLockedOverlay();
         if (mounted) {
-          setState(() {});
+          setState(() {
+            if (ref.read(featureAccessProvider(Feature.hdQuality))) {
+              _currentQuality = '1080P';
+            }
+          });
         }
         final retryIndex = lockedIndex ?? _pendingLockedEpisodeIndex;
         if (retryIndex != null) {
@@ -774,6 +779,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return Container(
@@ -838,7 +844,10 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           ),
         );
       },
-    );
+    ).then((_) {
+      if (!mounted) return;
+      setState(() {});
+    });
   }
 
   Widget _buildQualityItem(String label, bool isVipUnlocked, BuildContext sheetContext) {
@@ -943,13 +952,16 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       );
       if (!mounted) return;
       if (purchased) {
-        // Refresh user info so isVipProvider picks up the new VIP status
+        await ref.read(memberStateProvider.notifier).refreshStatus();
         await ref.read(authProvider.notifier).refreshUserInfo();
         if (mounted) {
-          setState(() {});
+          setState(() {
+            if (ref.read(featureAccessProvider(Feature.hdQuality))) {
+              _currentQuality = '1080P';
+            }
+          });
         }
       }
-      // Resume playback when returning from membership page
       if (mounted) {
         _resumeCurrent();
       }

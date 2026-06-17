@@ -358,15 +358,16 @@ class MemberBenefits {
 class SubscriptionProducts {
   SubscriptionProducts._();
 
-  static const _googlePlayBase = 'com.qahwatv.vip.';
-  static const _appStoreBase = 'com.qahwatv.vip.';
+  // Google Play Console 产品 ID（必须和 Google Play 后台一致）
+  static const _googlePlayBase = 'com.qahwa.vip';
+  static const _appStoreBase = 'com.qahwa.vip';
 
   static final List<SubscriptionProduct> fallbackProducts = [
     SubscriptionProduct(
-      id: 'monthly',
+      id: 'vip1',
       type: SubscriptionPeriod.monthly,
-      googlePlayId: '${_googlePlayBase}monthly',
-      appStoreId: '${_appStoreBase}monthly',
+      googlePlayId: '$_googlePlayBase.1',  // com.qahwa.vip.1
+      appStoreId: '$_appStoreBase.1',
       price: r'$24.99',
       priceCn: '¥30',
       originalPrice: r'$39.99',
@@ -380,10 +381,10 @@ class SubscriptionProducts {
       displayName: 'Monthly VIP',
     ),
     SubscriptionProduct(
-      id: 'quarterly',
+      id: 'vip2',
       type: SubscriptionPeriod.quarterly,
-      googlePlayId: '${_googlePlayBase}quarterly',
-      appStoreId: '${_appStoreBase}quarterly',
+      googlePlayId: '$_googlePlayBase.2',  // com.qahwa.vip.2
+      appStoreId: '$_appStoreBase.2',
       price: r'$32.99',
       priceCn: '¥78',
       originalPrice: r'$59.99',
@@ -398,10 +399,10 @@ class SubscriptionProducts {
       displayName: 'Quarterly VIP',
     ),
     SubscriptionProduct(
-      id: 'yearly',
+      id: 'vip3',
       type: SubscriptionPeriod.yearly,
-      googlePlayId: '${_googlePlayBase}yearly',
-      appStoreId: '${_appStoreBase}yearly',
+      googlePlayId: '$_googlePlayBase.3',  // com.qahwa.vip.3
+      appStoreId: '$_appStoreBase.3',
       price: r'$99.99',
       priceCn: '¥258',
       originalPrice: r'$159.99',

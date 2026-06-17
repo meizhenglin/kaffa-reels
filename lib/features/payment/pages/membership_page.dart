@@ -104,14 +104,19 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   }
 
   /// 检查产品是否已拥有
-  Future<bool> _checkIfProductAlreadyOwned(SubscriptionProduct product) async {
+  Future<bool> _checkIfProductAlreadyOwned(
+    SubscriptionProduct product, {
+    bool forceRefresh = false,
+  }) async {
     try {
       final paymentService = PaymentService.instance;
-      final purchases = await paymentService.queryExistingPurchases();
+      final purchases = await paymentService.queryExistingPurchases(
+        forceRefresh: forceRefresh,
+      );
       for (final purchase in purchases) {
         if ((purchase.status == PurchaseStatus.purchased ||
                 purchase.status == PurchaseStatus.restored) &&
-            purchase.productID == product.id) {
+            purchase.productID == product.googlePlayId) {
           return true;
         }
       }
@@ -127,6 +132,33 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
 
     if (!authState.isAuthenticated || (authState.user?.isTourist ?? true)) {
       await openMembershipPage(context, ref);
+      return;
+    }
+
+    final alreadyOwned = await _checkIfProductAlreadyOwned(
+      product,
+      forceRefresh: true,
+    );
+    if (alreadyOwned) {
+      if (mounted) {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              l10n.membershipItemAlreadyOwned,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.black),
+            ),
+            backgroundColor: const Color(0xFFFFFFFF),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
       return;
     }
 
@@ -178,32 +210,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     _isPurchasing = true;
     if (mounted) setState(() {});
 
-    // 检查是否已拥有此订阅
-    final isAlreadyOwned = await _checkIfProductAlreadyOwned(product);
-    if (isAlreadyOwned) {
-      _isPurchasing = false;
-      if (mounted) {
-        setState(() {});
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(
-                l10n.membershipItemAlreadyOwned,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.black),
-              ),
-              backgroundColor: const Color(0xFFFFFFFF),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          );
-      }
-      return;
-    }
+    // 订阅商品允许通过 Google Play 自动升级/降级，不在本地拦截重复购买
 
     if (kIsWeb) {
       _isPurchasing = false;
@@ -224,7 +231,31 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     _isPurchasing = false;
     if (mounted) setState(() {});
 
-    if (!success && mounted) {
+    if (success && mounted) {
+      final messenger = ScaffoldMessenger.of(context);
+      final activatedLabel = switch (product.type) {
+        SubscriptionPeriod.monthly => l10n.membershipSubscriptionActivatedMonthly,
+        SubscriptionPeriod.quarterly =>
+          l10n.membershipSubscriptionActivatedQuarterly,
+        SubscriptionPeriod.yearly => l10n.membershipSubscriptionActivatedYearly,
+      };
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            activatedLabel,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.black),
+          ),
+          backgroundColor: const Color(0xFFFFFFFF),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    } else if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(l10n.membershipPurchaseOpened),

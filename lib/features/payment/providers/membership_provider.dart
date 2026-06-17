@@ -38,11 +38,12 @@ class MemberState {
     String? pendingProductId,
     String? pendingSubscriptionType,
     bool clearPendingOrder = false,
+    bool clearError = false,
   }) {
     return MemberState(
       purchaseToken: clearPendingOrder ? null : (purchaseToken ?? this.purchaseToken),
       isLoading: isLoading ?? this.isLoading,
-      errorMessage: errorMessage,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       pendingOrderId: clearPendingOrder ? null : (pendingOrderId ?? this.pendingOrderId),
       pendingProductId: clearPendingOrder ? null : (pendingProductId ?? this.pendingProductId),
       pendingSubscriptionType: clearPendingOrder
@@ -134,7 +135,7 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
 
   /// 清理待处理订单状态（用户取消购买时调用）
   void clearPendingOrder() {
-    state = state.copyWith(clearPendingOrder: true);
+    state = state.copyWith(clearPendingOrder: true, clearError: true);
   }
 
   Future<void> _handlePurchaseComplete(PurchaseDetails purchase) async {
@@ -297,6 +298,17 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
   }
 
   void _handlePurchaseError(String error) {
+    // Don't show error dialog for user cancellation
+    if (error == 'Purchase was canceled') {
+      debugPrint('[MembershipProvider] Purchase canceled by user, ignoring');
+      state = state.copyWith(
+        isLoading: false,
+        clearPendingOrder: true,
+        errorMessage: null,
+      );
+      return;
+    }
+    
     state = state.copyWith(
       isLoading: false,
       errorMessage: error,
@@ -421,8 +433,10 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
+      debugPrint('[Purchase] Step 1: Creating order with goodsId=${selectedProduct.goodsId}');
       final order = await _payService.createOrder(payConfigId: selectedProduct.goodsId!);
       final orderId = order?.orderId;
+      debugPrint('[Purchase] Step 1: Order created, orderId=$orderId');
       if (orderId == null || orderId.isEmpty) {
         state = state.copyWith(
           isLoading: false,
@@ -432,7 +446,9 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         return false;
       }
 
+      debugPrint('[Purchase] Step 2: Querying Google Play products');
       final products = await getProducts([selectedProduct]);
+      debugPrint('[Purchase] Step 2: Found ${products.length} products');
       final platformProductId = selectedProduct.getProductId(_paymentService.currentPlatform).trim();
 
       if (products.isEmpty) {
@@ -460,21 +476,20 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         }
       }
 
+      debugPrint('[Purchase] Step 3: Starting Google Play purchase flow');
       state = state.copyWith(
         pendingOrderId: orderId,
         pendingProductId: productDetails.id,
         pendingSubscriptionType: selectedProduct.id,
       );
 
-      // 查询并缓存现有订阅（用于升级/降级）
-      await _paymentService.queryExistingPurchases();
-
-      // 如果 Google Play 查询不到购买但服务器有订阅，说明是同一商品续费
-      // Google Play 会自动处理，不传 oldPurchaseDetails 也没问题
+      // 标准订阅购买：允许 Google Play 查询现有订阅并自动处理升级/降级
       final success = await _paymentService.purchase(
         product: productDetails,
         applicationUserName: _resolveUserId(),
+        checkForExistingPurchases: true,
       );
+      debugPrint('[Purchase] Step 3: Purchase flow returned success=$success');
 
       if (!success) {
         state = state.copyWith(
@@ -483,7 +498,8 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         );
       }
       return success;
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('[Purchase] Error: $e\n$stack');
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.toString(),
