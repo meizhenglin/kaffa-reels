@@ -554,6 +554,23 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     _pendingLockedDialogIndex = null;
     if (!mounted) return;
     if (shouldConfirm == true) {
+      final alreadyVip = ref.read(isVipProvider);
+      if (alreadyVip) {
+        _clearPendingLockedOverlay();
+        if (mounted) {
+          setState(() {
+            if (ref.read(featureAccessProvider(Feature.hdQuality))) {
+              _currentQuality = '1080P';
+            }
+          });
+        }
+        final retryIndex = lockedIndex ?? _pendingLockedEpisodeIndex;
+        if (retryIndex != null) {
+          await _jumpToEpisode(retryIndex);
+        }
+        return;
+      }
+
       final purchased = await openMembershipPage(
         context,
         ref,
@@ -940,31 +957,32 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       },
     );
     if (!mounted) return;
-    if (shouldConfirm == true) {
-      // Pause playback before opening membership page
-      _pauseCurrent();
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+    if (shouldConfirm != true) return;
 
-      final purchased = await openMembershipPage(
+    _pauseCurrent();
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+
+    final alreadyVip = ref.read(isVipProvider);
+    if (!alreadyVip) {
+      await openMembershipPage(
         context,
         ref,
         showLoginPrompt: false,
       );
-      if (!mounted) return;
-      if (purchased) {
-        await ref.read(memberStateProvider.notifier).refreshStatus();
-        await ref.read(authProvider.notifier).refreshUserInfo();
-        if (mounted) {
-          setState(() {
-            if (ref.read(featureAccessProvider(Feature.hdQuality))) {
-              _currentQuality = '1080P';
-            }
-          });
+    }
+
+    if (!mounted) return;
+    await ref.read(memberStateProvider.notifier).refreshStatus();
+    await ref.read(authProvider.notifier).refreshUserInfo();
+    if (mounted) {
+      setState(() {
+        if (ref.read(featureAccessProvider(Feature.hdQuality))) {
+          _currentQuality = '1080P';
         }
-      }
-      if (mounted) {
-        _resumeCurrent();
-      }
+      });
+    }
+    if (mounted) {
+      _resumeCurrent();
     }
   }
 
