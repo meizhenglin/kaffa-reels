@@ -29,7 +29,6 @@ import '../../features/recommend/models/drama_list_type.dart';
 import '../../features/recommend/pages/recommend_tab.dart';
 import '../../features/home/pages/drama_list_page.dart';
 import '../../features/search/pages/search_page.dart';
-import '../../features/splash/pages/splash_page.dart';
 
 /// ============================================================================
 /// 路由配置文件
@@ -130,8 +129,8 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
-    // 初始页面为启动页
-    initialLocation: '/splash',
+    // 初始页面直接跳转到首页
+    initialLocation: '/',
     // 监听状态变化，自动刷新路由
     refreshListenable: refreshNotifier,
 
@@ -143,18 +142,6 @@ final routerProvider = Provider<GoRouter>((ref) {
 
     /// 路由列表
     routes: [
-      // ==================== 启动页 ====================
-      /// 启动页路由
-      /// 【路径】/splash
-      /// 【功能】显示启动动画，初始化应用，然后跳转到首页
-      GoRoute(
-        path: '/splash',
-        name: 'splash',
-        pageBuilder: (context, state) => const MaterialPage(
-          child: SplashPage(),
-        ),
-      ),
-
       // ==================== 底部导航 Tab 路由 ====================
       /// StatefulShellRoute 实现带底部导航栏的页面结构
       /// 【功能】支持 5 个 Tab，每个 Tab 都有自己的 Navigator

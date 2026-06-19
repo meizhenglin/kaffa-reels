@@ -1,0 +1,748 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../models/unlock_product.dart';
+import '../providers/recharge_provider.dart';
+import '../services/payment_service.dart';
+import '../../../app/providers/app_providers.dart';
+import '../../../core/network/api_service.dart';
+import '../../../core/service/pay_service.dart';
+
+/// 解锁剧集弹窗组件
+/// 显示当前K币余额、解锁当前集需要的K币
+/// 包含整剧解锁商品、VIP商品列表
+/// 根据余额和商品类型执行不同的解锁/购买逻辑
+class UnlockBottomSheet extends ConsumerStatefulWidget {
+  const UnlockBottomSheet({
+    super.key,
+    required this.videoId,
+    required this.episodeId,
+    required this.episodeIndex,
+    required this.dramaTitle,
+    this.coverUrl,
+    required this.config,
+    required this.onUnlockSuccess,
+    this.onDismiss,
+  });
+
+  final String videoId;
+  final String episodeId;
+  final int episodeIndex;
+  final String dramaTitle;
+  final String? coverUrl;
+  final UnlockConfig config;
+  final void Function(int episodeIndex) onUnlockSuccess;
+  final VoidCallback? onDismiss;
+
+  static Future<UnlockResult?> show({
+    required BuildContext context,
+    required String videoId,
+    required String episodeId,
+    required int episodeIndex,
+    required String dramaTitle,
+    String? coverUrl,
+    required UnlockConfig config,
+    required void Function(int episodeIndex) onUnlockSuccess,
+    VoidCallback? onDismiss,
+  }) {
+    return showModalBottomSheet<UnlockResult?>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      isDismissible: true,
+      enableDrag: true,
+      builder: (ctx) => UnlockBottomSheet(
+        videoId: videoId,
+        episodeId: episodeId,
+        episodeIndex: episodeIndex,
+        dramaTitle: dramaTitle,
+        coverUrl: coverUrl,
+        config: config,
+        onUnlockSuccess: onUnlockSuccess,
+        onDismiss: onDismiss,
+      ),
+    );
+  }
+
+  @override
+  ConsumerState<UnlockBottomSheet> createState() => _UnlockBottomSheetState();
+}
+
+class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
+  /// 正在处理的商品ID集合，支持同时处理多个商品
+  final Set<int> _processingProductIds = {};
+
+  bool _isProcessingProduct(int goodsId) => _processingProductIds.contains(goodsId);
+
+  void _setProcessing(int goodsId, bool processing) {
+    setState(() {
+      if (processing) {
+        _processingProductIds.add(goodsId);
+      } else {
+        _processingProductIds.remove(goodsId);
+      }
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  int get _userBalance => ref.read(coinBalanceProvider).balance;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFF5F0),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildTopDecoration(),
+          _buildTitleSection(),
+          _buildPriceInfoRow(),
+          _buildProductsGrid(),
+          _buildAgreementText(),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopDecoration() {
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.topCenter,
+      children: [
+        Container(
+          height: 30,
+          decoration: const BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+        ),
+        Positioned(
+          left: 20,
+          top: -10,
+          child: Container(
+            width: 50,
+            height: 50,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFD700),
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Text(
+                'K',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          right: 12,
+          top: 0,
+          child: GestureDetector(
+            onTap: () {
+              widget.onDismiss?.call();
+              if (mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.3),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.close,
+                color: Color(0xFF666666),
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTitleSection() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 50, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(left: 60, top: 4),
+            child: Text(
+              '充值解锁后精彩继续',
+              style: TextStyle(
+                color: Color(0xFFD9341C),
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Padding(
+            padding: const EdgeInsets.only(left: 60),
+            child: Text(
+              'Episode ${widget.episodeIndex + 1} - ${widget.dramaTitle}',
+              style: const TextStyle(
+                color: Color(0xFF666666),
+                fontSize: 11,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceInfoRow() {
+    final balance = _userBalance;
+    final episodePrice = widget.config.episodeUnlockPrice;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text(
+            '本集价格：',
+            style: TextStyle(
+              color: Color(0xFF333333),
+              fontSize: 12,
+            ),
+          ),
+          Text(
+            '${episodePrice.toInt()} K Coin',
+            style: const TextStyle(
+              color: Color(0xFFD9341C),
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Text(
+            '账号余额：',
+            style: TextStyle(
+              color: Color(0xFF333333),
+              fontSize: 12,
+            ),
+          ),
+          Text(
+            '$balance K Coin',
+            style: TextStyle(
+              color: balance >= episodePrice
+                  ? const Color(0xFFD9341C)
+                  : const Color(0xFFE34D27),
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductsGrid() {
+    // 直接使用所有返回的商品，不按类型过滤
+    final allProducts = widget.config.allProducts;
+    debugPrint('[UnlockBottomSheet] allProducts length: ${allProducts.length}');
+    debugPrint('[UnlockBottomSheet] allProducts: $allProducts');
+
+    if (allProducts.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(20),
+        child: Text(
+          '暂无可用商品',
+          style: TextStyle(color: Colors.black54, fontSize: 14),
+        ),
+      );
+    }
+
+    // 根据商品数量决定布局：2列或3列
+    final crossAxisCount = allProducts.length <= 4 ? 2 : 3;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          mainAxisSpacing: 6,
+          crossAxisSpacing: 6,
+          childAspectRatio: crossAxisCount == 2 ? 1.6 : 1.4,
+        ),
+        itemCount: allProducts.length,
+        itemBuilder: (context, index) {
+          final product = allProducts[index];
+          return _buildProductItem(product);
+        },
+      ),
+    );
+  }
+
+  Widget _buildProductItem(UnlockProduct product) {
+    final price = product.price;
+    final originalPrice = product.originalPrice;
+    final hasDiscount = originalPrice != null && originalPrice > price;
+
+    // 价格显示：如果价格是整数（如100.00），显示为整数
+    final priceInt = price.toInt();
+    final mainLabel = price - priceInt == 0 ? '¥$priceInt' : '¥${price.toStringAsFixed(2)}';
+    final subLabel = product.goodsName.isNotEmpty ? product.goodsName : '';
+
+    String? tagLabel;
+    if (hasDiscount) {
+      tagLabel = '限时特惠';
+    } else if (product.isBestValue) {
+      tagLabel = '超值';
+    } else if (product.isPopular) {
+      tagLabel = '热门';
+    }
+
+    return GestureDetector(
+      onTap: _isProcessingProduct(product.goodsId) ? null : () => _handleProductTap(product),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: tagLabel != null
+                ? const Color(0xFFD9341C)
+                : const Color(0xFFE0E0E0),
+            width: tagLabel != null ? 1.2 : 0.8,
+          ),
+        ),
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (subLabel.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        subLabel,
+                        style: const TextStyle(
+                          color: Color(0xFF333333),
+                          fontSize: 11,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        mainLabel,
+                        style: const TextStyle(
+                          color: Color(0xFFD9341C),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (hasDiscount) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '¥${originalPrice.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: Color(0xFF999999),
+                            fontSize: 11,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (tagLabel != null)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFD9341C),
+                    borderRadius: BorderRadius.only(
+                      topRight: Radius.circular(5),
+                      bottomLeft: Radius.circular(6),
+                    ),
+                  ),
+                  child: Text(
+                    tagLabel,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            if (_isProcessingProduct(product.goodsId))
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Center(
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Color(0xFFD9341C),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAgreementText() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '充值代表接受：充值规则协议',
+            style: TextStyle(
+              color: Color(0xFF666666),
+              fontSize: 11,
+            ),
+          ),
+          SizedBox(height: 2),
+          Text(
+            '1.看点和会员属于虚拟商品，一经购买不得退换；',
+            style: TextStyle(
+              color: Color(0xFF999999),
+              fontSize: 10,
+            ),
+          ),
+          Text(
+            '2.未满18岁未成年应在监护人的监护指导下进行付费操作；',
+            style: TextStyle(
+              color: Color(0xFF999999),
+              fontSize: 10,
+            ),
+          ),
+          Text(
+            '3.看点和会员仅在本APP生效使用，充值后即可直接观看。',
+            style: TextStyle(
+              color: Color(0xFF999999),
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleProductTap(UnlockProduct product) async {
+    final balance = _userBalance;
+
+    // VIP商品 → 走订阅购买
+    if (product.type == UnlockProductType.vip) {
+      await _handleVipPurchase(product);
+      return;
+    }
+
+    // 单集/整剧解锁：余额足够 → 扣余额解锁
+    if (balance >= product.price) {
+      await _confirmAndUnlockByBalance(product);
+    } else {
+      // 余额不足 → 走一次性购买（Google Play）
+      await _confirmAndUnlockByPurchase(product);
+    }
+  }
+
+  /// 余额足够，直接扣余额解锁
+  Future<void> _confirmAndUnlockByBalance(UnlockProduct product) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认解锁'),
+        content: Text('确定消耗 ${product.price.toInt()} K Coin 解锁 "${product.goodsName}" 吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              '确认',
+              style: TextStyle(color: Color(0xFFD9341C)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await _performUnlockByBalance(product);
+  }
+
+  /// 余额不足，走Google Play一次性购买
+  Future<void> _confirmAndUnlockByPurchase(UnlockProduct product) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('余额不足'),
+        content: Text('您的 K Coin 余额不足，是否通过 Google Play 购买 "${product.goodsName}"？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              '购买',
+              style: TextStyle(color: Color(0xFFD9341C)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    await _performUnlockByPurchase(product);
+  }
+
+  /// 扣余额解锁
+  Future<void> _performUnlockByBalance(UnlockProduct product) async {
+    _setProcessing(product.goodsId, true);
+
+    try {
+      final coinNotifier = ref.read(coinBalanceProvider.notifier);
+      await coinNotifier.deductCoins(product.price.toInt());
+
+      // 调用后端API解锁剧集
+      final apiService = ApiService(
+        dioClient: ref.read(dioClientProvider),
+        storage: ref.read(storageServiceProvider),
+      );
+      final resp = await apiService.getUserPayEpisodes(
+        videoId: widget.videoId,
+        episodesId: widget.episodeId,
+        goodsId: product.goodsId,
+      );
+
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+
+        if (resp.isSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('解锁成功！'),
+              backgroundColor: const Color(0xFFD9341C),
+            ),
+          );
+          Navigator.of(context).pop(UnlockResult.success(
+            episodeIndex: widget.episodeIndex,
+          ));
+        } else {
+          // 解锁失败，退款
+          await coinNotifier.addCoins(product.price.toInt());
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(resp.error ?? '解锁失败'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('解锁失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 通过Google Play购买解锁
+  Future<void> _performUnlockByPurchase(UnlockProduct product) async {
+    _setProcessing(product.goodsId, true);
+
+    try {
+      final paymentService = PaymentService.instance;
+
+      // 获取Google Play商品信息
+      final products = await paymentService.getProducts(
+        productIds: [product.googlePlayId ?? ''],
+      );
+
+      if (products.isEmpty) {
+        if (mounted) {
+          _setProcessing(product.goodsId, false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('商品不可用，请稍后重试'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 发起一次性购买
+      final success = await paymentService.purchase(product: products.first);
+
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+
+        if (success) {
+          // 购买成功后调用后端API解锁剧集
+          final apiService = ApiService(
+            dioClient: ref.read(dioClientProvider),
+            storage: ref.read(storageServiceProvider),
+          );
+          await apiService.getUserPayEpisodes(
+            videoId: widget.videoId,
+            episodesId: widget.episodeId,
+            goodsId: product.goodsId,
+          );
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('购买成功！'),
+              backgroundColor: const Color(0xFFD9341C),
+            ),
+          );
+          Navigator.of(context).pop(UnlockResult.success(
+            episodeIndex: widget.episodeIndex,
+          ));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(paymentService.lastError ?? '购买失败'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('购买失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// VIP商品 → 走Google Play订阅购买
+  Future<void> _handleVipPurchase(UnlockProduct product) async {
+    _setProcessing(product.goodsId, true);
+
+    try {
+      // Step 1: 创建后端订单
+      final payService = payServiceProvider;
+
+      try {
+        await payService.createOrder(payConfigId: product.goodsId);
+      } catch (e) {
+        debugPrint('[Unlock] Create order failed: $e');
+      }
+
+      // Step 2: 查询 Google Play 商品
+      final paymentService = PaymentService.instance;
+      final products = await paymentService.getProducts(
+        productIds: [product.googlePlayId ?? ''],
+        requireSubscriptionOnAndroid: true,
+      );
+
+      if (products.isEmpty) {
+        if (mounted) {
+          _setProcessing(product.goodsId, false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('VIP商品不可用，请稍后重试'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Step 3: 发起订阅购买
+      final success = await paymentService.purchase(
+        product: products.first,
+        applicationUserName: ref.read(storageServiceProvider).getString('user_id'),
+      );
+
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('VIP订阅成功！'),
+              backgroundColor: const Color(0xFFD9341C),
+            ),
+          );
+          Navigator.of(context).pop();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(paymentService.lastError ?? '订阅失败'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('订阅失败: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+}

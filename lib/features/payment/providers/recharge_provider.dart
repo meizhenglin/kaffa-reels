@@ -22,6 +22,9 @@ class RechargePurchaseHandler {
 
   final Ref _ref;
 
+  /// Last error message
+  String? lastError;
+
   /// Pending recharge product (set before purchase, cleared after)
   RechargeProduct? pendingProduct;
 
@@ -38,6 +41,7 @@ class RechargePurchaseHandler {
     );
 
     if (products.isEmpty) {
+      lastError = 'Product not available in Google Play';
       pendingProduct = null;
       return false;
     }
@@ -145,6 +149,11 @@ class CoinBalanceNotifier extends StateNotifier<CoinBalanceState> {
 
   Future<void> addCoins(int amount) async {
     final newBalance = state.balance + amount;
+    await setBalance(newBalance);
+  }
+
+  Future<void> deductCoins(int amount) async {
+    final newBalance = (state.balance - amount).clamp(0, state.balance);
     await setBalance(newBalance);
   }
 }

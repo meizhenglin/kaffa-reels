@@ -14,6 +14,9 @@ import '../recommend/providers/video_action_provider.dart';
 import '../recommend/utils/drama_navigation.dart';
 import '../auth/providers/auth_provider.dart';
 import '../payment/providers/membership_provider.dart';
+import '../payment/widgets/unlock_bottom_sheet.dart';
+import '../payment/models/unlock_product.dart';
+import '../../app/providers/app_providers.dart';
 import 'ali_player_preload.dart';
 import 'watch_short_video_item.dart';
 
@@ -524,81 +527,147 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     if (_pendingLockedDialogIndex == lockedIndex) return;
     _pendingLockedDialogIndex = lockedIndex;
 
-    final l10n = AppLocalizations.of(context);
-    final shouldConfirm = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(
-            l10n.watchLockedReminderTitle,
-            textAlign: TextAlign.center,
-          ),
-          content: Text(
-            l10n.watchLockedReminderMessage,
-            textAlign: TextAlign.center,
-          ),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: Text(l10n.common_cancel),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: Text(l10n.common_confirm),
-            ),
-          ],
-        );
-      },
-    );
+    // 显示新的解锁半屏组件
+    await _showUnlockBottomSheet(lockedIndex: lockedIndex);
+
     _pendingLockedDialogIndex = null;
     if (!mounted) return;
-    if (shouldConfirm == true) {
-      final alreadyVip = ref.read(isVipProvider);
-      if (alreadyVip) {
-        _clearPendingLockedOverlay();
-        if (mounted) {
-          setState(() {
-            if (ref.read(featureAccessProvider(Feature.hdQuality))) {
-              _currentQuality = '1080P';
-            }
-          });
-        }
-        final retryIndex = lockedIndex ?? _pendingLockedEpisodeIndex;
-        if (retryIndex != null) {
-          await _jumpToEpisode(retryIndex);
-        }
-        return;
-      }
 
-      final purchased = await openMembershipPage(
-        context,
-        ref,
-        showLoginPrompt: false,
-      );
-      if (!mounted) return;
-      if (purchased) {
-        await ref.read(memberStateProvider.notifier).refreshStatus();
-        await ref.read(authProvider.notifier).refreshUserInfo();
-        _clearPendingLockedOverlay();
-        if (mounted) {
-          setState(() {
-            if (ref.read(featureAccessProvider(Feature.hdQuality))) {
-              _currentQuality = '1080P';
-            }
-          });
-        }
-        final retryIndex = lockedIndex ?? _pendingLockedEpisodeIndex;
-        if (retryIndex != null) {
-          await _jumpToEpisode(retryIndex);
-        }
-      }
-      return;
-    }
     setState(() {
       _pendingLockedEpisodeIndex = lockedIndex ?? _pendingLockedEpisodeIndex;
       _showWatchNowOverlay = _pendingLockedEpisodeIndex != null;
     });
+  }
+
+  /// 显示K币解锁半屏
+  Future<void> _showUnlockBottomSheet({int? lockedIndex}) async {
+    final index = lockedIndex ?? _currentIndex;
+    if (index < 0 || index >= videoInfoList.length) return;
+
+    final videoInfo = videoInfoList[index];
+    final videoId = videoInfo.videoId.toString();
+    final episodeId = videoInfo.id.toString();
+    final dramaTitle = videoInfo.title;
+
+    // 从API获取商品列表
+    List<UnlockProduct> allProducts = [];
+    try {
+      final apiService = ApiService(
+        dioClient: ref.read(dioClientProvider),
+        storage: ref.read(storageServiceProvider),
+      );
+      debugPrint('[_showUnlockBottomSheet] Fetching products for videoId: $videoId');
+      final resp = await apiService.getQuickRechargeList(videoId: videoId);
+      debugPrint('[_showUnlockBottomSheet] Response success: ${resp.isSuccess}, data: ${resp.data}, error: ${resp.error}');
+      if (resp.isSuccess && resp.data != null) {
+        final data = resp.data!;
+        debugPrint('[_showUnlockBottomSheet] Data type: ${data.runtimeType}');
+        if (data is List) {
+          debugPrint('[_showUnlockBottomSheet] List length: ${data.length}');
+          for (final item in data) {
+            if (item is Map<String, dynamic>) {
+              debugPrint('[_showUnlockBottomSheet] Item: ${item['rechargeGoodsName']}');
+              final goodsType = item['rechargeGoodsType'] as int? ?? 0;
+              UnlockProductType type = UnlockProductType.episode;
+              if (goodsType == 2) {
+                type = UnlockProductType.episode; // 整剧解锁
+              } else if (goodsType == 0) {
+                final name = (item['rechargeGoodsName'] ?? '').toString().toLowerCase();
+                if (name.contains('vip') || name.contains('monthly') || name.contains('season') || name.contains('annual')) {
+                  type = UnlockProductType.vip;
+                }
+              }
+              allProducts.add(UnlockProduct(
+                goodsId: item['id'] as int? ?? 0,
+                goodsName: item['rechargeGoodsName']?.toString() ?? '',
+                price: (item['rechargeGoodsPrice'] as num?)?.toDouble() ?? 0.0,
+                type: type,
+                originalPrice: _parseOriginalPrice(item['rechargeGoodsSubname']?.toString()),
+                googlePlayId: item['remarks']?.toString(),
+              ));
+            }
+          }
+        }
+      }
+      debugPrint('[_showUnlockBottomSheet] allProducts length: ${allProducts.length}');
+    } catch (e, stack) {
+      debugPrint('[_showUnlockBottomSheet] Failed to load products: $e');
+      debugPrint('[_showUnlockBottomSheet] Stack trace: $stack');
+    }
+
+    // 构建解锁配置
+    final config = UnlockConfig(
+      videoId: videoId,
+      episodeUnlockPrice: (videoInfo.unlockPrice ?? 0).toDouble(),
+      allProducts: allProducts,
+    );
+
+    final result = await UnlockBottomSheet.show(
+      context: context,
+      videoId: videoId,
+      episodeId: episodeId,
+      episodeIndex: index,
+      dramaTitle: dramaTitle,
+      coverUrl: videoInfo.coverUrl,
+      config: config,
+      onUnlockSuccess: (episodeIndex) {
+        // 解锁成功后更新状态
+        if (episodeIndex < videoInfoList.length) {
+          final updatedInfo = videoInfoList[episodeIndex].copyWith(isCanPlay: 1);
+          videoInfoList[episodeIndex] = updatedInfo;
+        }
+      },
+    );
+
+    if (!mounted) return;
+
+    // 处理解锁结果
+    if (result == null) {
+      // 用户关闭弹窗
+      return;
+    }
+
+    if (result.isSuccess) {
+      _clearPendingLockedOverlay();
+      if (mounted) {
+        setState(() {
+          // 更新该集的可播放状态
+          videoInfoList[index] = videoInfo.copyWith(isCanPlay: 1);
+        });
+        // 显示成功提示
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('解锁成功'),
+            backgroundColor: Colors.green.shade400,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        // 重试播放
+        final retryIndex = lockedIndex ?? _pendingLockedEpisodeIndex;
+        if (retryIndex != null) {
+          await _jumpToEpisode(retryIndex);
+        }
+      }
+    } else if (result.isFailed) {
+      // 失败，显示错误消息
+      if (result.errorMessage != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.errorMessage!),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } else if (result.isCancelled) {
+      // 用户取消
+    }
+  }
+
+  /// 解析原价（rechargeGoodsSubname 可能是 "100" 表示原价100）
+  double? _parseOriginalPrice(String? subname) {
+    if (subname == null || subname.isEmpty) return null;
+    return double.tryParse(subname);
   }
 
   Future<bool> _guardLockedEpisode(int index, {int? previousIndex}) async {

@@ -28,20 +28,30 @@ class PaymentService {
 
   Completer<bool>? _pendingPurchaseCompleter;
   String? _pendingPurchaseProductId;
+  String? _lastError;
+
+  /// Last error message from purchase operations
+  String? get lastError => _lastError;
 
   /// Initialize the payment service
   Future<bool> initialize({
     Function(PurchaseDetails)? onPurchaseComplete,
     Function(String)? onPurchaseError,
   }) async {
-    _onPurchaseComplete = onPurchaseComplete;
-    _onPurchaseError = onPurchaseError;
+    // Update callbacks even if already initialized
+    if (onPurchaseComplete != null) {
+      _onPurchaseComplete = onPurchaseComplete;
+    }
+    if (onPurchaseError != null) {
+      _onPurchaseError = onPurchaseError;
+    }
 
     if (_isInitialized) return true;
 
     try {
       final isAvailable = await _inAppPurchase.isAvailable();
       if (!isAvailable) {
+        _lastError = 'Google Play billing is not available on this device.';
         _onPurchaseError?.call('Google Play billing is not available on this device.');
         return false;
       }
@@ -57,6 +67,7 @@ class PaymentService {
       _isInitialized = true;
       return true;
     } catch (e) {
+      _lastError = 'Failed to initialize billing: $e';
       _onPurchaseError?.call('Failed to initialize billing: $e');
       return false;
     }
@@ -67,11 +78,28 @@ class PaymentService {
     required List<String> productIds,
     bool requireSubscriptionOnAndroid = false,
   }) async {
+    // Auto-initialize if needed
+    if (!_isInitialized) {
+      final initialized = await initialize(
+        onPurchaseComplete: _onPurchaseComplete,
+        onPurchaseError: _onPurchaseError,
+      );
+      if (!initialized) {
+        _lastError = 'Payment service not available';
+        return [];
+      }
+    }
+
     // Sanitize product IDs: trim whitespace, remove invisible chars
     final sanitizedIds = productIds.map((id) {
       final cleaned = id.replaceAll(RegExp(r'[\u0000-\u001F\u007F\u200E\u200F\u202A-\u202E\s]'), '');
       return cleaned.trim();
     }).toList();
+
+    if (sanitizedIds.isEmpty || sanitizedIds.every((id) => id.isEmpty)) {
+      _lastError = 'No valid product IDs provided';
+      return [];
+    }
 
     try {
       final response = await _inAppPurchase.queryProductDetails(
@@ -79,7 +107,14 @@ class PaymentService {
       );
 
       if (response.error != null) {
+        _lastError = response.error!.message;
         _onPurchaseError?.call(response.error!.message);
+        return [];
+      }
+
+      if (response.productDetails.isEmpty) {
+        _lastError = 'Products not found in Google Play: ${sanitizedIds.join(", ")}';
+        debugPrint('[PaymentService] Products not found: $sanitizedIds');
         return [];
       }
 
@@ -121,12 +156,14 @@ class PaymentService {
         }).join(', ');
         final message =
             'Google Play products must be subscriptions (subs), but got: $invalidSummary';
+        _lastError = message;
         _onPurchaseError?.call(message);
         return [];
       }
 
       return _availableProducts;
     } catch (e) {
+      _lastError = 'Failed to fetch products: $e';
       _onPurchaseError?.call('Failed to fetch products: $e');
       return [];
     }
@@ -151,6 +188,8 @@ class PaymentService {
     bool checkForExistingPurchases = true,
     /// Force a fresh Google Play query instead of using cached purchases.
     bool forceRefreshCache = false,
+    /// Timeout duration for purchase flow (default 120 seconds)
+    Duration purchaseTimeout = const Duration(seconds: 120),
   }) async {
     if (!_isInitialized) {
       final initialized = await initialize(
@@ -158,6 +197,7 @@ class PaymentService {
         onPurchaseError: _onPurchaseError,
       );
       if (!initialized) {
+        _lastError = 'Payment service not initialized';
         return false;
       }
     }
@@ -221,6 +261,7 @@ class PaymentService {
           } catch (e) {
             debugPrint('[PaymentService] queryPastPurchases error: $e');
             clearCachedPurchases();
+            _lastError = 'Purchase failed: unable to load purchase history';
             _onPurchaseError?.call('Purchase failed: unable to load purchase history');
             return false;
           }
@@ -249,7 +290,18 @@ class PaymentService {
       _pendingPurchaseCompleter = completer;
       _pendingPurchaseProductId = product.id;
 
+      // Add timeout to prevent infinite waiting
+      Timer? timeoutTimer;
+      timeoutTimer = Timer(purchaseTimeout, () {
+        if (!completer.isCompleted) {
+          debugPrint('[PaymentService] Purchase timeout after ${purchaseTimeout.inSeconds}s');
+          _lastError = 'Purchase timeout. Please try again.';
+          completer.complete(false);
+        }
+      });
+
       Future<void> finalizePendingPurchase() async {
+        timeoutTimer?.cancel();
         if (_pendingPurchaseCompleter != completer) {
           return;
         }
@@ -307,6 +359,7 @@ class PaymentService {
             );
             clearCachedPurchases();
           }
+          _lastError = 'Purchase failed: $message';
           _onPurchaseError?.call('Purchase failed: $message');
           await finalizePendingPurchase();
           return completer.future;
@@ -334,6 +387,7 @@ class PaymentService {
             );
             clearCachedPurchases();
           }
+          _lastError = 'Purchase failed: $message';
           _onPurchaseError?.call('Purchase failed: $message');
           await finalizePendingPurchase();
           return completer.future;
@@ -345,6 +399,7 @@ class PaymentService {
       final message = e.toString();
       debugPrint('[PaymentService] Purchase flow error: $message');
       clearCachedPurchases();
+      _lastError = 'Purchase failed: $message';
       _onPurchaseError?.call('Purchase failed: $message');
       return Future.value(false);
     }
@@ -514,6 +569,7 @@ class PaymentService {
         purchaseParam: purchaseParam,
       );
     } catch (e) {
+      _lastError = 'Purchase failed: $e';
       _onPurchaseError?.call('Purchase failed: $e');
       return false;
     }
@@ -538,6 +594,7 @@ class PaymentService {
       );
       return true;
     } catch (e) {
+      _lastError = 'Restore failed: $e';
       _onPurchaseError?.call('Restore failed: $e');
       return false;
     }
@@ -631,6 +688,7 @@ class PaymentService {
           final errorCode = purchase.error?.code ?? 'unknown';
           debugPrint('[PaymentService] Purchase error: code=$errorCode, message=$errorMsg');
           final userFriendlyMsg = _mapPurchaseErrorToUserMessage(errorMsg);
+          _lastError = userFriendlyMsg;
           _onPurchaseError?.call(userFriendlyMsg);
           if (isPendingProduct) {
             _pendingPurchaseCompleter?.complete(false);

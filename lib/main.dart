@@ -132,9 +132,9 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
   @override
   void initState() {
     super.initState();
-    // 启动时主动拉起认证初始化，避免依赖页面首次读取 authProvider 才触发。
-    // 这样刷新 Web / 冷启动 App 后，会尽早执行正式登录恢复或游客初始化。
-    Future.microtask(() {
+    // 延迟初始化认证和设置，后台处理，不阻塞首屏渲染
+    Future.microtask(() async {
+      await Future.delayed(const Duration(milliseconds: 100));
       ref.read(authProvider);
       ref.read(themeModeProvider.notifier).load();
       ref.read(localeProvider.notifier).load();
