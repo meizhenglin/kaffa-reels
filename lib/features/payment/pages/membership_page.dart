@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
 import '../../../core/utils/localized_badge_assets.dart';
 import '../../../components/preload_network_image.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
@@ -32,6 +31,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   int _selectedIndex = 0;
   bool _isBootstrappingProducts = true;
   bool _isCheckingPendingPayments = true;
+  bool _hasActiveSubscription = false;
 
   @override
   void initState() {
@@ -78,9 +78,26 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
 
       ref.read(membershipDramaProvider.notifier).load();
       await ref.read(membershipProductsProvider.notifier).loadVipProducts();
+
+      // 从服务器获取VIP状态
+      final authState = ref.read(authProvider);
+      final isVip = authState.user?.isVip ?? false;
+      final vipExpireDate = authState.user?.vipExpireDate;
+      final hasActive = isVip && (vipExpireDate == null || vipExpireDate.isAfter(DateTime.now()));
+
+      // 调试打印
+      debugPrint('[MembershipPage] ===== VIP 状态调试 =====');
+      debugPrint('[MembershipPage] userId: ${authState.user?.id}');
+      debugPrint('[MembershipPage] isVip: $isVip');
+      debugPrint('[MembershipPage] vipExpireDate: $vipExpireDate');
+      debugPrint('[MembershipPage] hasActiveSubscription: $hasActive');
+      debugPrint('[MembershipPage] 当前时间: ${DateTime.now()}');
+      debugPrint('[MembershipPage] =========================');
+
       if (mounted) {
         setState(() {
           _isBootstrappingProducts = false;
+          _hasActiveSubscription = hasActive;
         });
       }
     });
@@ -103,29 +120,6 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     context.go('/profile');
   }
 
-  /// 检查产品是否已拥有
-  Future<bool> _checkIfProductAlreadyOwned(
-    SubscriptionProduct product, {
-    bool forceRefresh = false,
-  }) async {
-    try {
-      final paymentService = PaymentService.instance;
-      final purchases = await paymentService.queryExistingPurchases(
-        forceRefresh: forceRefresh,
-      );
-      for (final purchase in purchases) {
-        if ((purchase.status == PurchaseStatus.purchased ||
-                purchase.status == PurchaseStatus.restored) &&
-            purchase.productID == product.googlePlayId) {
-          return true;
-        }
-      }
-    } catch (e) {
-      // Silently handle error
-    }
-    return false;
-  }
-
   Future<void> _handlePurchase(SubscriptionProduct product) async {
     final l10n = AppLocalizations.of(context);
     final authState = ref.read(authProvider);
@@ -135,15 +129,24 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       return;
     }
 
-    final alreadyOwned = await _checkIfProductAlreadyOwned(
-      product,
-      forceRefresh: true,
-    );
-    if (alreadyOwned) {
+    // 从服务器获取VIP状态（包含过期时间检查）
+    final isVip = authState.user?.isVip ?? false;
+    final vipExpireDate = authState.user?.vipExpireDate;
+    final hasActiveSubscription = isVip && 
+        (vipExpireDate == null || vipExpireDate.isAfter(DateTime.now()));
+
+    // 调试打印
+    debugPrint('[MembershipPage] ===== 点击购买按钮 =====');
+    debugPrint('[MembershipPage] userId: ${authState.user?.id}');
+    debugPrint('[MembershipPage] isVip: $isVip');
+    debugPrint('[MembershipPage] vipExpireDate: $vipExpireDate');
+    debugPrint('[MembershipPage] hasActiveSubscription: $hasActiveSubscription');
+    debugPrint('[MembershipPage] 当前时间: ${DateTime.now()}');
+    debugPrint('[MembershipPage] =========================');
+
+    if (hasActiveSubscription) {
       if (mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.hideCurrentSnackBar();
-        messenger.showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               l10n.membershipItemAlreadyOwned,
@@ -272,6 +275,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     final recommendState = ref.watch(membershipDramaProvider);
     final memberState = ref.watch(memberStateProvider);
     final membershipProductsState = ref.watch(membershipProductsProvider);
+    final isVip = ref.watch(isVipProvider);
     final hasProducts = membershipProductsState.products.isNotEmpty;
     final products = hasProducts
         ? membershipProductsState.products
@@ -283,10 +287,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       _selectedIndex = 0;
     }
 
-    // Note: Don't block purchase flow for VIP users - they can still buy to upgrade/downgrade
-    // Google Play handles the logic automatically
-
-    // 检查待处理支付时的加载状态
+    // 检查待处理支付时的加载状态 - 这个需要全屏 loading
     if (_isCheckingPendingPayments) {
       return GradientScaffold(
         bottomBackgroundColor: _membershipBottomColor,
@@ -309,6 +310,17 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       );
     }
 
+    // 如果是 VIP 用户，显示会员专属视图
+    if (isVip) {
+      return _buildActiveView(
+        l10n,
+        memberState,
+        products,
+        isInitialProductsLoading: isInitialProductsLoading,
+      );
+    }
+
+    // 非 VIP 用户 - 普通购买视图
     return GradientScaffold(
       bottomBackgroundColor: _membershipBottomColor,
       bottomNavigationBar:
@@ -319,21 +331,23 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
             child: ColoredBox(color: _membershipBottomColor),
           ),
           Positioned.fill(
-            child: isInitialProductsLoading
-                ? _buildInitialProductsLoadingState(context)
-                : SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        _buildTopImage(),
-                        _buildVipOptions(l10n, products, membershipProductsState.isLoading),
-                        _buildDramaSection(recommendState),
-                        _buildBenefitsSection(l10n, products),
-                        // TODO: 下版本开启 K 币充值功能
-                        // _buildRechargeSection(context),
-                        _buildBottomSpacer(context),
-                      ],
-                    ),
-                  ),
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildTopImage(),
+                  // 商品列表区域 - 独立处理 loading 状态
+                  if (isInitialProductsLoading)
+                    _buildProductsLoadingState(context)
+                  else
+                    _buildVipOptions(l10n, products, false, hasActiveSubscription: _hasActiveSubscription),
+                  _buildDramaSection(recommendState),
+                  _buildBenefitsSection(l10n, products),
+                  // TODO: 下版本开启 K 币充值功能
+                  // _buildRechargeSection(context),
+                  _buildBottomSpacer(context),
+                ],
+              ),
+            ),
           ),
           PositionedDirectional(
             top: MediaQuery.of(context).padding.top + 8,
@@ -348,33 +362,48 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
   }
 
+  /// 商品列表加载状态
+  Widget _buildProductsLoadingState(BuildContext context) {
+    return Container(
+      color: const Color(0xFF121212),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 40),
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      ),
+    );
+  }
+
   /// 1. 顶部图片
   Widget _buildTopImage() {
-    return Stack(
-      children: [
-        Image.asset(
-          'assets/images/vip_banner.png',
-          width: double.infinity,
-          errorBuilder: (_, __, ___) => Container(
-            height: 379,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF5D4391), Color(0xFF1F2025)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
+    return SizedBox(
+      width: double.infinity,
+      child: Image.asset(
+        'assets/images/vip_banner.png',
+        width: double.infinity,
+        fit: BoxFit.fitWidth,
+        errorBuilder: (_, __, ___) => Container(
+          height: 380,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF5D4391), Color(0xFF1F2025)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 
   Widget _buildVipOptions(
     AppLocalizations l10n,
     List<SubscriptionProduct> products,
-    bool isLoading,
-  ) {
+    bool isLoading, {
+    bool hasActiveSubscription = false,
+  }) {
     if (isLoading && products.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -406,6 +435,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
             product: product,
             title: _localizedProductTitle(l10n, product),
             isSelected: isSelected,
+            isSubscribed: hasActiveSubscription,
             onTap: () => setState(() => _selectedIndex = i),
           );
         }),
@@ -479,23 +509,6 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     }
 
     return null;
-  }
-
-  /// 3. 剧卡片横向滚动区：高 137
-  Widget _buildInitialProductsLoadingState(BuildContext context) {
-    final viewportHeight = MediaQuery.of(context).size.height;
-    final topPadding = MediaQuery.of(context).padding.top;
-
-    return SizedBox(
-      width: double.infinity,
-      height: viewportHeight - topPadding,
-      child: const ColoredBox(
-        color: Color(0xFF121212),
-        child: Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
-      ),
-    );
   }
 
   Widget _buildDramaSection(MembershipDramaState recommendState) {
@@ -661,7 +674,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   }
 
   /// 5. K币充值入口
-  Widget _buildRechargeSection(BuildContext context) {
+  Widget _buildRechargeSection(BuildContext context, AppLocalizations l10n) {
     return Container(
       color: const Color(0xFF121212),
       padding: const EdgeInsets.fromLTRB(15, 16, 15, 0),
@@ -691,22 +704,22 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
                 children: [
                   const Icon(Icons.monetization_on, color: Colors.amber, size: 32),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Get Coins',
-                          style: TextStyle(
+                          l10n.getCoins,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
-                          'Watch premium content',
-                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                          l10n.watchPremiumContent,
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
                         ),
                       ],
                     ),
@@ -728,7 +741,10 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     List<SubscriptionProduct> products,
   ) {
     final product = _selectedIndex < products.length ? products[_selectedIndex] : null;
-    final buttonLabel = product != null ? 'Pay ${product.price.trim()}' : 'Pay';
+    final isDisabled = _hasActiveSubscription || product == null;
+    final buttonLabel = _hasActiveSubscription
+        ? l10n.alreadySubscribed
+        : (product != null ? '${l10n.pay} ${product.price.trim()}' : l10n.pay);
 
     return ColoredBox(
       color: const Color(0xFF121212),
@@ -757,7 +773,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
                 borderRadius: BorderRadius.circular(21),
               ),
               child: FilledButton(
-                onPressed: product == null ? null : () => _handlePurchase(product),
+                onPressed: isDisabled ? null : () => _handlePurchase(product),
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   disabledBackgroundColor: Colors.transparent,
@@ -798,25 +814,23 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       bottomNavigationBar: isInitialProductsLoading ? null : _buildBottomPayButton(l10n, memberState, products),
       body: Stack(
         children: [
+          const Positioned.fill(
+            child: ColoredBox(color: _membershipBottomColor),
+          ),
           Positioned.fill(
-            child: Column(
-              children: [
-                _buildTopImage(),
-                Expanded(
-                  child: isInitialProductsLoading
-                      ? _buildInitialProductsLoadingState(context)
-                      : SingleChildScrollView(
-                          child: Column(
-                            children: [
-                              _buildVipOptions(l10n, products, false),
-                              _buildDramaSection(recommendState),
-                              _buildBenefitsSection(l10n, products),
-                              _buildBottomSpacer(context),
-                            ],
-                          ),
-                        ),
-                ),
-              ],
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _buildTopImage(),
+                  if (isInitialProductsLoading)
+                    _buildProductsLoadingState(context)
+                  else
+                    _buildVipOptions(l10n, products, false, hasActiveSubscription: _hasActiveSubscription),
+                  _buildDramaSection(recommendState),
+                  _buildBenefitsSection(l10n, products),
+                  _buildBottomSpacer(context),
+                ],
+              ),
             ),
           ),
           PositionedDirectional(
@@ -871,12 +885,14 @@ class _VipOptionItem extends StatelessWidget {
     required this.title,
     required this.isSelected,
     required this.onTap,
+    this.isSubscribed = false,
   });
 
   final SubscriptionProduct product;
   final String title;
   final bool isSelected;
   final VoidCallback onTap;
+  final bool isSubscribed;
 
   static const _priceGradient = LinearGradient(
     begin: Alignment.centerRight,
@@ -915,88 +931,95 @@ class _VipOptionItem extends StatelessWidget {
         originalPrice.isNotEmpty && originalPrice != product.price;
 
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 60,
-        margin: const EdgeInsets.only(bottom: 15),
-        padding: const EdgeInsets.symmetric(horizontal: 15),
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/vip_item_bg.png'),
-            fit: BoxFit.fill,
+      onTap: isSubscribed ? null : onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          height: 60,
+          margin: const EdgeInsets.only(bottom: 15),
+          decoration: const BoxDecoration(
+            image: DecorationImage(
+              image: AssetImage('assets/images/vip_item_bg.png'),
+              fit: BoxFit.fill,
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            Image.asset(
-              isSelected
-                  ? 'assets/images/vip_selected.png'
-                  : 'assets/images/vip_notselected.png',
-              width: 20,
-              height: 20,
-            ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-            const SizedBox(width: 15),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 15),
+            child: Row(
               children: [
-                if (hasOriginalPrice) ...[
-                  Text(
-                    originalPriceParts.amount,
+                Image.asset(
+                  isSubscribed
+                      ? 'assets/images/vip_selected.png'
+                      : (isSelected
+                          ? 'assets/images/vip_selected.png'
+                          : 'assets/images/vip_notselected.png'),
+                  width: 20,
+                  height: 20,
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w400,
-                      color: Colors.white,
-                      decoration: TextDecoration.lineThrough,
-                      decorationColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                ],
-                ShaderMask(
-                  shaderCallback: (bounds) => _priceGradient.createShader(
-                    Rect.fromLTWH(0, 0, bounds.width, bounds.height),
-                  ),
-                  blendMode: BlendMode.srcIn,
-                  child: const Text(
-                    r'$',
-                    style: TextStyle(
-                      fontSize: 22,
+                      fontSize: 14,
                       fontWeight: FontWeight.w500,
                       color: Colors.white,
                     ),
                   ),
                 ),
-                ShaderMask(
-                  shaderCallback: (bounds) => _priceGradient.createShader(
-                    Rect.fromLTWH(0, 0, bounds.width, bounds.height),
-                  ),
-                  blendMode: BlendMode.srcIn,
-                  child: Text(
-                    amount,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
+                const SizedBox(width: 15),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    if (hasOriginalPrice) ...[
+                      Text(
+                        originalPriceParts.amount,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w400,
+                          color: Colors.white,
+                          decoration: TextDecoration.lineThrough,
+                          decorationColor: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 7),
+                    ],
+                    ShaderMask(
+                      shaderCallback: (bounds) => _priceGradient.createShader(
+                        Rect.fromLTWH(0, 0, bounds.width, bounds.height),
+                      ),
+                      blendMode: BlendMode.srcIn,
+                      child: const Text(
+                        r'$',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
-                  ),
+                    ShaderMask(
+                      shaderCallback: (bounds) => _priceGradient.createShader(
+                        Rect.fromLTWH(0, 0, bounds.width, bounds.height),
+                      ),
+                      blendMode: BlendMode.srcIn,
+                      child: Text(
+                        amount,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );

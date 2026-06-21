@@ -39,11 +39,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     color: Colors.white,
                     onPressed: () => context.pop(),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
-                        'Notification',
-                        style: TextStyle(
+                        l10n.notifications,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,

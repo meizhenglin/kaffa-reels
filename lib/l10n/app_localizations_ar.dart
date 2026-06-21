@@ -27,19 +27,19 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bottomNav_profile => 'حسابي';
 
   @override
-  String get home => 'Home';
+  String get home => 'الرئيسية';
 
   @override
-  String get explore => 'Explore';
+  String get explore => 'استكشف';
 
   @override
   String get library => 'Library';
 
   @override
-  String get profile => 'Profile';
+  String get profile => 'حسابي';
 
   @override
-  String get settings => 'Settings';
+  String get settings => 'الإعدادات';
 
   @override
   String get search => 'Search';
@@ -90,7 +90,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get newReleases => 'New Releases';
 
   @override
-  String get recommended => 'Recommended';
+  String get recommended => 'موصى به';
 
   @override
   String get categories => 'Categories';
@@ -144,16 +144,16 @@ class AppLocalizationsAr extends AppLocalizations {
   String get seeMore => 'See More';
 
   @override
-  String get favorites => 'My Favorites';
+  String get favorites => 'المفضلة';
 
   @override
-  String get watchHistory => 'Watch History';
+  String get watchHistory => 'سجل المشاهدة';
 
   @override
   String get downloads => 'Downloads';
 
   @override
-  String get notifications => 'Notifications';
+  String get notifications => 'الإشعارات';
 
   @override
   String get language => 'Language';
@@ -198,7 +198,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get yearly => 'Yearly';
 
   @override
-  String get games => 'Games';
+  String get games => 'ألعاب';
 
   @override
   String get loading => 'Loading...';
@@ -244,6 +244,20 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get unknownError => 'An unknown error occurred';
+
+  @override
+  String get today => 'اليوم';
+
+  @override
+  String get yesterday => 'أمس';
+
+  @override
+  String daysAgo(int count) {
+    return 'منذ $count يوم';
+  }
+
+  @override
+  String get unknown => 'غير معروف';
 
   @override
   String get requiredField => 'This field is required';
@@ -710,11 +724,307 @@ class AppLocalizationsAr extends AppLocalizations {
   String get error_auth => 'فشل المصادقة';
 
   @override
-  String get recommend => 'Recommend';
+  String get recommend => 'موصى به';
 
   @override
   String get hot => 'Hot';
 
   @override
   String get all => 'All';
+
+  @override
+  String get renewal => 'تجديد';
+
+  @override
+  String get favourites => 'المفضلة';
+
+  @override
+  String get giftRecords => 'سجلات الهدايا';
+
+  @override
+  String get complaintAndReport => 'الشكوى والإبلاغ';
+
+  @override
+  String validityPeriod(String date) {
+    return 'فترة الصلاحية: $date';
+  }
+
+  @override
+  String get noRechargeRecords => 'لا توجد سجلات شحن';
+
+  @override
+  String get noUsageRecords => 'لا توجد سجلات استخدام';
+
+  @override
+  String get noGiftRecords => 'لا توجد سجلات هدايا';
+
+  @override
+  String get kCoinRecharge => 'شحن K-Coin';
+
+  @override
+  String get kCoinUsed => 'استخدام K-Coin';
+
+  @override
+  String get kCoinGift => 'هدية K-Coin';
+
+  @override
+  String get kCoinTransaction => 'معاملة K-Coin';
+
+  @override
+  String get todaysReward => 'مكافأة اليوم';
+
+  @override
+  String get weeklyRewards => 'المكافآت الأسبوعية';
+
+  @override
+  String get signRule1 => 'سجّل الدخول يومياً للحصول على K-coins';
+
+  @override
+  String get signRule2 => 'تسجيل الدخول المتتالي يفتح المزيد من المكافآت';
+
+  @override
+  String get signRule3 => 'تتم إعادة تعيين المكافآت أسبوعياً';
+
+  @override
+  String get rules => 'القواعد';
+
+  @override
+  String get confirmPurchase => 'تأكيد الشراء';
+
+  @override
+  String get purchaseStarted => 'بدأ الشراء، يرجى الانتظار...';
+
+  @override
+  String get failedToStartPurchase => 'فشل في بدء الشراء';
+
+  @override
+  String get pay => 'دفع';
+
+  @override
+  String get purchaseSuccessful => 'تم الشراء بنجاح! تمت إضافة العملات.';
+
+  @override
+  String get selected => 'محدد';
+
+  @override
+  String get select => 'اختيار';
+
+  @override
+  String get myCoins => 'عماتي';
+
+  @override
+  String get getCoins => 'احصل على عملات';
+
+  @override
+  String get watchPremiumContent => 'شاهد محتوى مميز';
+
+  @override
+  String get alreadySubscribed => 'مشترك بالفعل';
+
+  @override
+  String get chargingAgreement => 'بالشحن، فأنت تقبل: اتفاقية قواعد الشحن';
+
+  @override
+  String get chargingRule1 =>
+      '١. النقاط وعضوية VIP هي سلع افتراضية ولا يمكن استردادها بمجرد شرائها؛';
+
+  @override
+  String get chargingRule2 =>
+      '٢. يجب على القاصرين تحت ١٨ عاماً إجراء عمليات مدفوعة تحت إشراف أولياء الأمور؛';
+
+  @override
+  String get chargingRule3 =>
+      '٣. النقاط والعضوية صالحة للاستخدام في هذا التطبيق فقط، يمكنك المشاهدة مباشرة بعد الشحن.';
+
+  @override
+  String get confirmUnlock => 'تأكيد الفتح';
+
+  @override
+  String confirmUnlockMessage(int coins, String title) {
+    return 'هل أنت متأكد أنك تريد إنفاق $coins K Coin لفتح \"$title\"؟';
+  }
+
+  @override
+  String get insufficientBalance => 'رصيد غير كافٍ';
+
+  @override
+  String insufficientBalanceMessage(String title) {
+    return 'رصيد K Coin غير كافٍ. هل تريد شراء \"$title\" عبر Google Play؟';
+  }
+
+  @override
+  String get unlockSuccess => 'تم الفتح بنجاح!';
+
+  @override
+  String get unlockFailed => 'فشل الفتح';
+
+  @override
+  String get unlockToContinue => 'فتح للمتابعة';
+
+  @override
+  String get productUnavailable => 'المنتج غير متاح، يرجى المحاولة لاحقاً';
+
+  @override
+  String get purchaseSuccess => 'تم الشراء بنجاح!';
+
+  @override
+  String get purchaseFailed => 'فشل الشراء';
+
+  @override
+  String get vipProductUnavailable => 'منتج VIP غير متاح، يرجى المحاولة لاحقاً';
+
+  @override
+  String get vipSubscriptionSuccess => 'تم اشتراك VIP بنجاح!';
+
+  @override
+  String get vipSubscriptionFailed => 'فشل الاشتراك';
+
+  @override
+  String get dailyCheckIn => 'تسجيل الدخول اليومي';
+
+  @override
+  String consecutiveDays(int days) {
+    return '$days أيام متتالية';
+  }
+
+  @override
+  String get signInDailyHint => 'سجّل الدخول يومياً للحصول على المكافآت';
+
+  @override
+  String get signed => 'تم التوقيع';
+
+  @override
+  String get viewAllRewards => 'عرض جميع المكافآت';
+
+  @override
+  String signInSuccessful(int coins) {
+    return 'تم التوقيع بنجاح! +$coins عملات';
+  }
+
+  @override
+  String day(int day) {
+    return 'اليوم $day';
+  }
+
+  @override
+  String getReward(int coins) {
+    return 'احصل على $coins K-coins';
+  }
+
+  @override
+  String get close => 'إغلاق';
+
+  @override
+  String get allRewards => 'جميع المكافآت';
+
+  @override
+  String get signedToday => 'تم التوقيع اليوم!';
+
+  @override
+  String get notSignedYet => 'لم يتم التوقيع بعد';
+
+  @override
+  String get consecutiveDaysLabel => 'الأيام المتتالية';
+
+  @override
+  String get balance => 'الرصيد';
+
+  @override
+  String get recharge => 'شحن';
+
+  @override
+  String get rechargeRecords => 'سجلات الشحن';
+
+  @override
+  String get usageRecords => 'سجلات الاستخدام';
+
+  @override
+  String get kCoinRecords => 'سجلات K-Coin';
+
+  @override
+  String get rechargeHistory => 'عرض سجل شحن K-Coin الخاص بك';
+
+  @override
+  String get spendingHistory => 'عرض سجل إنفاق K-Coin الخاص بك';
+
+  @override
+  String get giftHistory => 'عرض سجل هدايا K-Coin الخاص بك';
+
+  @override
+  String get rechargeTab => 'شحن';
+
+  @override
+  String get usageTab => 'استخدام';
+
+  @override
+  String get giftTab => 'هدية';
+
+  @override
+  String get back => 'رجوع';
+
+  @override
+  String get report => 'إبلاغ';
+
+  @override
+  String get pageNotFound => 'الصفحة غير موجودة';
+
+  @override
+  String get loadCatalogFailed => 'فشل تحميل الكتالوج';
+
+  @override
+  String get loadVideoFailed => 'فشل تحميل الفيديو';
+
+  @override
+  String get noPlayableEpisodes => 'لا توجد حلقات قابلة للتشغيل';
+
+  @override
+  String get loadFailed => 'فشل التحميل';
+
+  @override
+  String get coins => 'عملات';
+
+  @override
+  String get purchase => 'شراء';
+
+  @override
+  String get episodePrice => 'سعر الحلقة';
+
+  @override
+  String get accountBalance => 'رصيد الحساب';
+
+  @override
+  String get noProductsAvailable => 'لا توجد منتجات متاحة';
+
+  @override
+  String get limitedOffer => 'عرض محدود';
+
+  @override
+  String get bestValue => 'أفضل قيمة';
+
+  @override
+  String get buy => 'شراء';
+
+  @override
+  String get contentIssue => 'مشكلة في المحتوى';
+
+  @override
+  String get playbackProblem => 'مشكلة في التشغيل';
+
+  @override
+  String get copyrightConcern => 'concern حقوق النشر';
+
+  @override
+  String get other => 'أخرى';
+
+  @override
+  String get pleaseEnterFeedback => 'الرجاء إدخال ملاحظاتك';
+
+  @override
+  String get failedToSubmitFeedback => 'فشل إرسال الملاحظات';
+
+  @override
+  String get submitReport => 'إرسال التقرير';
+
+  @override
+  String get submitting => 'جار الإرسال...';
 }

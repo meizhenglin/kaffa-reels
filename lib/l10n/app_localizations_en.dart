@@ -246,6 +246,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unknownError => 'An unknown error occurred';
 
   @override
+  String get today => 'Today';
+
+  @override
+  String get yesterday => 'Yesterday';
+
+  @override
+  String daysAgo(int count) {
+    return '$count days ago';
+  }
+
+  @override
+  String get unknown => 'Unknown';
+
+  @override
   String get requiredField => 'This field is required';
 
   @override
@@ -715,4 +729,303 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get all => 'All';
+
+  @override
+  String get renewal => 'Renewal';
+
+  @override
+  String get favourites => 'Favourites';
+
+  @override
+  String get giftRecords => 'Gift Records';
+
+  @override
+  String get complaintAndReport => 'Complaint and Report';
+
+  @override
+  String validityPeriod(String date) {
+    return 'Validity Period: $date';
+  }
+
+  @override
+  String get noRechargeRecords => 'No recharge records';
+
+  @override
+  String get noUsageRecords => 'No usage records';
+
+  @override
+  String get noGiftRecords => 'No gift records';
+
+  @override
+  String get kCoinRecharge => 'K-Coin Recharge';
+
+  @override
+  String get kCoinUsed => 'K-Coin Used';
+
+  @override
+  String get kCoinGift => 'K-Coin Gift';
+
+  @override
+  String get kCoinTransaction => 'K-Coin Transaction';
+
+  @override
+  String get todaysReward => 'Today\'s Reward';
+
+  @override
+  String get weeklyRewards => 'Weekly Rewards';
+
+  @override
+  String get signRule1 => 'Sign in daily to earn K-coins';
+
+  @override
+  String get signRule2 => 'Consecutive sign-ins unlock more rewards';
+
+  @override
+  String get signRule3 => 'Rewards reset weekly';
+
+  @override
+  String get rules => 'Rules';
+
+  @override
+  String get confirmPurchase => 'Confirm Purchase';
+
+  @override
+  String get purchaseStarted => 'Purchase started, please wait...';
+
+  @override
+  String get failedToStartPurchase => 'Failed to start purchase';
+
+  @override
+  String get pay => 'Pay';
+
+  @override
+  String get purchaseSuccessful => 'Purchase successful! Coins added.';
+
+  @override
+  String get selected => 'Selected';
+
+  @override
+  String get select => 'Select';
+
+  @override
+  String get myCoins => 'My Coins';
+
+  @override
+  String get getCoins => 'Get Coins';
+
+  @override
+  String get watchPremiumContent => 'Watch premium content';
+
+  @override
+  String get alreadySubscribed => 'Already Subscribed';
+
+  @override
+  String get chargingAgreement =>
+      'By recharging, you accept the: Recharge Rules Agreement';
+
+  @override
+  String get chargingRule1 =>
+      '1. K-points and membership are virtual goods and cannot be refunded once purchased;';
+
+  @override
+  String get chargingRule2 =>
+      '2. Minors under 18 should perform paid operations under the guidance of guardians;';
+
+  @override
+  String get chargingRule3 =>
+      '3. K-points and membership are only valid for use in this APP, you can watch directly after recharging.';
+
+  @override
+  String get confirmUnlock => 'Confirm Unlock';
+
+  @override
+  String confirmUnlockMessage(int coins, String title) {
+    return 'Are you sure you want to spend $coins K Coin to unlock \"$title\"?';
+  }
+
+  @override
+  String get insufficientBalance => 'Insufficient Balance';
+
+  @override
+  String insufficientBalanceMessage(String title) {
+    return 'Your K Coin balance is insufficient. Would you like to purchase \"$title\" via Google Play?';
+  }
+
+  @override
+  String get unlockSuccess => 'Unlock successful!';
+
+  @override
+  String get unlockFailed => 'Unlock failed';
+
+  @override
+  String get unlockToContinue => 'Unlock to Continue';
+
+  @override
+  String get productUnavailable =>
+      'Product unavailable, please try again later';
+
+  @override
+  String get purchaseSuccess => 'Purchase successful!';
+
+  @override
+  String get purchaseFailed => 'Purchase failed';
+
+  @override
+  String get vipProductUnavailable =>
+      'VIP product unavailable, please try again later';
+
+  @override
+  String get vipSubscriptionSuccess => 'VIP subscription successful!';
+
+  @override
+  String get vipSubscriptionFailed => 'Subscription failed';
+
+  @override
+  String get dailyCheckIn => 'Daily Check-in';
+
+  @override
+  String consecutiveDays(int days) {
+    return 'Consecutive $days days';
+  }
+
+  @override
+  String get signInDailyHint => 'Sign in daily to earn rewards';
+
+  @override
+  String get signed => 'Signed';
+
+  @override
+  String get viewAllRewards => 'View all rewards';
+
+  @override
+  String signInSuccessful(int coins) {
+    return 'Sign-in successful! +$coins coins';
+  }
+
+  @override
+  String day(int day) {
+    return 'Day $day';
+  }
+
+  @override
+  String getReward(int coins) {
+    return 'Get $coins K-coins';
+  }
+
+  @override
+  String get close => 'Close';
+
+  @override
+  String get allRewards => 'All Rewards';
+
+  @override
+  String get signedToday => 'Signed Today!';
+
+  @override
+  String get notSignedYet => 'Not Signed Yet';
+
+  @override
+  String get consecutiveDaysLabel => 'Consecutive Days';
+
+  @override
+  String get balance => 'Balance';
+
+  @override
+  String get recharge => 'Recharge';
+
+  @override
+  String get rechargeRecords => 'Recharge Records';
+
+  @override
+  String get usageRecords => 'Usage Records';
+
+  @override
+  String get kCoinRecords => 'K-Coin Records';
+
+  @override
+  String get rechargeHistory => 'View your K-Coin recharge history';
+
+  @override
+  String get spendingHistory => 'View your K-Coin spending history';
+
+  @override
+  String get giftHistory => 'View your K-Coin gift history';
+
+  @override
+  String get rechargeTab => 'Recharge';
+
+  @override
+  String get usageTab => 'Usage';
+
+  @override
+  String get giftTab => 'Gift';
+
+  @override
+  String get back => 'Back';
+
+  @override
+  String get report => 'Report';
+
+  @override
+  String get pageNotFound => 'Page not found';
+
+  @override
+  String get loadCatalogFailed => 'Failed to load catalog';
+
+  @override
+  String get loadVideoFailed => 'Failed to load video';
+
+  @override
+  String get noPlayableEpisodes => 'No playable episodes';
+
+  @override
+  String get loadFailed => 'Failed to load';
+
+  @override
+  String get coins => 'coins';
+
+  @override
+  String get purchase => 'Purchase';
+
+  @override
+  String get episodePrice => 'Episode Price';
+
+  @override
+  String get accountBalance => 'Account Balance';
+
+  @override
+  String get noProductsAvailable => 'No products available';
+
+  @override
+  String get limitedOffer => 'Limited Offer';
+
+  @override
+  String get bestValue => 'Best Value';
+
+  @override
+  String get buy => 'Buy';
+
+  @override
+  String get contentIssue => 'Content issue';
+
+  @override
+  String get playbackProblem => 'Playback problem';
+
+  @override
+  String get copyrightConcern => 'Copyright concern';
+
+  @override
+  String get other => 'Other';
+
+  @override
+  String get pleaseEnterFeedback => 'Please enter your feedback';
+
+  @override
+  String get failedToSubmitFeedback => 'Failed to submit feedback';
+
+  @override
+  String get submitReport => 'Submit Report';
+
+  @override
+  String get submitting => 'Submitting...';
 }

@@ -78,11 +78,18 @@
   "like": "Like",
   "comment": "Comment",
   "watch": "Watch",
-  "episode": "Episode",
-  "episodes": "Episodes",
   "noResults": "No results found",
   "networkError": "Network error. Please check your connection.",
   "unknownError": "An unknown error occurred",
+  "today": "Today",
+  "yesterday": "Yesterday",
+  "daysAgo": "{count} days ago",
+  "@daysAgo": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "unknown": "Unknown",
   "requiredField": "This field is required",
   "invalidEmail": "Please enter a valid email",
   "passwordTooShort": "Password must be at least 6 characters",
@@ -241,5 +248,144 @@
 
   "recommend": "Recommend",
   "hot": "Hot",
-  "all": "All"
+  "all": "All",
+
+  "renewal": "Renewal",
+  "favourites": "Favourites",
+  "giftRecords": "Gift Records",
+  "complaintAndReport": "Complaint and Report",
+  "validityPeriod": "Validity Period: {date}",
+  "@validityPeriod": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+
+  "noRechargeRecords": "No recharge records",
+  "noUsageRecords": "No usage records",
+  "noGiftRecords": "No gift records",
+  "kCoinRecharge": "K-Coin Recharge",
+  "kCoinUsed": "K-Coin Used",
+  "kCoinGift": "K-Coin Gift",
+  "kCoinTransaction": "K-Coin Transaction",
+  "todaysReward": "Today's Reward",
+  "weeklyRewards": "Weekly Rewards",
+  "signRule1": "Sign in daily to earn K-coins",
+  "signRule2": "Consecutive sign-ins unlock more rewards",
+  "signRule3": "Rewards reset weekly",
+  "rules": "Rules",
+
+  "confirmPurchase": "Confirm Purchase",
+  "purchaseStarted": "Purchase started, please wait...",
+  "failedToStartPurchase": "Failed to start purchase",
+  "pay": "Pay",
+  "purchaseSuccessful": "Purchase successful! Coins added.",
+  "selected": "Selected",
+  "select": "Select",
+  "myCoins": "My Coins",
+  "getCoins": "Get Coins",
+  "watchPremiumContent": "Watch premium content",
+  "alreadySubscribed": "Already Subscribed",
+
+  "chargingAgreement": "By recharging, you accept the: Recharge Rules Agreement",
+  "chargingRule1": "1. K-points and membership are virtual goods and cannot be refunded once purchased;",
+  "chargingRule2": "2. Minors under 18 should perform paid operations under the guidance of guardians;",
+  "chargingRule3": "3. K-points and membership are only valid for use in this APP, you can watch directly after recharging.",
+  "confirmUnlock": "Confirm Unlock",
+  "confirmUnlockMessage": "Are you sure you want to spend {coins} K Coin to unlock \"{title}\"?",
+  "@confirmUnlockMessage": {
+    "placeholders": {
+      "coins": {"type": "int"},
+      "title": {"type": "String"}
+    }
+  },
+  "insufficientBalance": "Insufficient Balance",
+  "insufficientBalanceMessage": "Your K Coin balance is insufficient. Would you like to purchase \"{title}\" via Google Play?",
+  "@insufficientBalanceMessage": {
+    "placeholders": {
+      "title": {"type": "String"}
+    }
+  },
+  "unlockSuccess": "Unlock successful!",
+  "unlockFailed": "Unlock failed",
+  "unlockToContinue": "Unlock to Continue",
+  "productUnavailable": "Product unavailable, please try again later",
+  "purchaseSuccess": "Purchase successful!",
+  "purchaseFailed": "Purchase failed",
+  "vipProductUnavailable": "VIP product unavailable, please try again later",
+  "vipSubscriptionSuccess": "VIP subscription successful!",
+  "vipSubscriptionFailed": "Subscription failed",
+
+  "dailyCheckIn": "Daily Check-in",
+  "consecutiveDays": "Consecutive {days} days",
+  "@consecutiveDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "signInDailyHint": "Sign in daily to earn rewards",
+  "signed": "Signed",
+  "viewAllRewards": "View all rewards",
+  "signInSuccessful": "Sign-in successful! +{coins} coins",
+  "@signInSuccessful": {
+    "placeholders": {
+      "coins": {"type": "int"}
+    }
+  },
+  "day": "Day {day}",
+  "@day": {
+    "placeholders": {
+      "day": {"type": "int"}
+    }
+  },
+  "getReward": "Get {coins} K-coins",
+  "@getReward": {
+    "placeholders": {
+      "coins": {"type": "int"}
+    }
+  },
+  "close": "Close",
+  "allRewards": "All Rewards",
+  "signedToday": "Signed Today!",
+  "notSignedYet": "Not Signed Yet",
+  "consecutiveDaysLabel": "Consecutive Days",
+
+  "balance": "Balance",
+  "recharge": "Recharge",
+  "rechargeRecords": "Recharge Records",
+  "usageRecords": "Usage Records",
+
+  "kCoinRecords": "K-Coin Records",
+  "rechargeHistory": "View your K-Coin recharge history",
+  "spendingHistory": "View your K-Coin spending history",
+  "giftHistory": "View your K-Coin gift history",
+  "rechargeTab": "Recharge",
+  "usageTab": "Usage",
+  "giftTab": "Gift",
+
+  "back": "Back",
+  "report": "Report",
+  "pageNotFound": "Page not found",
+
+  "loadCatalogFailed": "Failed to load catalog",
+  "loadVideoFailed": "Failed to load video",
+  "noPlayableEpisodes": "No playable episodes",
+  "loadFailed": "Failed to load",
+  "coins": "coins",
+  "purchase": "Purchase",
+  "episodePrice": "Episode Price",
+  "accountBalance": "Account Balance",
+  "noProductsAvailable": "No products available",
+  "limitedOffer": "Limited Offer",
+  "bestValue": "Best Value",
+  "buy": "Buy",
+
+  "contentIssue": "Content issue",
+  "playbackProblem": "Playback problem",
+  "copyrightConcern": "Copyright concern",
+  "other": "Other",
+  "pleaseEnterFeedback": "Please enter your feedback",
+  "failedToSubmitFeedback": "Failed to submit feedback",
+  "submitReport": "Submit Report",
+  "submitting": "Submitting..."
 }

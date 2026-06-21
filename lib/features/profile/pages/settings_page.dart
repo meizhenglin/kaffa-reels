@@ -30,32 +30,34 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _handleLogout() async {
+    final l10n = AppLocalizations.of(context);
+    
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: const Color(0xFF2C2C2E),
         title: Text(
-          AppLocalizations.of(context).logoutTitle,
+          AppLocalizations.of(dialogContext).logoutTitle,
           style: const TextStyle(color: Colors.white),
         ),
-        content: const Text(
-          'Are you sure you want to log out?',
-          style: TextStyle(color: Colors.white70),
+        content: Text(
+          l10n.logoutConfirm,
+          style: const TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Colors.white54),
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(
+              l10n.cancel,
+              style: const TextStyle(color: Colors.white54),
             ),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Log out',
-              style: TextStyle(color: Colors.red),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              l10n.logout,
+              style: const TextStyle(color: Colors.red),
             ),
           ),
         ],

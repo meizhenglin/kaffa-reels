@@ -86,7 +86,7 @@ class AuthState {
   );
 }
 
-final authRepositoryProvider = Provider<AuthRepository>((ref) => AuthRepository(ref.watch(storageServiceProvider)));
+final authRepositoryProvider = Provider<AuthRepository>((ref) => AuthRepository(ref.watch(storageServiceProvider), ref.watch(apiServiceProviderRef)));
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) => AuthNotifier(ref));
 
 /// 认证状态管理器

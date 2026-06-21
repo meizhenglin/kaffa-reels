@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../../core/network/api_service.dart' show apiServiceProvider;
+import '../../../l10n/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class ReportPage extends ConsumerStatefulWidget {
@@ -15,18 +16,12 @@ class ReportPage extends ConsumerStatefulWidget {
 }
 
 class _ReportPageState extends ConsumerState<ReportPage> {
-  static const List<String> _reportTypes = [
-    'Content issue',
-    'Playback problem',
-    'Copyright concern',
-    'Other',
-  ];
-
+  late List<String> _reportTypes;
   late final TextEditingController _reportController;
   late final ScrollController _scrollController;
   late final FocusNode _reportFocusNode;
   final GlobalKey _reportFieldKey = GlobalKey();
-  String _selectedType = _reportTypes.first;
+  String _selectedType = '';
   bool _isSubmitting = false;
 
   @override
@@ -35,6 +30,23 @@ class _ReportPageState extends ConsumerState<ReportPage> {
     _reportController = TextEditingController();
     _scrollController = ScrollController();
     _reportFocusNode = FocusNode()..addListener(_handleReportFocusChange);
+    _reportTypes = [];
+    _selectedType = '';
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final l10n = AppLocalizations.of(context);
+    _reportTypes = [
+      l10n.contentIssue,
+      l10n.playbackProblem,
+      l10n.copyrightConcern,
+      l10n.other,
+    ];
+    if (_selectedType.isEmpty || !_reportTypes.contains(_selectedType)) {
+      _selectedType = _reportTypes.isNotEmpty ? _reportTypes.first : '';
+    }
   }
 
   @override
@@ -64,11 +76,12 @@ class _ReportPageState extends ConsumerState<ReportPage> {
 
   Future<void> _submitReport() async {
     if (_isSubmitting) return;
+    final l10n = AppLocalizations.of(context);
 
     final content = _reportController.text.trim();
     if (content.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your feedback')),
+        SnackBar(content: Text(l10n.pleaseEnterFeedback)),
       );
       return;
     }
@@ -96,7 +109,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
       debugPrint('[ReportPage] submit failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to submit feedback')),
+          SnackBar(content: Text(l10n.failedToSubmitFeedback)),
         );
       }
     } finally {
@@ -108,6 +121,8 @@ class _ReportPageState extends ConsumerState<ReportPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: GradientScaffold(
@@ -124,14 +139,19 @@ class _ReportPageState extends ConsumerState<ReportPage> {
                       onPressed: () => context.pop(),
                     ),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Complaint and Report',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          l10n.complaintAndReport,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 40),
                   ],
                 ),
               ),
@@ -205,6 +225,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
                   child: _SubmitButton(
                     onPressed: _submitReport,
                     isLoading: _isSubmitting,
+                    l10n: l10n,
                   ),
                 ),
               ),
@@ -428,10 +449,11 @@ class _ReportTextArea extends StatelessWidget {
 }
 
 class _SubmitButton extends StatelessWidget {
-  const _SubmitButton({required this.onPressed, required this.isLoading});
+  const _SubmitButton({required this.onPressed, required this.isLoading, required this.l10n});
 
   final VoidCallback onPressed;
   final bool isLoading;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -452,7 +474,7 @@ class _SubmitButton extends StatelessWidget {
             ),
           ),
           child: Text(
-            isLoading ? 'Submitting...' : 'Submit Report',
+            isLoading ? l10n.submitting : l10n.submitReport,
             style: const TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 16,

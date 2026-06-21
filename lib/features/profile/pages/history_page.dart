@@ -57,7 +57,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(context),
+            _buildHeader(context, l10n),
             Expanded(
               child: _buildBody(context, history, l10n),
             ),
@@ -67,7 +67,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, AppLocalizations l10n) {
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: HomeCardLayout.sectionHorizontalPadding(context),
@@ -81,7 +81,7 @@ class _HistoryPageState extends ConsumerState<HistoryPage> {
           ),
           Expanded(
             child: Text(
-              'Watching History',
+              l10n.watchHistory,
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white,

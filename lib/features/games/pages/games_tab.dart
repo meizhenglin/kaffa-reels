@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../l10n/app_localizations.dart';
 import '../../home/mixins/tab_scroll_mixin.dart';
 import 'games_page.dart';
-
-/// 游戏 Tab
+/// 游戏 Tab（新版 - 后端数据驱动）
 class GamesTab extends ConsumerStatefulWidget {
   const GamesTab({super.key});
 

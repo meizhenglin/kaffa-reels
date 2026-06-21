@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../models/unlock_product.dart';
 import '../providers/recharge_provider.dart';
 import '../services/payment_service.dart';
@@ -93,6 +94,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xFFFFF5F0),
@@ -102,9 +104,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _buildTopDecoration(),
-          _buildTitleSection(),
-          _buildPriceInfoRow(),
-          _buildProductsGrid(),
+          _buildTitleSection(l10n),
+          _buildPriceInfoRow(l10n),
+          _buildProductsGrid(l10n),
           _buildAgreementText(),
           const SizedBox(height: 16),
         ],
@@ -175,17 +177,17 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     );
   }
 
-  Widget _buildTitleSection() {
+  Widget _buildTitleSection(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 50, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(left: 60, top: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 60, top: 4),
             child: Text(
-              '充值解锁后精彩继续',
-              style: TextStyle(
+              l10n.unlockToContinue,
+              style: const TextStyle(
                 color: Color(0xFFD9341C),
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -210,7 +212,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     );
   }
 
-  Widget _buildPriceInfoRow() {
+  Widget _buildPriceInfoRow(AppLocalizations l10n) {
     final balance = _userBalance;
     final episodePrice = widget.config.episodeUnlockPrice;
 
@@ -224,9 +226,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text(
-            '本集价格：',
-            style: TextStyle(
+          Text(
+            l10n.episodePrice,
+            style: const TextStyle(
               color: Color(0xFF333333),
               fontSize: 12,
             ),
@@ -240,9 +242,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
             ),
           ),
           const SizedBox(width: 12),
-          const Text(
-            '账号余额：',
-            style: TextStyle(
+          Text(
+            l10n.accountBalance,
+            style: const TextStyle(
               color: Color(0xFF333333),
               fontSize: 12,
             ),
@@ -262,18 +264,18 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     );
   }
 
-  Widget _buildProductsGrid() {
+  Widget _buildProductsGrid(AppLocalizations l10n) {
     // 直接使用所有返回的商品，不按类型过滤
     final allProducts = widget.config.allProducts;
     debugPrint('[UnlockBottomSheet] allProducts length: ${allProducts.length}');
     debugPrint('[UnlockBottomSheet] allProducts: $allProducts');
 
     if (allProducts.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(20),
+      return Padding(
+        padding: const EdgeInsets.all(20),
         child: Text(
-          '暂无可用商品',
-          style: TextStyle(color: Colors.black54, fontSize: 14),
+          l10n.noProductsAvailable,
+          style: const TextStyle(color: Colors.black54, fontSize: 14),
         ),
       );
     }
@@ -302,6 +304,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   }
 
   Widget _buildProductItem(UnlockProduct product) {
+    final l10n = AppLocalizations.of(context);
     final price = product.price;
     final originalPrice = product.originalPrice;
     final hasDiscount = originalPrice != null && originalPrice > price;
@@ -313,11 +316,11 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
     String? tagLabel;
     if (hasDiscount) {
-      tagLabel = '限时特惠';
+      tagLabel = l10n.limitedOffer;
     } else if (product.isBestValue) {
-      tagLabel = '超值';
+      tagLabel = l10n.bestValue;
     } else if (product.isPopular) {
-      tagLabel = '热门';
+      tagLabel = l10n.hot;
     }
 
     return GestureDetector(
@@ -430,36 +433,37 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   }
 
   Widget _buildAgreementText() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+    final l10n = AppLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '充值代表接受：充值规则协议',
-            style: TextStyle(
+            l10n.chargingAgreement,
+            style: const TextStyle(
               color: Color(0xFF666666),
               fontSize: 11,
             ),
           ),
-          SizedBox(height: 2),
+          const SizedBox(height: 2),
           Text(
-            '1.看点和会员属于虚拟商品，一经购买不得退换；',
-            style: TextStyle(
+            l10n.chargingRule1,
+            style: const TextStyle(
               color: Color(0xFF999999),
               fontSize: 10,
             ),
           ),
           Text(
-            '2.未满18岁未成年应在监护人的监护指导下进行付费操作；',
-            style: TextStyle(
+            l10n.chargingRule2,
+            style: const TextStyle(
               color: Color(0xFF999999),
               fontSize: 10,
             ),
           ),
           Text(
-            '3.看点和会员仅在本APP生效使用，充值后即可直接观看。',
-            style: TextStyle(
+            l10n.chargingRule3,
+            style: const TextStyle(
               color: Color(0xFF999999),
               fontSize: 10,
             ),
@@ -489,21 +493,22 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
   /// 余额足够，直接扣余额解锁
   Future<void> _confirmAndUnlockByBalance(UnlockProduct product) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('确认解锁'),
-        content: Text('确定消耗 ${product.price.toInt()} K Coin 解锁 "${product.goodsName}" 吗？'),
+        title: Text(l10n.confirmUnlock),
+        content: Text(l10n.confirmUnlockMessage(product.price.toInt(), product.goodsName)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              '确认',
-              style: TextStyle(color: Color(0xFFD9341C)),
+            child: Text(
+              l10n.confirm,
+              style: const TextStyle(color: Color(0xFFD9341C)),
             ),
           ),
         ],
@@ -517,21 +522,22 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
   /// 余额不足，走Google Play一次性购买
   Future<void> _confirmAndUnlockByPurchase(UnlockProduct product) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('余额不足'),
-        content: Text('您的 K Coin 余额不足，是否通过 Google Play 购买 "${product.goodsName}"？'),
+        title: Text(l10n.insufficientBalance),
+        content: Text(l10n.insufficientBalanceMessage(product.goodsName)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              '购买',
-              style: TextStyle(color: Color(0xFFD9341C)),
+            child: Text(
+              l10n.buy,
+              style: const TextStyle(color: Color(0xFFD9341C)),
             ),
           ),
         ],
@@ -545,6 +551,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
   /// 扣余额解锁
   Future<void> _performUnlockByBalance(UnlockProduct product) async {
+    final l10n = AppLocalizations.of(context);
     _setProcessing(product.goodsId, true);
 
     try {
@@ -568,7 +575,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         if (resp.isSuccess) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('解锁成功！'),
+              content: Text(l10n.unlockSuccess),
               backgroundColor: const Color(0xFFD9341C),
             ),
           );
@@ -580,7 +587,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           await coinNotifier.addCoins(product.price.toInt());
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(resp.error ?? '解锁失败'),
+              content: Text(resp.error ?? l10n.unlockFailed),
               backgroundColor: Colors.red,
             ),
           );
@@ -591,7 +598,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         _setProcessing(product.goodsId, false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('解锁失败: $e'),
+            content: Text('${l10n.unlockFailed}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -601,6 +608,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
   /// 通过Google Play购买解锁
   Future<void> _performUnlockByPurchase(UnlockProduct product) async {
+    final l10n = AppLocalizations.of(context);
     _setProcessing(product.goodsId, true);
 
     try {
@@ -615,8 +623,8 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         if (mounted) {
           _setProcessing(product.goodsId, false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('商品不可用，请稍后重试'),
+            SnackBar(
+              content: Text(l10n.productUnavailable),
               backgroundColor: Colors.red,
             ),
           );
@@ -644,7 +652,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('购买成功！'),
+              content: Text(l10n.purchaseSuccess),
               backgroundColor: const Color(0xFFD9341C),
             ),
           );
@@ -654,7 +662,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(paymentService.lastError ?? '购买失败'),
+              content: Text(paymentService.lastError ?? l10n.purchaseFailed),
               backgroundColor: Colors.red,
             ),
           );
@@ -665,7 +673,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         _setProcessing(product.goodsId, false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('购买失败: $e'),
+            content: Text('${l10n.purchaseFailed}: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -675,6 +683,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
   /// VIP商品 → 走Google Play订阅购买
   Future<void> _handleVipPurchase(UnlockProduct product) async {
+    final l10n = AppLocalizations.of(context);
     _setProcessing(product.goodsId, true);
 
     try {
@@ -698,8 +707,8 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         if (mounted) {
           _setProcessing(product.goodsId, false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('VIP商品不可用，请稍后重试'),
+            SnackBar(
+              content: Text(l10n.vipProductUnavailable),
               backgroundColor: Colors.red,
             ),
           );
@@ -719,7 +728,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('VIP订阅成功！'),
+              content: Text(l10n.vipSubscriptionSuccess),
               backgroundColor: const Color(0xFFD9341C),
             ),
           );
@@ -727,7 +736,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(paymentService.lastError ?? '订阅失败'),
+              content: Text(paymentService.lastError ?? l10n.vipSubscriptionFailed),
               backgroundColor: Colors.red,
             ),
           );
@@ -738,7 +747,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         _setProcessing(product.goodsId, false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('订阅失败: $e'),
+            content: Text('${l10n.vipSubscriptionFailed}: $e'),
             backgroundColor: Colors.red,
           ),
         );

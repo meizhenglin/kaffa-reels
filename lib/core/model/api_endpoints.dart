@@ -73,6 +73,11 @@ class ApiEndpoints {
   static const String userSignInfo = '/api/userSign/getSignInfo';
   static const String userSign = '/api/userSign/sign';
 
+  // ==================== 游戏模块 ====================
+  static const String gameBanner = '/api/game/banner';
+  static const String gameList = '/api/game/list';
+  static const String gameDetail = '/api/game/detail/{id}';
+
   // ==================== App 更新 ====================
   static const String queryVersionInfo = '/farmerApi/commons/v1/appVersion/queryVersionInfo';
 

@@ -10,6 +10,7 @@ import '../../home/pages/main_page.dart' show currentTabIndexProvider;
 import '../../auth/providers/auth_provider.dart'
     show AuthState, AuthStatus, authProvider;
 import '../../recommend/utils/drama_navigation.dart';
+import '../../payment/widgets/sign_and_coin_module.dart';
 import 'chat_page.dart';
 
 class ProfileTab extends ConsumerStatefulWidget {
@@ -120,6 +121,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
   }
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return GradientScaffold(
       body: SafeArea(
         child: Column(
@@ -131,12 +133,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                 children: [
                   IconButton(
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ChatPage(),
-                        ),
-                      );
+                      context.push('/profile/notifications');
                     },
                     icon: Image.asset(
                       'assets/images/notification.png',
@@ -168,7 +165,9 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                     const SizedBox(height: 27),
                     _buildVipBanner(context),
                     const SizedBox(height: 25),
-                    _buildFunctionIcons(context),
+                    const SignAndCoinModule(),
+                    const SizedBox(height: 25),
+                    _buildFunctionIcons(context, l10n),
                     const SizedBox(height: 100),
                   ],
                 ),
@@ -230,7 +229,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                user?.userNickname ?? 'Guest',
+                user?.userNickname ?? l10n.login,
                 style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -387,7 +386,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                 const SizedBox(height: 4),
                 Text(
                   isVip
-                      ? 'Validity Period：${_formatDate(user.membershipExpiryDate)}'
+                      ? l10n.validityPeriod(_formatDate(user.membershipExpiryDate))
                       : l10n.vipSubtitle,
                   style: const TextStyle(color: Color(0xFF3A1D00), fontSize: 12),
                 ),
@@ -443,7 +442,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                   ),
                 ),
                 child: Text(
-                  isVip ? 'Renewal' : l10n.activate,
+                  isVip ? l10n.renewal : l10n.activate,
                   style: const TextStyle(
                     color: Color(0xFFFFEDC6),
                     fontSize: 13,
@@ -461,28 +460,57 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
     context.push('/profile/report');
   }
 
-  Widget _buildFunctionIcons(BuildContext context) {
-    return Row(
-      textDirection: Directionality.of(context),
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildFunctionIcons(BuildContext context, AppLocalizations l10n) {
+    return Column(
       children: [
-        _buildIconButton(
-          context,
-          imagePath: 'assets/images/history.png',
-          label: 'Watching History',
-          onTap: () => context.push('/history'),
+        Row(
+          textDirection: Directionality.of(context),
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildIconButton(
+              context,
+              imagePath: 'assets/images/history.png',
+              label: l10n.watchHistory,
+              onTap: () => context.push('/history'),
+            ),
+            _buildIconButton(
+              context,
+              imagePath: 'assets/images/favourites.png',
+              label: l10n.favourites,
+              onTap: () => context.push('/profile/favorites'),
+            ),
+            _buildIconButton(
+              context,
+              imagePath: 'assets/images/share.png',
+              label: l10n.rechargeRecords,
+              onTap: () => context.push('/coin-records/recharge'),
+            ),
+          ],
         ),
-        _buildIconButton(
-          context,
-          imagePath: 'assets/images/favourites.png',
-          label: 'Favourites',
-          onTap: () => context.push('/profile/favorites'),
-        ),
-        _buildIconButton(
-          context,
-          imagePath: 'assets/images/report.png',
-          label: 'Complaint and Report',
-          onTap: _openComplaintAndReport,
+        const SizedBox(height: 18),
+        Row(
+          textDirection: Directionality.of(context),
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildIconButton(
+              context,
+              imagePath: 'assets/images/share.png',
+              label: l10n.usageRecords,
+              onTap: () => context.push('/coin-records/consume'),
+            ),
+            _buildIconButton(
+              context,
+              imagePath: 'assets/images/share.png',
+              label: l10n.giftRecords,
+              onTap: () => context.push('/coin-records/give'),
+            ),
+            _buildIconButton(
+              context,
+              imagePath: 'assets/images/report.png',
+              label: l10n.complaintAndReport,
+              onTap: _openComplaintAndReport,
+            ),
+          ],
         ),
       ],
     );
@@ -494,17 +522,27 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
     required String label,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Image.asset(imagePath, width: 44, height: 44),
-          const SizedBox(height: 12),
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white, fontSize: 12),
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          height: 70,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(imagePath, width: 44, height: 44),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

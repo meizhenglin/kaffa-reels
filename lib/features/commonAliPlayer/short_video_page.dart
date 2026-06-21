@@ -217,6 +217,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   bool _isLoading = true;
   String? _errorMessage;
   bool _isCurrentTabActive = false;
+  bool _isDataLoaded = false;
   ProviderSubscription<int>? _tabIndexSubscription;
   int? _pendingLockedEpisodeIndex;
   bool _showWatchNowOverlay = false;
@@ -262,7 +263,11 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         },
       );
     }
+  }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     _loadData();
   }
 
@@ -302,13 +307,14 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     if (widget.videoId.isEmpty) return;
 
     debugPrint('[$_tag] fetching by videoId=${widget.videoId}');
+    final l10n = AppLocalizations.of(context);
 
     try {
       final dirResp = await apiServiceProvider.getEpisodesDirectoryByVideoId(
         videoId: widget.videoId,
       );
       if (!dirResp.isSuccess || dirResp.data == null) {
-        _setError('无法加载剧集目录');
+        _setError(l10n.loadCatalogFailed);
         return;
       }
 
@@ -322,7 +328,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         pageSize: videoEpisodes,
       );
       if (!playResp.isSuccess || playResp.data is! List) {
-        _setError('无法加载视频地址');
+        _setError(l10n.loadVideoFailed);
         return;
       }
 
@@ -344,7 +350,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         ..sort((a, b) => a.serialNum.compareTo(b.serialNum));
 
       if (videos.isEmpty) {
-        _setError('该剧暂无可播放剧集');
+        _setError(l10n.noPlayableEpisodes);
         return;
       }
 
@@ -411,11 +417,13 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       });
     } catch (e) {
       debugPrint('[$_tag] fetchByVideoId error=$e');
-      _setError('加载失败：$e');
+      _setError(l10n.loadFailed);
     }
   }
 
   void _loadData() {
+    if (_isDataLoaded) return;
+    _isDataLoaded = true;
     _fetchByVideoId();
   }
 
@@ -635,9 +643,10 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           videoInfoList[index] = videoInfo.copyWith(isCanPlay: 1);
         });
         // 显示成功提示
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('解锁成功'),
+            content: Text(l10n.unlockSuccess),
             backgroundColor: Colors.green.shade400,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1178,6 +1187,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     if (_isLoading) {
       return Container(
         color: Colors.black,
@@ -1197,7 +1207,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
             const SizedBox(height: 16),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('返回', style: TextStyle(color: Colors.white)),
+              child: Text(l10n.back, style: const TextStyle(color: Colors.white)),
             ),
           ],
         ),
@@ -1422,7 +1432,7 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
   }
 
   Widget _buildReportButton(BuildContext context) {
-    final isArabic = Directionality.of(context) == TextDirection.rtl;
+    final l10n = AppLocalizations.of(context);
     return InkWell(
       onTap: widget.onReportTap,
       child: Padding(
@@ -1437,7 +1447,7 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
             ),
             const SizedBox(width: 4),
             Text(
-              isArabic ? 'تقرير' : 'Report',
+              l10n.report,
               style: const TextStyle(
                 fontWeight: FontWeight.w500,
                 fontSize: 13,

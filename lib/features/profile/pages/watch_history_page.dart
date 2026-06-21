@@ -113,14 +113,15 @@ class _WatchHistoryPageState extends ConsumerState<WatchHistoryPage> {
                   ? const Center(child: CircularProgressIndicator(color: Colors.white))
                   : _historyList.isEmpty
                       ? AppEmptyState(message: l10n.noDataAvailableAtTheMoment)
-                      : _buildHistoryList(),
+                      : _buildHistoryList(l10n),
             ),
           ],
         ),
       ),
     );
   }
-  Widget _buildHistoryList() {
+
+  Widget _buildHistoryList(AppLocalizations l10n) {
     final groupedHistory = <String, List<Map<String, dynamic>>>{};
 
     for (final item in _historyList) {
@@ -132,19 +133,19 @@ class _WatchHistoryPageState extends ConsumerState<WatchHistoryPage> {
           final now = DateTime.now();
           final diff = now.difference(dateTime);
           if (diff.inDays == 0) {
-            date = 'Today';
+            date = l10n.today;
           } else if (diff.inDays == 1) {
-            date = 'Yesterday';
+            date = l10n.yesterday;
           } else if (diff.inDays < 7) {
-            date = '${diff.inDays} days ago';
+            date = l10n.daysAgo(diff.inDays);
           } else {
             date = '${dateTime.day}/${dateTime.month}/${dateTime.year}';
           }
         } else {
-          date = 'Unknown';
+          date = l10n.unknown;
         }
       } else {
-        date = 'Unknown';
+        date = l10n.unknown;
       }
       groupedHistory.putIfAbsent(date, () => []);
       groupedHistory[date]!.add(item);

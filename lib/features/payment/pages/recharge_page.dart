@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../../l10n/app_localizations.dart';
 import '../providers/recharge_provider.dart';
 
 /// Recharge coins page (K币充值)
@@ -29,10 +30,11 @@ class _RechargePageState extends ConsumerState<RechargePage> {
   }
 
   Future<void> _handlePurchase(RechargeProduct product) async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Confirm Purchase'),
+        title: Text(l10n.confirmPurchase),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -46,17 +48,17 @@ class _RechargePageState extends ConsumerState<RechargePage> {
                   ),
             ),
             const SizedBox(height: 8),
-            Text('${product.totalAmount} coins'),
+            Text('${product.totalAmount} ${l10n.coins ?? 'coins'}'),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Purchase'),
+            child: Text(l10n.purchase),
           ),
         ],
       ),
@@ -71,13 +73,13 @@ class _RechargePageState extends ConsumerState<RechargePage> {
     if (success) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Purchase started, please wait...')),
+          SnackBar(content: Text(l10n.purchaseStarted)),
         );
       }
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to start purchase')),
+          SnackBar(content: Text(l10n.failedToStartPurchase)),
         );
       }
     }
@@ -85,6 +87,7 @@ class _RechargePageState extends ConsumerState<RechargePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final state = ref.watch(rechargeProductsProvider);
     final coinState = ref.watch(coinBalanceProvider);
 
@@ -111,9 +114,9 @@ class _RechargePageState extends ConsumerState<RechargePage> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'My Coins',
-                                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                                Text(
+                                  l10n.myCoins,
+                                  style: const TextStyle(color: Colors.white70, fontSize: 14),
                                 ),
                                 Text(
                                   '${coinState.balance}',
@@ -203,6 +206,7 @@ class _RechargePageState extends ConsumerState<RechargePage> {
   }
 
   Widget _buildProductCard(RechargeProduct product, bool isSelected, int index) {
+    final l10n = AppLocalizations.of(context);
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -238,9 +242,9 @@ class _RechargePageState extends ConsumerState<RechargePage> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const Text(
-              'Coins',
-              style: TextStyle(color: Colors.white70, fontSize: 12),
+            Text(
+              l10n.coins,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
             ),
             const SizedBox(height: 8),
             Container(

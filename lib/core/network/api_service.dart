@@ -666,8 +666,52 @@ class ApiService {
   }
 
   /// 用户签到
-  Future<ApiResponse> setUserSign() {
-    return request(ApiEndpoints.userSign, method: 'POST');
+  Future<ApiResponse> setUserSign({int? signGoodsId}) {
+    return request(
+      ApiEndpoints.userSign,
+      data: {
+        if (signGoodsId != null) 'signGoodsId': signGoodsId,
+      },
+      method: 'POST',
+    );
+  }
+
+  /// 游戏轮播图
+  Future<ApiResponse> getGameBanner({int position = 0}) {
+    return request(
+      ApiEndpoints.gameBanner,
+      data: {'position': position},
+      method: 'GET',
+    );
+  }
+
+  /// 游戏列表
+  Future<ApiResponse> getGameList({
+    int? categoryId,
+    int? gameType,
+    String? moduleType,
+    int page = 1,
+    int pageSize = 20,
+  }) {
+    return request(
+      ApiEndpoints.gameList,
+      data: {
+        if (categoryId != null) 'categoryId': categoryId,
+        if (gameType != null) 'gameType': gameType,
+        if (moduleType != null) 'moduleType': moduleType,
+        'page': page,
+        'pageSize': pageSize,
+      },
+      method: 'GET',
+    );
+  }
+
+  /// 游戏详情
+  Future<ApiResponse> getGameDetail({required String id}) {
+    return request(
+      ApiEndpoints.gameDetail.replaceFirst('{id}', id),
+      method: 'GET',
+    );
   }
 
   // ==================== UpdataModel App 更新 ====================

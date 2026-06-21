@@ -17,13 +17,15 @@ import '../../../core/storage/storage_service.dart';
 import '../models/user_model.dart';
 
 class AuthRepository {
-  AuthRepository(this._storage);
+  AuthRepository(this._storage, this._apiService);
 
   static const List<String> _googleScopes = <String>['email', 'profile'];
   static const String _googleServerClientId =
       '278933660671-jrqbp7tau6kofqgnar97qrat346uv0kp.apps.googleusercontent.com';
 
   final StorageService _storage;
+  final ApiService _apiService;
+  ApiService get apiService => _apiService;
   FirebaseAuth get _auth => FirebaseAuth.instance;
   GoogleSignInClient? _googleSignIn;
   final Logger _logger = Logger();
@@ -111,6 +113,25 @@ class AuthRepository {
       membershipType: cached?.membershipType ?? MembershipType.regular,
       membershipExpiryDate: cached?.membershipExpiryDate,
     );
+  }
+
+  Future<UserModel> _refreshVipStatusFromBackend(UserModel model) async {
+    try {
+      final resp = await apiService.getUserCenter();
+      if (resp.isSuccess && resp.data != null) {
+        final userCenterData = resp.data as Map<String, dynamic>;
+        final isVip = userCenterData['isVip'] as int? ?? 0;
+        final vipEndTime = userCenterData['vipEndTime'] as String?;
+        return model.copyWith(
+          membershipType: isVip == 1 ? MembershipType.premium : MembershipType.regular,
+          membershipExpiryDate: vipEndTime != null ? DateTime.tryParse(vipEndTime) : null,
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('[AuthRepo] Failed to refresh VIP status from backend: $e');
+      _logger.e('[AuthRepo] Failed to refresh VIP status from backend', error: e, stackTrace: stackTrace);
+    }
+    return model;
   }
 
   Future<void> warmUpGoogleSignIn() async {
@@ -469,10 +490,11 @@ class AuthRepository {
     _logger.i('[AuthRepo] Firebase ID token refresh completed in ${refreshStopwatch.elapsedMilliseconds}ms');
 
     final model = await _userModelFromFirebaseUser(user, refreshFirebaseIdToken: false);
-    await cacheUser(model);
+    final updatedModel = await _refreshVipStatusFromBackend(model);
+    await cacheUser(updatedModel);
     debugPrint('[GoogleLoginFlow] finished total=${stopwatch.elapsedMilliseconds}ms');
     _logger.i('[AuthRepo] Google sign-in finished in ${stopwatch.elapsedMilliseconds}ms');
-    return model;
+    return updatedModel;
   }
 
   Future<UserModel> signInWithApple() async {
@@ -531,8 +553,9 @@ class AuthRepository {
     }
 
     final model = await _userModelFromFirebaseUser(user);
-    await cacheUser(model);
-    return model;
+    final updatedModel = await _refreshVipStatusFromBackend(model);
+    await cacheUser(updatedModel);
+    return updatedModel;
   }
 
   Future<void> sendPasswordResetEmail(String email) async {
@@ -583,8 +606,9 @@ class AuthRepository {
     final user = _auth.currentUser;
     if (user == null) return null;
     final model = await _userModelFromFirebaseUser(user);
-    await cacheUser(model);
-    return model;
+    final updatedModel = await _refreshVipStatusFromBackend(model);
+    await cacheUser(updatedModel);
+    return updatedModel;
   }
 
   Future<UserModel?> resolveStoredUser() async {
@@ -603,8 +627,9 @@ class AuthRepository {
       return null;
     }
 
-    await cacheUser(user);
-    return user;
+    final updatedModel = await _refreshVipStatusFromBackend(user);
+    await cacheUser(updatedModel);
+    return updatedModel;
   }
 
   Future<void> saveLanguage(String languageCode) async {

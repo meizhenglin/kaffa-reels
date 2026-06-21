@@ -572,6 +572,30 @@ abstract class AppLocalizations {
   /// **'An unknown error occurred'**
   String get unknownError;
 
+  /// No description provided for @today.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get today;
+
+  /// No description provided for @yesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get yesterday;
+
+  /// No description provided for @daysAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} days ago'**
+  String daysAgo(int count);
+
+  /// No description provided for @unknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get unknown;
+
   /// No description provided for @requiredField.
   ///
   /// In en, this message translates to:
@@ -1471,6 +1495,564 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'All'**
   String get all;
+
+  /// No description provided for @renewal.
+  ///
+  /// In en, this message translates to:
+  /// **'Renewal'**
+  String get renewal;
+
+  /// No description provided for @favourites.
+  ///
+  /// In en, this message translates to:
+  /// **'Favourites'**
+  String get favourites;
+
+  /// No description provided for @giftRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift Records'**
+  String get giftRecords;
+
+  /// No description provided for @complaintAndReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Complaint and Report'**
+  String get complaintAndReport;
+
+  /// No description provided for @validityPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Validity Period: {date}'**
+  String validityPeriod(String date);
+
+  /// No description provided for @noRechargeRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'No recharge records'**
+  String get noRechargeRecords;
+
+  /// No description provided for @noUsageRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'No usage records'**
+  String get noUsageRecords;
+
+  /// No description provided for @noGiftRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'No gift records'**
+  String get noGiftRecords;
+
+  /// No description provided for @kCoinRecharge.
+  ///
+  /// In en, this message translates to:
+  /// **'K-Coin Recharge'**
+  String get kCoinRecharge;
+
+  /// No description provided for @kCoinUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'K-Coin Used'**
+  String get kCoinUsed;
+
+  /// No description provided for @kCoinGift.
+  ///
+  /// In en, this message translates to:
+  /// **'K-Coin Gift'**
+  String get kCoinGift;
+
+  /// No description provided for @kCoinTransaction.
+  ///
+  /// In en, this message translates to:
+  /// **'K-Coin Transaction'**
+  String get kCoinTransaction;
+
+  /// No description provided for @todaysReward.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'s Reward'**
+  String get todaysReward;
+
+  /// No description provided for @weeklyRewards.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly Rewards'**
+  String get weeklyRewards;
+
+  /// No description provided for @signRule1.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in daily to earn K-coins'**
+  String get signRule1;
+
+  /// No description provided for @signRule2.
+  ///
+  /// In en, this message translates to:
+  /// **'Consecutive sign-ins unlock more rewards'**
+  String get signRule2;
+
+  /// No description provided for @signRule3.
+  ///
+  /// In en, this message translates to:
+  /// **'Rewards reset weekly'**
+  String get signRule3;
+
+  /// No description provided for @rules.
+  ///
+  /// In en, this message translates to:
+  /// **'Rules'**
+  String get rules;
+
+  /// No description provided for @confirmPurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Purchase'**
+  String get confirmPurchase;
+
+  /// No description provided for @purchaseStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase started, please wait...'**
+  String get purchaseStarted;
+
+  /// No description provided for @failedToStartPurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to start purchase'**
+  String get failedToStartPurchase;
+
+  /// No description provided for @pay.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay'**
+  String get pay;
+
+  /// No description provided for @purchaseSuccessful.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase successful! Coins added.'**
+  String get purchaseSuccessful;
+
+  /// No description provided for @selected.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected'**
+  String get selected;
+
+  /// No description provided for @select.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get select;
+
+  /// No description provided for @myCoins.
+  ///
+  /// In en, this message translates to:
+  /// **'My Coins'**
+  String get myCoins;
+
+  /// No description provided for @getCoins.
+  ///
+  /// In en, this message translates to:
+  /// **'Get Coins'**
+  String get getCoins;
+
+  /// No description provided for @watchPremiumContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Watch premium content'**
+  String get watchPremiumContent;
+
+  /// No description provided for @alreadySubscribed.
+  ///
+  /// In en, this message translates to:
+  /// **'Already Subscribed'**
+  String get alreadySubscribed;
+
+  /// No description provided for @chargingAgreement.
+  ///
+  /// In en, this message translates to:
+  /// **'By recharging, you accept the: Recharge Rules Agreement'**
+  String get chargingAgreement;
+
+  /// No description provided for @chargingRule1.
+  ///
+  /// In en, this message translates to:
+  /// **'1. K-points and membership are virtual goods and cannot be refunded once purchased;'**
+  String get chargingRule1;
+
+  /// No description provided for @chargingRule2.
+  ///
+  /// In en, this message translates to:
+  /// **'2. Minors under 18 should perform paid operations under the guidance of guardians;'**
+  String get chargingRule2;
+
+  /// No description provided for @chargingRule3.
+  ///
+  /// In en, this message translates to:
+  /// **'3. K-points and membership are only valid for use in this APP, you can watch directly after recharging.'**
+  String get chargingRule3;
+
+  /// No description provided for @confirmUnlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Unlock'**
+  String get confirmUnlock;
+
+  /// No description provided for @confirmUnlockMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to spend {coins} K Coin to unlock \"{title}\"?'**
+  String confirmUnlockMessage(int coins, String title);
+
+  /// No description provided for @insufficientBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Insufficient Balance'**
+  String get insufficientBalance;
+
+  /// No description provided for @insufficientBalanceMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your K Coin balance is insufficient. Would you like to purchase \"{title}\" via Google Play?'**
+  String insufficientBalanceMessage(String title);
+
+  /// No description provided for @unlockSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock successful!'**
+  String get unlockSuccess;
+
+  /// No description provided for @unlockFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock failed'**
+  String get unlockFailed;
+
+  /// No description provided for @unlockToContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock to Continue'**
+  String get unlockToContinue;
+
+  /// No description provided for @productUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Product unavailable, please try again later'**
+  String get productUnavailable;
+
+  /// No description provided for @purchaseSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase successful!'**
+  String get purchaseSuccess;
+
+  /// No description provided for @purchaseFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase failed'**
+  String get purchaseFailed;
+
+  /// No description provided for @vipProductUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'VIP product unavailable, please try again later'**
+  String get vipProductUnavailable;
+
+  /// No description provided for @vipSubscriptionSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'VIP subscription successful!'**
+  String get vipSubscriptionSuccess;
+
+  /// No description provided for @vipSubscriptionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscription failed'**
+  String get vipSubscriptionFailed;
+
+  /// No description provided for @dailyCheckIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily Check-in'**
+  String get dailyCheckIn;
+
+  /// No description provided for @consecutiveDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Consecutive {days} days'**
+  String consecutiveDays(int days);
+
+  /// No description provided for @signInDailyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in daily to earn rewards'**
+  String get signInDailyHint;
+
+  /// No description provided for @signed.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed'**
+  String get signed;
+
+  /// No description provided for @viewAllRewards.
+  ///
+  /// In en, this message translates to:
+  /// **'View all rewards'**
+  String get viewAllRewards;
+
+  /// No description provided for @signInSuccessful.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign-in successful! +{coins} coins'**
+  String signInSuccessful(int coins);
+
+  /// No description provided for @day.
+  ///
+  /// In en, this message translates to:
+  /// **'Day {day}'**
+  String day(int day);
+
+  /// No description provided for @getReward.
+  ///
+  /// In en, this message translates to:
+  /// **'Get {coins} K-coins'**
+  String getReward(int coins);
+
+  /// No description provided for @close.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get close;
+
+  /// No description provided for @allRewards.
+  ///
+  /// In en, this message translates to:
+  /// **'All Rewards'**
+  String get allRewards;
+
+  /// No description provided for @signedToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed Today!'**
+  String get signedToday;
+
+  /// No description provided for @notSignedYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not Signed Yet'**
+  String get notSignedYet;
+
+  /// No description provided for @consecutiveDaysLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Consecutive Days'**
+  String get consecutiveDaysLabel;
+
+  /// No description provided for @balance.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance'**
+  String get balance;
+
+  /// No description provided for @recharge.
+  ///
+  /// In en, this message translates to:
+  /// **'Recharge'**
+  String get recharge;
+
+  /// No description provided for @rechargeRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'Recharge Records'**
+  String get rechargeRecords;
+
+  /// No description provided for @usageRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage Records'**
+  String get usageRecords;
+
+  /// No description provided for @kCoinRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'K-Coin Records'**
+  String get kCoinRecords;
+
+  /// No description provided for @rechargeHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'View your K-Coin recharge history'**
+  String get rechargeHistory;
+
+  /// No description provided for @spendingHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'View your K-Coin spending history'**
+  String get spendingHistory;
+
+  /// No description provided for @giftHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'View your K-Coin gift history'**
+  String get giftHistory;
+
+  /// No description provided for @rechargeTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Recharge'**
+  String get rechargeTab;
+
+  /// No description provided for @usageTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage'**
+  String get usageTab;
+
+  /// No description provided for @giftTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Gift'**
+  String get giftTab;
+
+  /// No description provided for @back.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get back;
+
+  /// No description provided for @report.
+  ///
+  /// In en, this message translates to:
+  /// **'Report'**
+  String get report;
+
+  /// No description provided for @pageNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Page not found'**
+  String get pageNotFound;
+
+  /// No description provided for @loadCatalogFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load catalog'**
+  String get loadCatalogFailed;
+
+  /// No description provided for @loadVideoFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load video'**
+  String get loadVideoFailed;
+
+  /// No description provided for @noPlayableEpisodes.
+  ///
+  /// In en, this message translates to:
+  /// **'No playable episodes'**
+  String get noPlayableEpisodes;
+
+  /// No description provided for @loadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load'**
+  String get loadFailed;
+
+  /// No description provided for @coins.
+  ///
+  /// In en, this message translates to:
+  /// **'coins'**
+  String get coins;
+
+  /// No description provided for @purchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase'**
+  String get purchase;
+
+  /// No description provided for @episodePrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Episode Price'**
+  String get episodePrice;
+
+  /// No description provided for @accountBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Balance'**
+  String get accountBalance;
+
+  /// No description provided for @noProductsAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No products available'**
+  String get noProductsAvailable;
+
+  /// No description provided for @limitedOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'Limited Offer'**
+  String get limitedOffer;
+
+  /// No description provided for @bestValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Best Value'**
+  String get bestValue;
+
+  /// No description provided for @buy.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy'**
+  String get buy;
+
+  /// No description provided for @contentIssue.
+  ///
+  /// In en, this message translates to:
+  /// **'Content issue'**
+  String get contentIssue;
+
+  /// No description provided for @playbackProblem.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback problem'**
+  String get playbackProblem;
+
+  /// No description provided for @copyrightConcern.
+  ///
+  /// In en, this message translates to:
+  /// **'Copyright concern'**
+  String get copyrightConcern;
+
+  /// No description provided for @other.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get other;
+
+  /// No description provided for @pleaseEnterFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter your feedback'**
+  String get pleaseEnterFeedback;
+
+  /// No description provided for @failedToSubmitFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to submit feedback'**
+  String get failedToSubmitFeedback;
+
+  /// No description provided for @submitReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit Report'**
+  String get submitReport;
+
+  /// No description provided for @submitting.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitting...'**
+  String get submitting;
 }
 
 class _AppLocalizationsDelegate

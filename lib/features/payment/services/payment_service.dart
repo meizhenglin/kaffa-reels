@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
-import 'package:in_app_purchase_android/billing_client_wrappers.dart' show ProductType, ReplacementMode;
+import 'package:in_app_purchase_android/billing_client_wrappers.dart' show ProductType;
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Local storage helper for caching purchase state
@@ -179,15 +179,6 @@ class PaymentService {
   Future<bool> purchase({
     required ProductDetails product,
     String? applicationUserName,
-    /// Existing purchase to upgrade/downgrade from
-    PurchaseDetails? oldPurchaseDetails,
-    /// Replacement mode for subscription changes (Android only)
-    ReplacementMode replacementMode = ReplacementMode.withTimeProration,
-    /// Whether to query for existing purchases for upgrade/downgrade
-    /// Set to false when user is buying the same product (e.g., retry after cancel)
-    bool checkForExistingPurchases = true,
-    /// Force a fresh Google Play query instead of using cached purchases.
-    bool forceRefreshCache = false,
     /// Timeout duration for purchase flow (default 120 seconds)
     Duration purchaseTimeout = const Duration(seconds: 120),
   }) async {
@@ -203,94 +194,12 @@ class PaymentService {
     }
 
     try {
-      final isAndroid = defaultTargetPlatform == TargetPlatform.android;
-
-      debugPrint(
-        '[PaymentService] purchase() called, _pastPurchases count: ${_pastPurchases.length}, '
-        'checkForExisting=$checkForExistingPurchases, forceRefresh=$forceRefreshCache',
-      );
-
-      PurchaseDetails? cachedOldPurchase = oldPurchaseDetails;
-
-      if (isAndroid && cachedOldPurchase == null && checkForExistingPurchases) {
-        debugPrint('[PaymentService] Checking for existing purchases...');
-
-        if (forceRefreshCache) {
-          debugPrint('[PaymentService] Force refreshing purchase cache');
-          clearCachedPurchases();
-        }
-
-        final candidates = <PurchaseDetails>[];
-
-        if (_pastPurchases.isNotEmpty && !forceRefreshCache) {
-          debugPrint('[PaymentService] Found ${_pastPurchases.length} cached purchases');
-          candidates.addAll(
-            _pastPurchases.where((purchase) {
-              final active = purchase.status == PurchaseStatus.purchased ||
-                  purchase.status == PurchaseStatus.restored;
-              debugPrint(
-                '[PaymentService] Cached purchase: ${purchase.productID}, status: ${purchase.status}, active=$active',
-              );
-              return active && purchase.productID != product.id;
-            }),
-          );
-        }
-
-        if (candidates.isEmpty) {
-          debugPrint('[PaymentService] No cached purchases found, querying...');
-          try {
-            final androidAddition = _inAppPurchase.getPlatformAddition<
-                InAppPurchaseAndroidPlatformAddition>();
-            final response = await androidAddition.queryPastPurchases(
-              applicationUserName: _resolveUserId(),
-            );
-            debugPrint(
-              '[PaymentService] queryPastPurchases returned ${response.pastPurchases.length} purchases',
-            );
-            for (final p in response.pastPurchases) {
-              cachePastPurchase(p);
-              debugPrint(
-                '[PaymentService] Past purchase: ${p.productID}, status: ${p.status}',
-              );
-              final active = p.status == PurchaseStatus.purchased ||
-                  p.status == PurchaseStatus.restored;
-              if (active && p.productID != product.id) {
-                candidates.add(p);
-              }
-            }
-          } catch (e) {
-            debugPrint('[PaymentService] queryPastPurchases error: $e');
-            clearCachedPurchases();
-            _lastError = 'Purchase failed: unable to load purchase history';
-            _onPurchaseError?.call('Purchase failed: unable to load purchase history');
-            return false;
-          }
-        }
-
-        if (candidates.isNotEmpty) {
-          cachedOldPurchase = _pickBestOldPurchase(candidates);
-          debugPrint(
-            '[PaymentService] Selected for upgrade: ${cachedOldPurchase!.productID}',
-          );
-        }
-      } else if (!checkForExistingPurchases) {
-        debugPrint('[PaymentService] Skipping existing purchase check for fresh buy');
-      }
-
-      if (isAndroid && cachedOldPurchase != null) {
-        if (cachedOldPurchase.productID == product.id) {
-          debugPrint(
-            '[PaymentService] Ignoring same-product old purchase to avoid ITEM_ALREADY_OWNED',
-          );
-          cachedOldPurchase = null;
-        }
-      }
+      debugPrint('[PaymentService] purchase() called for ${product.id}');
 
       final completer = Completer<bool>();
       _pendingPurchaseCompleter = completer;
       _pendingPurchaseProductId = product.id;
 
-      // Add timeout to prevent infinite waiting
       Timer? timeoutTimer;
       timeoutTimer = Timer(purchaseTimeout, () {
         if (!completer.isCompleted) {
@@ -312,86 +221,28 @@ class PaymentService {
         _pendingPurchaseProductId = null;
       }
 
-      if (isAndroid && cachedOldPurchase != null) {
-        final googlePlayDetails = product as GooglePlayProductDetails;
-        final oldGooglePurchase = cachedOldPurchase as GooglePlayPurchaseDetails;
+      final purchaseParam = PurchaseParam(
+        productDetails: product,
+        applicationUserName: applicationUserName,
+      );
 
-        ReplacementMode effectiveReplacementMode = replacementMode;
-        if (_isDowngrade(googlePlayDetails, oldGooglePurchase)) {
-          effectiveReplacementMode = ReplacementMode.deferred;
-          debugPrint(
-            '[PaymentService] Downgrade detected from ${oldGooglePurchase.productID} '
-            'to ${googlePlayDetails.id}, using deferred replacement',
-          );
-        } else {
-          debugPrint(
-            '[PaymentService] Upgrade detected from ${oldGooglePurchase.productID} '
-            'to ${googlePlayDetails.id}',
-          );
+      debugPrint('[PaymentService] Launching purchase for ${product.id}');
+
+      try {
+        await _inAppPurchase.buyNonConsumable(
+          purchaseParam: purchaseParam,
+        );
+      } catch (e) {
+        final message = e.toString();
+        debugPrint('[PaymentService] buyNonConsumable error: $message');
+        if (message.contains('ITEM_ALREADY_OWNED')) {
+          debugPrint('[PaymentService] Detected ITEM_ALREADY_OWNED, clearing cache');
+          clearCachedPurchases();
         }
-
-        final changeSubscriptionParam = ChangeSubscriptionParam(
-          oldPurchaseDetails: oldGooglePurchase,
-          replacementMode: effectiveReplacementMode,
-        );
-
-        final purchaseParam = GooglePlayPurchaseParam(
-          productDetails: googlePlayDetails,
-          applicationUserName: applicationUserName,
-          changeSubscriptionParam: changeSubscriptionParam,
-        );
-
-        debugPrint(
-          '[PaymentService] Launching subscription change from ${oldGooglePurchase.productID} '
-          'to ${googlePlayDetails.id} with mode=$effectiveReplacementMode',
-        );
-
-        try {
-          await _inAppPurchase.buyNonConsumable(
-            purchaseParam: purchaseParam,
-          );
-        } catch (e) {
-          final message = e.toString();
-          debugPrint('[PaymentService] buyNonConsumable error: $message');
-          if (message.contains('ITEM_ALREADY_OWNED')) {
-            debugPrint(
-              '[PaymentService] Detected ITEM_ALREADY_OWNED, clearing cache and refreshing purchase state',
-            );
-            clearCachedPurchases();
-          }
-          _lastError = 'Purchase failed: $message';
-          _onPurchaseError?.call('Purchase failed: $message');
-          await finalizePendingPurchase();
-          return completer.future;
-        }
-      } else {
-        final purchaseParam = PurchaseParam(
-          productDetails: product,
-          applicationUserName: applicationUserName,
-        );
-
-        debugPrint(
-          '[PaymentService] Launching normal purchase for ${product.id}',
-        );
-
-        try {
-          await _inAppPurchase.buyNonConsumable(
-            purchaseParam: purchaseParam,
-          );
-        } catch (e) {
-          final message = e.toString();
-          debugPrint('[PaymentService] buyNonConsumable error: $message');
-          if (message.contains('ITEM_ALREADY_OWNED')) {
-            debugPrint(
-              '[PaymentService] Detected ITEM_ALREADY_OWNED on normal purchase, clearing cache',
-            );
-            clearCachedPurchases();
-          }
-          _lastError = 'Purchase failed: $message';
-          _onPurchaseError?.call('Purchase failed: $message');
-          await finalizePendingPurchase();
-          return completer.future;
-        }
+        _lastError = 'Purchase failed: $message';
+        _onPurchaseError?.call('Purchase failed: $message');
+        await finalizePendingPurchase();
+        return completer.future;
       }
 
       return completer.future;
@@ -404,80 +255,6 @@ class PaymentService {
       return Future.value(false);
     }
   }
-
-  static int _subscriptionPriority(ProductDetails product) {
-    final id = product.id.toLowerCase();
-    if (id.contains('year')) {
-      return 3;
-    }
-    if (id.contains('quarter') || id.contains('season')) {
-      return 2;
-    }
-    if (id.contains('month')) {
-      return 1;
-    }
-    return 0;
-  }
-
-  static int _subscriptionPriorityById(String productId) {
-    final id = productId.toLowerCase();
-    if (id.contains('year')) {
-      return 3;
-    }
-    if (id.contains('quarter') || id.contains('season')) {
-      return 2;
-    }
-    if (id.contains('month')) {
-      return 1;
-    }
-    return 0;
-  }
-
-  bool _isDowngrade(ProductDetails newProduct, PurchaseDetails oldPurchase) {
-    return _subscriptionPriority(newProduct) <
-        _subscriptionPriorityById(oldPurchase.productID);
-  }
-
-  PurchaseDetails? _pickBestOldPurchase(List<PurchaseDetails> candidates) {
-    if (candidates.isEmpty) return null;
-
-    final autoRenewing = <PurchaseDetails>[];
-    final nonRenewing = <PurchaseDetails>[];
-
-    for (final purchase in candidates) {
-      final isAutoRenewing = purchase is GooglePlayPurchaseDetails
-          ? purchase.billingClientPurchase.isAutoRenewing
-          : null;
-      debugPrint(
-        '[PaymentService] Candidate ${purchase.productID} autoRenewing=$isAutoRenewing',
-      );
-
-      if (isAutoRenewing == true) {
-        autoRenewing.add(purchase);
-      } else {
-        nonRenewing.add(purchase);
-      }
-    }
-
-    final pool = autoRenewing.isNotEmpty ? autoRenewing : candidates;
-
-    pool.sort(
-      (a, b) {
-        final aTime = a is GooglePlayPurchaseDetails
-            ? a.billingClientPurchase.purchaseTime
-            : 0;
-        final bTime = b is GooglePlayPurchaseDetails
-            ? b.billingClientPurchase.purchaseTime
-            : 0;
-        return bTime.compareTo(aTime);
-      },
-    );
-
-    return pool.first;
-  }
-
-  /// Cached past purchases for upgrade/downgrade scenarios
-  final List<PurchaseDetails> _pastPurchases = [];
 
   /// User ID for purchase association
   String? _userId;
@@ -502,40 +279,20 @@ class PaymentService {
     return _subscriptionTypeToProductId[subscriptionType];
   }
 
-  /// Store past purchase for later use in upgrades.
+  /// Store purchase in cache
   void cachePastPurchase(PurchaseDetails purchase) {
-    _pastPurchases.removeWhere((p) => p.productID == purchase.productID);
-    _pastPurchases.add(purchase);
-
     _cachedPurchases.removeWhere((p) => p.productID == purchase.productID);
     _cachedPurchases.add(purchase);
   }
 
   /// Get cached purchase for a specific product type
-  /// Get the cached purchase for a specific subscription type
-  /// Uses productId mapping to find the correct purchase
   PurchaseDetails? getCachedPurchase(String subscriptionType) {
-    // First try to match by productId mapping
     final expectedProductId = _subscriptionTypeToProductId[subscriptionType];
     if (expectedProductId != null) {
-      for (final purchase in _pastPurchases) {
+      for (final purchase in _cachedPurchases) {
         if (purchase.productID == expectedProductId &&
             (purchase.status == PurchaseStatus.purchased ||
                 purchase.status == PurchaseStatus.restored)) {
-          return purchase;
-        }
-      }
-    }
-
-    // Fallback: try to match by name contains (for backwards compatibility)
-    for (final purchase in _pastPurchases) {
-      if (purchase.status == PurchaseStatus.purchased ||
-          purchase.status == PurchaseStatus.restored) {
-        final productId = purchase.productID.toLowerCase();
-        final type = subscriptionType.toLowerCase();
-        if ((type.contains('month') && productId.contains('month')) ||
-            (type.contains('quarter') && productId.contains('quarter')) ||
-            (type.contains('year') && productId.contains('year'))) {
           return purchase;
         }
       }
@@ -600,8 +357,7 @@ class PaymentService {
     }
   }
 
-  /// Query existing purchases from Google Play (for upgrade/downgrade)
-  /// Returns list of active purchases that can be used for subscription changes
+  /// Query existing purchases from Google Play
   Future<List<PurchaseDetails>> queryExistingPurchases({bool forceRefresh = false}) async {
     if (!forceRefresh &&
         _cachedPurchases.isNotEmpty &&
@@ -624,7 +380,6 @@ class PaymentService {
       final androidAddition = _inAppPurchase.getPlatformAddition<
           InAppPurchaseAndroidPlatformAddition>();
 
-      // Query all purchases including expired ones
       final response = await androidAddition.queryPastPurchases(
         applicationUserName: _resolveUserId(),
       );
@@ -633,13 +388,8 @@ class PaymentService {
         return _cachedPurchases.isNotEmpty ? _cachedPurchases : [];
       }
 
-      // Update cache
       _cachedPurchases = response.pastPurchases;
       _lastPurchaseQueryTime = DateTime.now();
-
-      for (final purchase in response.pastPurchases) {
-        cachePastPurchase(purchase);
-      }
 
       return response.pastPurchases;
     } catch (e) {
@@ -769,7 +519,6 @@ class PaymentService {
   /// Clear cached purchases - needed when user cancels and wants to buy again
   void clearCachedPurchases() {
     _cachedPurchases.clear();
-    _pastPurchases.clear();
     _lastPurchaseQueryTime = null;
     debugPrint('[PaymentService] Cached purchases cleared');
   }

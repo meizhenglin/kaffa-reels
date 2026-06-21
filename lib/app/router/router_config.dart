@@ -18,13 +18,22 @@ import '../../features/home/pages/main_page.dart';
 import '../../features/home/models/navigation_item.dart';
 import '../../features/payment/pages/membership_page.dart';
 import '../../features/payment/pages/recharge_page.dart';
+import '../../features/payment/pages/coin_records_list_page.dart';
+import '../../features/payment/pages/coin_recharge_page.dart';
+import '../../features/payment/pages/recharge_records_page.dart';
+import '../../features/payment/pages/consume_records_page.dart';
+import '../../features/payment/pages/give_records_page.dart';
+import '../../features/payment/pages/sign_page.dart';
 import '../../features/profile/pages/profile_tab.dart';
+import '../../features/profile/pages/chat_page.dart';
 import '../../features/profile/pages/settings_page.dart';
 import '../../features/profile/pages/change_name_page.dart';
 import '../../features/profile/pages/personal_info_page.dart';
 import '../../features/profile/pages/history_page.dart';
 import '../../features/profile/pages/favorites_page.dart';
 import '../../features/profile/pages/report_page.dart';
+import '../../features/games/pages/games_tab.dart';
+import '../../features/games/pages/game_detail_page.dart';
 import '../../features/recommend/models/drama_list_type.dart';
 import '../../features/recommend/pages/recommend_tab.dart';
 import '../../features/home/pages/drama_list_page.dart';
@@ -244,6 +253,41 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
 
+          // ----- 游戏 Tab -----
+          StatefulShellBranch(
+            navigatorKey: shellNavigatorGamesKey,
+            routes: [
+              GoRoute(
+                path: '/games',
+                name: 'games',
+                pageBuilder: (context, state) => const NoTransitionPage(
+                  child: GamesTab(),
+                ),
+                routes: [
+                  /// 游戏详情页
+                  /// 【路径】/games/detail/:gameId
+                  /// 【参数】
+                  /// - gameId: 游戏ID（路径参数）
+                  /// - extra: 可选，{'gameName': 游戏名称}
+                  GoRoute(
+                    parentNavigatorKey: rootNavigatorKey,
+                    path: 'detail/:id',
+                    name: 'game-detail',
+                    builder: (context, state) {
+                      final id = state.pathParameters['id'] ?? '';
+                      final extra = state.extra as Map<String, dynamic>?;
+                      final gameName = extra?['gameName'] as String?;
+                      return GameDetailPage(
+                        id: id,
+                        gameName: gameName,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+
           // ----- 我的 Tab -----
           StatefulShellBranch(
             navigatorKey: shellNavigatorProfileKey,
@@ -255,6 +299,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                   child: ProfileTab(),
                 ),
                 routes: [
+                  GoRoute(
+                    parentNavigatorKey: rootNavigatorKey,
+                    path: 'notifications',
+                    name: 'profile-notifications',
+                    builder: (context, state) => const ChatPage(),
+                  ),
                   GoRoute(
                     parentNavigatorKey: rootNavigatorKey,
                     path: 'settings',
@@ -475,6 +525,63 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/history',
         name: 'history',
         builder: (context, state) => const HistoryPage(),
+      ),
+
+      /// K币记录列表页面
+      /// 【路径】/coin-records
+      /// 【功能】显示充值/消费/赠送三个选项
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/coin-records',
+        name: 'coin-records',
+        builder: (context, state) => const CoinRecordsListPage(),
+      ),
+
+      /// K币充值商品列表页面
+      /// 【路径】/coin-recharge
+      /// 【功能】显示K币充值套餐
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/coin-recharge',
+        name: 'coin-recharge',
+        builder: (context, state) => const CoinRechargePage(),
+      ),
+
+      /// K币充值记录页面
+      /// 【路径】/coin-records/recharge
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/coin-records/recharge',
+        name: 'coin-records-recharge',
+        builder: (context, state) => const RechargeRecordsPage(),
+      ),
+
+      /// K币消费记录页面
+      /// 【路径】/coin-records/consume
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/coin-records/consume',
+        name: 'coin-records-consume',
+        builder: (context, state) => const ConsumeRecordsPage(),
+      ),
+
+      /// K币赠送记录页面
+      /// 【路径】/coin-records/give
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/coin-records/give',
+        name: 'coin-records-give',
+        builder: (context, state) => const GiveRecordsPage(),
+      ),
+
+      /// 签到页面
+      /// 【路径】/sign
+      /// 【功能】显示签到配置和用户签到信息
+      GoRoute(
+        parentNavigatorKey: rootNavigatorKey,
+        path: '/sign',
+        name: 'sign',
+        builder: (context, state) => const SignPage(),
       ),
     ],
 

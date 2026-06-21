@@ -65,6 +65,7 @@ class NavigationConfig {
     '/', // 首页
     '/explore', // 发现
     '/recommend', // 推荐
+    '/games', // 游戏
     '/profile', // 我的
   ];
 
@@ -73,6 +74,7 @@ class NavigationConfig {
     'home',
     'explore',
     'recommend',
+    'games',
     'profile',
   ];
 
@@ -82,9 +84,7 @@ class NavigationConfig {
   static List<NavigationItem> items(AppLocalizations l10n) => [
     NavigationItem(
       id: 'home',
-      titleBuilder: (_) => 'Main Page',
-      // icon: const Icon(Icons.home_outlined, size: 24),
-      // icon: const Image.asset('assets/images/mainPage_icon.png', width: 24, height: 24),
+      titleBuilder: (l) => l.home,
       icon: Image(
         image: AssetImage('assets/images/mainPage_icon.png'),
         width: 24,
@@ -118,7 +118,7 @@ class NavigationConfig {
     NavigationItem(
       id: 'recommend',
       titleBuilder: (l) => l.recommended,
-       icon: Image(
+      icon: Image(
         image: AssetImage('assets/images/recommend_icon.png'),
         width: 24,
         height: 24,
@@ -130,6 +130,22 @@ class NavigationConfig {
         height: 24,
       ),
       routePath: '/recommend',
+    ),
+    NavigationItem(
+      id: 'games',
+      titleBuilder: (l) => l.games,
+      icon: Image(
+        image: AssetImage('assets/images/game_icon.png'),
+        width: 24,
+        height: 24,
+      ),
+
+      activeIcon: Image(
+        image: AssetImage('assets/images/game_icon_active.png'),
+        width: 24,
+        height: 24,
+      ),
+      routePath: '/games',
     ),
     NavigationItem(
       id: 'profile',
