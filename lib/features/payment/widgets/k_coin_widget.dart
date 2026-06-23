@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../features/auth/providers/auth_provider.dart';
+import '../../../features/recommend/utils/drama_navigation.dart';
 import '../../../l10n/app_localizations.dart';
 import '../providers/coin_record_provider.dart';
 
@@ -130,7 +132,15 @@ class _KCoinWidgetState extends ConsumerState<KCoinWidget> {
                 child: _QuickActionButton(
                   icon: Icons.add_circle_outline,
                   label: l10n.recharge,
-                  onTap: () => context.push('/recharge'),
+                  onTap: () {
+                    // 游客不能充值
+                    final authState = ref.read(authProvider);
+                    if (!authState.isAuthenticated || (authState.user?.isTourist ?? true)) {
+                      openMembershipPage(context, ref);
+                      return;
+                    }
+                    context.push('/recharge');
+                  },
                 ),
               ),
               const SizedBox(width: 8),

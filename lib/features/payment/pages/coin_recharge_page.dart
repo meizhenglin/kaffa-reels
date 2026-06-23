@@ -5,9 +5,12 @@ import 'package:go_router/go_router.dart';
 import '../../../app/widgets/app_empty_state.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../../features/auth/providers/auth_provider.dart';
+import '../../../features/recommend/utils/drama_navigation.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/models/home_card_layout.dart';
 import '../models/recharge_product.dart';
+import '../providers/coin_record_provider.dart';
 import '../providers/membership_provider.dart';
 
 /// K-Coin recharge products page
@@ -33,6 +36,13 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
 
   Future<void> _handlePurchase(RechargeProduct product) async {
     final l10n = AppLocalizations.of(context);
+    
+    // 游客不能充值K币
+    final authState = ref.read(authProvider);
+    if (!authState.isAuthenticated || (authState.user?.isTourist ?? true)) {
+      await openMembershipPage(context, ref);
+      return;
+    }
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -94,6 +104,8 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
             backgroundColor: const Color(0xFF4CAF50),
           ),
         );
+        // 刷新余额
+        await ref.read(coinBalanceInfoProvider.notifier).load();
       }
     } finally {
       if (mounted) {

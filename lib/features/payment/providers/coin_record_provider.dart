@@ -51,6 +51,26 @@ class CoinBalanceNotifier extends StateNotifier<CoinBalance> {
       giveAmount: state.giveAmount,
     );
   }
+
+  /// Deduct coins locally
+  void deductCoins(int amount) {
+    state = CoinBalance(
+      balance: (state.balance - amount).clamp(0, state.balance),
+      rechargeAmount: state.rechargeAmount,
+      consumeAmount: state.consumeAmount + amount,
+      giveAmount: state.giveAmount,
+    );
+  }
+
+  /// Add coins locally (for refund)
+  void addCoins(int amount) {
+    state = CoinBalance(
+      balance: state.balance + amount,
+      rechargeAmount: state.rechargeAmount,
+      consumeAmount: state.consumeAmount,
+      giveAmount: state.giveAmount,
+    );
+  }
 }
 
 /// Recharge records provider

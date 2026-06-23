@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../models/unlock_product.dart';
-import '../providers/recharge_provider.dart';
+import '../providers/coin_record_provider.dart';
 import '../services/payment_service.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../core/network/api_service.dart';
@@ -88,28 +89,40 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   @override
   void initState() {
     super.initState();
+    // 从API加载K币余额
+    Future.microtask(() {
+      ref.read(coinBalanceInfoProvider.notifier).load();
+    });
   }
 
-  int get _userBalance => ref.read(coinBalanceProvider).balance;
+  int get _userBalance => ref.watch(coinBalanceInfoProvider).balance;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final mediaQuery = MediaQuery.of(context);
+    final bottomPadding = mediaQuery.viewInsets.bottom > 0
+        ? mediaQuery.viewInsets.bottom
+        : mediaQuery.padding.bottom + 16;
     return Container(
       decoration: const BoxDecoration(
         color: Color(0xFFFFF5F0),
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildTopDecoration(),
-          _buildTitleSection(l10n),
-          _buildPriceInfoRow(l10n),
-          _buildProductsGrid(l10n),
-          _buildAgreementText(),
-          const SizedBox(height: 16),
-        ],
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.only(bottom: bottomPadding),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildTopDecoration(),
+              _buildTitleSection(l10n),
+              _buildPriceInfoRow(l10n),
+              _buildProductsGrid(l10n),
+              _buildAgreementText(),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -474,6 +487,14 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   }
 
   Future<void> _handleProductTap(UnlockProduct product) async {
+    // 检查是否是游客，游客需要登录后才能支付
+    final authState = ref.read(authProvider);
+    if (!authState.isAuthenticated || (authState.user?.isTourist ?? true)) {
+      // 游客不能支付，关闭弹窗返回需要登录
+      Navigator.of(context).pop(UnlockResult.loginRequired());
+      return;
+    }
+
     final balance = _userBalance;
 
     // VIP商品 → 走订阅购买
@@ -555,8 +576,8 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     _setProcessing(product.goodsId, true);
 
     try {
-      final coinNotifier = ref.read(coinBalanceProvider.notifier);
-      await coinNotifier.deductCoins(product.price.toInt());
+      final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
+      coinNotifier.deductCoins(product.price.toInt());
 
       // 调用后端API解锁剧集
       final apiService = ApiService(
@@ -584,7 +605,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           ));
         } else {
           // 解锁失败，退款
-          await coinNotifier.addCoins(product.price.toInt());
+          coinNotifier.addCoins(product.price.toInt());
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(resp.error ?? l10n.unlockFailed),

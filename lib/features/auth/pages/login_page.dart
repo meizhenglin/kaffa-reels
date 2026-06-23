@@ -7,6 +7,7 @@ import '../providers/auth_provider.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../home/pages/main_page.dart' show currentTabIndexProvider;
 import '../../payment/providers/membership_provider.dart' show memberStateProvider;
+import '../../../app/providers/app_providers.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key, this.redirect, this.backTarget = '/'});
@@ -21,36 +22,34 @@ class LoginPage extends ConsumerStatefulWidget {
 class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserver {
   bool _appIsInForeground = true;
   bool _googleSignInInProgress = false;
-
-  void _navigateAfterLogin() {
-    if (!mounted) return;
-
-    final target = widget.redirect;
-    final shouldSelectProfileTab = (target == null || target.isEmpty || target == '/profile');
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-
-      // Refresh member status after login
-      ref.read(memberStateProvider.notifier).refreshStatus();
-
-      if (shouldSelectProfileTab) {
-        ref.read(currentTabIndexProvider.notifier).state = 4;
-      }
-
-      if (target != null && target.isNotEmpty) {
-        context.go(target);
-        return;
-      }
-
-      context.go('/profile');
-    });
-  }
+  bool _hasProcessedLogin = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // 监听登录状态变化 - 如果从 LoginEmailPage 返回时用户已登录，自动返回 ShortVideoPage
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.listenManual<AuthState>(
+        authProvider,
+        (previous, next) {
+          // 如果用户刚刚登录成功（从 LoginEmailPage 返回后），且还没有处理过
+          if (next.isAuthenticated &&
+              !(previous?.isAuthenticated ?? false) &&
+              !_hasProcessedLogin) {
+            _hasProcessedLogin = true;
+            debugPrint('[LoginPage] user just logged in, auto-popping to ShortVideoPage');
+            // 延迟执行，确保页面已经完全返回
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                context.pop();
+              }
+            });
+          }
+        },
+      );
+    });
   }
 
   @override
@@ -80,13 +79,16 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       body: Stack(
         fit: StackFit.expand,
         children: [
           Image.asset(
             'assets/images/login_bg.png',
+            width: double.infinity,
+            height: double.infinity,
             fit: BoxFit.cover,
+            gaplessPlayback: true,
             errorBuilder: (_, __, ___) =>
                 Container(color: const Color(0xFF1A1A2A)),
           ),
@@ -100,6 +102,16 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                     children: [
                       RtlBackButton(
                         onPressed: () async {
+                          // 如果目标是 short-video 页面，发送登录返回通知
+                          final effectiveTarget = (widget.redirect != null &&
+                                  widget.redirect!.isNotEmpty &&
+                                  widget.redirect != '/profile')
+                              ? widget.redirect
+                              : widget.backTarget;
+                          if (effectiveTarget == '/short-video') {
+                            ref.read(loginReturnProvider.notifier).state++;
+                          }
+
                           final navigator = Navigator.of(context);
                           final didPop = await navigator.maybePop();
                           if (!context.mounted) return;
@@ -292,8 +304,15 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                     // Auto close and navigate after 1 second
                                     Future.delayed(const Duration(seconds: 1), () {
                                       if (mounted) {
+                                        // 关闭成功弹窗
                                         Navigator.of(context, rootNavigator: true).pop();
-                                        _navigateAfterLogin();
+                                        // 直接 pop 返回，让原来的 ShortVideoPage 接收登录状态变化
+                                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                                          if (mounted) {
+                                            debugPrint('[LoginPage] Google login success, popping back');
+                                            context.pop();
+                                          }
+                                        });
                                       }
                                     });
                                     return;
@@ -459,8 +478,15 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                       // Auto close and navigate after 1 second
                                       Future.delayed(const Duration(seconds: 1), () {
                                         if (mounted) {
+                                          // 关闭成功弹窗
                                           Navigator.of(context, rootNavigator: true).pop();
-                                          _navigateAfterLogin();
+                                          // 直接 pop 返回，让原来的 ShortVideoPage 接收登录状态变化
+                                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                                            if (mounted) {
+                                              debugPrint('[LoginPage] Apple login success, popping back');
+                                              context.pop();
+                                            }
+                                          });
                                         }
                                       });
                                       return;

@@ -176,16 +176,20 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
       );
       // Auto close and navigate after 1 second
       Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          Navigator.of(context, rootNavigator: true).pop();
-          // Navigate based on redirect or default to profile
-          final target = widget.redirect;
-          if (target != null && target.isNotEmpty) {
-            GoRouter.of(context).go(target);
-          } else {
-            GoRouter.of(context).go('/profile');
+        debugPrint('[LoginEmailPage] success handler: redirect=${widget.redirect}, mounted=$mounted');
+        if (!mounted) return;
+
+        // 先关闭成功弹窗
+        Navigator.of(context, rootNavigator: true).pop();
+
+        // 直接 pop 返回，让原来的 ShortVideoPage 接收登录状态变化
+        // LoginPage 会被自动 pop，回到 ShortVideoPage
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            debugPrint('[LoginEmailPage] popping back to ShortVideoPage');
+            context.pop();
           }
-        }
+        });
       });
       return;
     }
@@ -245,7 +249,10 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
         children: [
           Image.asset(
             'assets/images/login_bg.png',
+            width: double.infinity,
+            height: double.infinity,
             fit: BoxFit.cover,
+            gaplessPlayback: true,
             errorBuilder: (_, __, ___) =>
                 Container(color: const Color(0xFF1A1A2A)),
           ),

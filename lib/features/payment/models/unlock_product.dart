@@ -129,6 +129,7 @@ enum UnlockResultType {
   success,
   failed,
   cancelled,
+  loginRequired,  // 需要登录
 }
 
 class UnlockResult {
@@ -156,6 +157,10 @@ class UnlockResult {
     return const UnlockResult._(resultType: UnlockResultType.cancelled);
   }
 
+  factory UnlockResult.loginRequired() {
+    return const UnlockResult._(resultType: UnlockResultType.loginRequired);
+  }
+
   final UnlockResultType resultType;
   final int? episodeIndex;
   final String? errorMessage;
@@ -163,6 +168,7 @@ class UnlockResult {
   bool get isSuccess => resultType == UnlockResultType.success;
   bool get isFailed => resultType == UnlockResultType.failed;
   bool get isCancelled => resultType == UnlockResultType.cancelled;
+  bool get isLoginRequired => resultType == UnlockResultType.loginRequired;
 }
 
 /// 解锁商品列表状态

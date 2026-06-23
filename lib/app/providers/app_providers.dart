@@ -181,3 +181,6 @@ class LocaleNotifier extends StateNotifier<Locale> {
     }
   }
 }
+
+/// 登录返回通知 Provider，用于通知视频页面从登录页返回
+final loginReturnProvider = StateProvider<int>((ref) => 0);

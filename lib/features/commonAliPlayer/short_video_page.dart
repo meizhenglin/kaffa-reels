@@ -213,7 +213,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   final ShortVideoListController _listController = ShortVideoListController();
 
   int _currentIndex = 0;
-  final List<GlobalKey<WatchShortVideoItemState>> _itemKeys = [];
+  List<GlobalKey<WatchShortVideoItemState>> _itemKeys = [];
   bool _isLoading = true;
   String? _errorMessage;
   bool _isCurrentTabActive = false;
@@ -221,6 +221,12 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   ProviderSubscription<int>? _tabIndexSubscription;
   int? _pendingLockedEpisodeIndex;
   bool _showWatchNowOverlay = false;
+  int? _preLoginLockedIndex;
+
+  void _setCurrentIndex(int index) {
+    debugPrint('[_shortVideoPage] _setCurrentIndex: $_currentIndex -> $index');
+    _currentIndex = index;
+  }
 
   bool get _shouldFollowHomeTabVisibility => widget.videoId.isNotEmpty;
 
@@ -230,6 +236,27 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // 监听登录状态变化 - 登录成功后重新显示解锁半屏
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.listenManual<AuthState>(
+        authProvider,
+        (previous, next) {
+          debugPrint('[_shortVideoPage] auth changed: prev authenticated=${previous?.isAuthenticated}, prev tourist=${previous?.user?.isTourist}, next authenticated=${next.isAuthenticated}, next tourist=${next.user?.isTourist}, preLoginLockedIndex=$_preLoginLockedIndex, showOverlay=$_showWatchNowOverlay');
+          if (!mounted) return;
+          // 用户刚登录完成（有待解锁的索引）
+          if (next.isAuthenticated &&
+              !(previous?.isAuthenticated ?? false) &&
+              _preLoginLockedIndex != null) {
+            debugPrint('[_shortVideoPage] user just logged in, showing unlock sheet for index=$_preLoginLockedIndex');
+            final lockedIdx = _preLoginLockedIndex;
+            _preLoginLockedIndex = null;
+            // 重新显示解锁半屏
+            _showMembershipReminderDialog(lockedIndex: lockedIdx);
+          }
+        },
+      );
+    });
 
     if (_usePreloadMode) {
       _preloadPageController = PreloadPageController(initialPage: _currentIndex);
@@ -377,14 +404,10 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         _pageController = PageController(initialPage: _currentIndex);
       }
 
-      _itemKeys
-        ..clear()
-        ..addAll(
-          List.generate(
-            videoInfoList.length,
-            (_) => GlobalKey<WatchShortVideoItemState>(),
-          ),
-        );
+      final newKeys = List.generate(
+        videoInfoList.length,
+        (_) => GlobalKey<WatchShortVideoItemState>(),
+      );
 
       _aliPlayerPreload?.destroy();
       _aliPlayerPreload = AliPlayerPreload(
@@ -400,6 +423,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         setState(() {
           _isLoading = false;
           _errorMessage = null;
+          _itemKeys = newKeys;
         });
       }
 
@@ -532,6 +556,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   }
 
   Future<void> _showMembershipReminderDialog({int? lockedIndex}) async {
+    debugPrint('[_showMembershipReminderDialog] called with lockedIndex=$lockedIndex, currentIndex=$_currentIndex, videoInfoList.length=${videoInfoList.length}');
     if (_pendingLockedDialogIndex == lockedIndex) return;
     _pendingLockedDialogIndex = lockedIndex;
 
@@ -541,9 +566,11 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     _pendingLockedDialogIndex = null;
     if (!mounted) return;
 
+    debugPrint('[_showMembershipReminderDialog] after bottom sheet, setting state');
     setState(() {
       _pendingLockedEpisodeIndex = lockedIndex ?? _pendingLockedEpisodeIndex;
       _showWatchNowOverlay = _pendingLockedEpisodeIndex != null;
+      debugPrint('[_showMembershipReminderDialog] _showWatchNowOverlay=$_showWatchNowOverlay, _pendingLockedEpisodeIndex=$_pendingLockedEpisodeIndex');
     });
   }
 
@@ -627,11 +654,20 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       },
     );
 
+    debugPrint('[_showUnlockBottomSheet] returned from bottom sheet, result=$result, index=$index');
+
     if (!mounted) return;
 
     // 处理解锁结果
     if (result == null) {
-      // 用户关闭弹窗
+      // 用户关闭弹窗或取消，恢复 watch now 状态
+      debugPrint('[_showUnlockBottomSheet] result is null, restoring overlay. _pendingLockedEpisodeIndex=$_pendingLockedEpisodeIndex, currentIndex=$index');
+      if (mounted) {
+        setState(() {
+          _showWatchNowOverlay = _pendingLockedEpisodeIndex != null;
+          debugPrint('[_showUnlockBottomSheet] setState called: _showWatchNowOverlay=$_showWatchNowOverlay');
+        });
+      }
       return;
     }
 
@@ -670,6 +706,19 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       }
     } else if (result.isCancelled) {
       // 用户取消
+      debugPrint('[_showUnlockBottomSheet] result.isCancelled');
+    } else if (result.isLoginRequired) {
+      // 游客需要登录，记录当前锁定的集索引
+      debugPrint('[_showUnlockBottomSheet] result.isLoginRequired, setting _preLoginLockedIndex=$index');
+      _preLoginLockedIndex = index;
+      if (mounted) {
+        // 使用 microtask 延迟导航，确保 bottom sheet 完全关闭
+        Future.microtask(() {
+          if (!mounted) return;
+          final currentPath = '/short-video';
+          context.push('/auth/login?redirect=${Uri.encodeComponent(currentPath)}');
+        });
+      }
     }
   }
 
@@ -680,6 +729,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   }
 
   Future<bool> _guardLockedEpisode(int index, {int? previousIndex}) async {
+    debugPrint('[_guardLockedEpisode] called with index=$index');
     if (!_isEpisodeLocked(index)) return true;
     final sourceIndex = previousIndex ?? _currentIndex;
     _pauseNearbyItems(sourceIndex);
@@ -695,6 +745,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         _showWatchNowOverlay = true;
       });
     }
+    debugPrint('[_guardLockedEpisode] calling _showMembershipReminderDialog');
     await _showMembershipReminderDialog(lockedIndex: index);
     return false;
   }
@@ -1310,49 +1361,35 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    final currentEpisode = widget.episodes[widget.currentIndex];
+    final safeIndex = widget.currentIndex.clamp(0, widget.episodes.isEmpty ? 0 : widget.episodes.length - 1);
+    final currentEpisode = widget.episodes.isNotEmpty ? widget.episodes[safeIndex] : null;
     final maxHeight = mediaQuery.size.height * 0.72;
 
-    return SafeArea(
-      top: false,
-      child: Container(
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        decoration: const BoxDecoration(
-          color: _sheetColor,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(15),
-            topRight: Radius.circular(15),
-          ),
+    return Container(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      decoration: const BoxDecoration(
+        color: _sheetColor,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(15),
+          topRight: Radius.circular(15),
         ),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(15, 15, 15, mediaQuery.padding.bottom + 15),
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 28),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(context, currentEpisode),
-                    const SizedBox(height: 15),
-                    _buildTabs(context),
-                    const SizedBox(height: 15),
-                    Expanded(
-                      child: _activeTab == _EpisodeSheetTab.episodes
-                          ? _buildEpisodesPanel()
-                          : _buildContentPanel(currentEpisode),
-                    ),
-                  ],
-                ),
-              ),
-              PositionedDirectional(
-                top: 10,
-                end: 0,
-                child: _buildReportButton(context),
-              ),
-            ],
-          ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(15, 15, 15, 15),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (currentEpisode != null) _buildHeader(context, currentEpisode),
+            const SizedBox(height: 15),
+            _buildTabs(context),
+            const SizedBox(height: 15),
+            Expanded(
+              child: _activeTab == _EpisodeSheetTab.episodes
+                  ? _buildEpisodesPanel()
+                  : (currentEpisode != null ? _buildContentPanel(currentEpisode) : const SizedBox()),
+            ),
+          ],
         ),
       ),
     );
@@ -1522,6 +1559,14 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
 
   Widget _buildEpisodesPanel() {
     final segments = _episodeSegments;
+    if (segments.isEmpty || widget.episodes.isEmpty) {
+      return const Center(
+        child: Text(
+          'No episodes available',
+          style: TextStyle(color: Colors.white54),
+        ),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

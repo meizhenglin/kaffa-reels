@@ -4,7 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../../features/auth/providers/auth_provider.dart';
 import '../../../features/home/models/home_card_layout.dart';
+import '../../../features/recommend/utils/drama_navigation.dart';
 import '../../../l10n/app_localizations.dart';
 import '../providers/sign_provider.dart';
 import '../models/sign_model.dart';
@@ -325,6 +327,14 @@ class _SignPageState extends ConsumerState<SignPage> {
 
   Future<void> _handleSign() async {
     final l10n = AppLocalizations.of(context);
+    final authState = ref.read(authProvider);
+    
+    // 游客不能签到（签到会获得金币）
+    if (!authState.isAuthenticated || (authState.user?.isTourist ?? true)) {
+      await openMembershipPage(context, ref);
+      return;
+    }
+    
     final success = await ref.read(signStateProvider.notifier).sign();
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

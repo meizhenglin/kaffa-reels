@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../features/auth/providers/auth_provider.dart';
+import '../../../features/recommend/utils/drama_navigation.dart';
 import '../../../l10n/app_localizations.dart';
 import '../providers/sign_provider.dart';
 import '../models/sign_model.dart';
@@ -91,7 +93,7 @@ class _SignInWidgetState extends ConsumerState<SignInWidget> {
                   ),
                 )
               else if ((config?.isTodaySigned ?? false))
-                _buildSignedBadge()
+                _buildSignedBadge(l10n)
               else
                 _buildSignButton(),
             ],
@@ -100,14 +102,14 @@ class _SignInWidgetState extends ConsumerState<SignInWidget> {
           // Rewards preview
           if (config != null && config.rewards.isNotEmpty) ...[
             const SizedBox(height: 16),
-            _buildRewardsPreview(config),
+            _buildRewardsPreview(config, l10n),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildSignedBadge() {
+  Widget _buildSignedBadge(AppLocalizations l10n) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -152,7 +154,7 @@ class _SignInWidgetState extends ConsumerState<SignInWidget> {
     );
   }
 
-  Widget _buildRewardsPreview(SignConfig config) {
+  Widget _buildRewardsPreview(SignConfig config, AppLocalizations l10n) {
     final currentDay = (config.continueDay) + 1;
     final displayRewards = config.rewards.take(7).toList();
 
@@ -206,11 +208,26 @@ class _SignInWidgetState extends ConsumerState<SignInWidget> {
   }
 
   Future<void> _handleSign() async {
+    final l10n = AppLocalizations.of(context);
+    final authState = ref.read(authProvider);
+    
+    // 游客不能签到（签到会获得金币）
+    if (!authState.isAuthenticated || (authState.user?.isTourist ?? true)) {
+      await openMembershipPage(context, ref);
+      return;
+    }
+    
+    final signState = ref.read(signStateProvider);
+    final config = signState.config;
+    final todayReward = config?.rewards.isNotEmpty == true
+        ? config!.rewards[config.isTodaySigned ? config.continueDay : config.continueDay]
+        : null;
+    
     final success = await ref.read(signStateProvider.notifier).sign();
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(l10n.signInSuccessful(reward?.coins ?? 0)),
+          content: Text(l10n.signInSuccessful(todayReward?.coins ?? 0)),
           backgroundColor: Colors.green,
         ),
       );

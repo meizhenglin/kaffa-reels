@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../l10n/app_localizations.dart';
 import '../models/game_detail.dart';
@@ -24,10 +25,18 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
   String? _errorMessage;
   GameDetail? _gameDetail;
 
+  // Popup state
+  bool _showRewardPopup = false;
+
   @override
   void initState() {
     super.initState();
     _loadGameDetail();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   Future<void> _loadGameDetail() async {
@@ -67,6 +76,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     final l10n = AppLocalizations.of(context);
 
     if (game.isH5Game) {
+      // H5 游戏 - 使用 h5Url 在应用内打开
       if (game.h5Url != null && game.h5Url!.isNotEmpty) {
         final uri = Uri.parse(game.h5Url!);
         try {
@@ -91,6 +101,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
         }
       }
     } else if (game.isAppGame) {
+      // App 游戏 - 使用 downloadUrl 外部下载
       if (game.downloadUrl != null && game.downloadUrl!.isNotEmpty) {
         final uri = Uri.parse(game.downloadUrl!);
         try {
@@ -110,125 +121,324 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     }
   }
 
+  void _toggleRewardPopup() {
+    setState(() {
+      _showRewardPopup = !_showRewardPopup;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.gameName ?? l10n.games,
-          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+    return GradientScaffold(
+      body: Stack(
+        children: [
+          _buildMainContent(theme, l10n),
+          if (_showRewardPopup) _buildRewardPopup(),
+        ],
       ),
-      body: _buildBody(theme, l10n),
     );
   }
 
-  Widget _buildBody(ThemeData theme, AppLocalizations l10n) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_errorMessage != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                _errorMessage!,
-                style: theme.textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _loadGameDetail,
-                icon: const Icon(Icons.refresh),
-                label: Text(l10n.retry),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
+  Widget _buildMainContent(ThemeData theme, AppLocalizations l10n) {
     final game = _gameDetail;
-    if (game == null) {
-      return Center(
-        child: Text(
-          l10n.noContentAvailable,
-          style: theme.textTheme.bodyMedium,
-        ),
-      );
-    }
 
-    return Column(
+    return Stack(
       children: [
-        Expanded(
+        // Scrollable content
+        SafeArea(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(theme, game),
-                const SizedBox(height: 16),
-                _buildBannerImages(game),
-                const SizedBox(height: 24),
+                const SizedBox(height: 50), // Space for fixed back button
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (game != null) ...[
+                        _buildHeader(game),
+                        const SizedBox(height: 20),
+                        _buildRatingsDownload(game),
+                        const SizedBox(height: 20),
+                        _buildInstallButton(game),
+                        const SizedBox(height: 24),
+                        _buildShareRow(),
+                        const SizedBox(height: 24),
+                        _buildScreenshots(game),
+                        const SizedBox(height: 24),
+                        _buildAboutSection(game),
+                        const SizedBox(height: 24),
+                        _buildDeveloperInfo(game),
+                        const SizedBox(height: 24),
+                        _buildReviewsSection(game),
+                        const SizedBox(height: 24),
+                      ] else ...[
+                        _buildHeaderSkeleton(),
+                        const SizedBox(height: 20),
+                        _buildRatingsDownloadSkeleton(),
+                        const SizedBox(height: 20),
+                        _buildInstallButtonSkeleton(),
+                        const SizedBox(height: 24),
+                        _buildShareRow(),
+                        const SizedBox(height: 24),
+                        _buildScreenshotsSkeleton(),
+                        const SizedBox(height: 24),
+                        _buildAboutSectionSkeleton(),
+                        const SizedBox(height: 24),
+                        _buildDeveloperInfoSkeleton(),
+                        const SizedBox(height: 24),
+                      ],
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
         ),
-        _buildBottomAction(theme, l10n, game),
+        // Fixed back button
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildHeader(ThemeData theme, GameDetail game) {
-    final iconUrl = game.icon;
+  Widget _buildLoadingOverlay() {
+    return Container(
+      color: const Color(0xFF13131A),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.8),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 40,
+                height: 40,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 4,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Loading',
+                style: TextStyle(color: Colors.white, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorView(ThemeData theme, AppLocalizations l10n) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _errorMessage!,
+              style: theme.textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _loadGameDetail,
+              icon: const Icon(Icons.refresh),
+              label: Text(l10n.retry),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(GameDetail? game) {
+    final iconUrl = game?.icon;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (iconUrl != null && iconUrl.isNotEmpty)
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.network(
-              iconUrl,
-              width: 72,
-              height: 72,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => _buildIconPlaceholder(),
-            ),
-          )
-        else
-          _buildIconPlaceholder(),
+        // App icon with progress indicator
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: (iconUrl != null && iconUrl.isNotEmpty)
+                    ? Image.network(
+                        iconUrl,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            _buildIconPlaceholder(),
+                      )
+                    : _buildIconPlaceholder(),
+              ),
+        ),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                game.name,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+              // Title row with game name and verified badge
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      game?.name ?? '',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Image.asset(
+                    'assets/images/gamename.png',
+                    width: 16,
+                    height: 16,
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              // Developer/Category with green background pill
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF028760).withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  game?.description ?? '',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF028760),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(height: 8),
-              if (game.description != null && game.description!.isNotEmpty)
-                Text(
-                  game.description!,
-                  style: theme.textTheme.bodyMedium,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+              // Verified by Play Protect
+              Row(
+                children: [
+                  Container(
+                    width: 14,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF028760),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: const Icon(
+                      Icons.shield,
+                      size: 12,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Verified by Play Protect',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                      color: Color(0xFF555555),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderSkeleton() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 80,
+          height: 80,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            color: Colors.white.withValues(alpha: 0.1),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 20,
+                width: 150,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  color: Colors.white.withValues(alpha: 0.1),
                 ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                height: 16,
+                width: 100,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  color: Colors.white.withValues(alpha: 0.08),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                height: 12,
+                width: 120,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  color: Colors.white.withValues(alpha: 0.06),
+                ),
+              ),
             ],
           ),
         ),
@@ -238,49 +448,416 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
 
   Widget _buildIconPlaceholder() {
     return Container(
-      width: 72,
-      height: 72,
+      width: 80,
+      height: 80,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: const Color(0xFF2A2A2A),
+        borderRadius: BorderRadius.circular(10),
+        color: const Color(0xFFF5F5F5),
       ),
       child: const Icon(
         Icons.videogame_asset,
-        size: 36,
-        color: Colors.white54,
+        size: 40,
+        color: Color(0xFFCCCCCC),
       ),
     );
   }
 
-  Widget _buildBannerImages(GameDetail game) {
-    final urls = _parseBannerUrls(game.banner);
-    if (urls.isEmpty) return const SizedBox.shrink();
+  Widget _buildRatingsDownload(GameDetail game) {
+    // Generate mock data for demo
+    const rating = '5.0';
+    const reviewCount = '193';
+    const downloadCount = '24K+';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _buildRatingItem(rating, reviewCount),
+          _buildDivider(),
+          _buildDownloadItem(downloadCount),
+          _buildDivider(),
+          _buildEditorChoice(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRatingsDownloadSkeleton() {
+    return Container(
+      height: 60,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+    );
+  }
+
+  Widget _buildInstallButtonSkeleton() {
+    return Container(
+      height: 50,
+      decoration: BoxDecoration(
+        color: const Color(0xFF028760),
+        borderRadius: BorderRadius.circular(25),
+      ),
+    );
+  }
+
+  Widget _buildScreenshotsSkeleton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 20,
+          width: 120,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            color: Colors.white.withValues(alpha: 0.1),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 200,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: 3,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, __) => Container(
+              width: 120,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.white.withValues(alpha: 0.1),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRatingItem(String rating, String reviewCount) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              rating,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 2),
+            const Text(
+              '★',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFFFFBB33),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '$reviewCount reviews',
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w400,
+            color: Colors.white70,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDownloadItem(String count) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          count,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 2),
+        const Text(
+          'Downloads',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w400,
+            color: Colors.white70,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEditorChoice() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Image.asset(
+          'assets/images/cp.png',
+          width: 16,
+          height: 16,
+          color: const Color(0xFFFFD700),
+          errorBuilder: (_, __, ___) => const Icon(
+            Icons.star,
+            size: 16,
+            color: Color(0xFFFFD700),
+          ),
+        ),
+        const SizedBox(height: 2),
+        const Text(
+          "Editor's Choice",
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w400,
+            color: Colors.white70,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDivider() {
+    return Container(
+      height: 30,
+      width: 1,
+      color: Colors.white24,
+    );
+  }
+
+  Widget _buildInstallButton(GameDetail game) {
+    final isDownload = game.isAppGame;
+    final buttonText = isDownload ? 'Install' : 'Play Now';
 
     return SizedBox(
-      height: 220,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: urls.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final url = urls[index];
-          return ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.network(
-              url,
-              fit: BoxFit.cover,
-              width: 160,
-              height: 220,
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return const Center(
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) => _buildBannerPlaceholder(),
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: _handlePlayAction,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF028760),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          elevation: 0,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (isDownload) ...[
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+              ),
+                child: const Icon(
+                  Icons.shield,
+                  size: 14,
+                  color: Color(0xFFFFE336),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              buttonText,
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          );
-        },
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShareRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _buildShareItem('assets/images/share.png', 'Share'),
+        const SizedBox(width: 24),
+        _buildShareItem('assets/images/addwishlist.png', 'Add to wishlist'),
+      ],
+    );
+  }
+
+  Widget _buildShareItem(String iconPath, String label) {
+    return GestureDetector(
+      onTap: () {},
+      child: Row(
+        children: [
+          Image.asset(
+            iconPath,
+            width: 17,
+            height: 20,
+            errorBuilder: (_, __, ___) => const Icon(
+              Icons.share,
+              size: 17,
+              color: Color(0xFF00A173),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF00A173),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScreenshots(GameDetail game) {
+    final urls = _parseBannerUrls(game.banner);
+    if (urls.isEmpty) {
+      return _buildMockScreenshots();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Screenshots',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 15),
+        SizedBox(
+          height: 200,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: urls.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final url = urls[index];
+              return ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  url,
+                  fit: BoxFit.cover,
+                  width: 120,
+                  height: 200,
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return Container(
+                      width: 120,
+                      height: 200,
+                      color: const Color(0xFF2A2A2A),
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) =>
+                      _buildScreenshotPlaceholder(),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMockScreenshots() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Screenshots',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 15),
+        SizedBox(
+          height: 200,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: 4,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              return Container(
+                width: 120,
+                height: 200,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: Color.lerp(
+                    const Color(0xFF2A2A2A),
+                    const Color(0xFF3A3A3A),
+                    index * 0.1,
+                  ),
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.screenshot,
+                        size: 40,
+                        color: Colors.white38,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Screenshot ${index + 1}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white54,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildScreenshotPlaceholder() {
+    return Container(
+      width: 120,
+      height: 200,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xFF2A2A2A),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.image,
+          size: 40,
+          color: Colors.white38,
+        ),
       ),
     );
   }
@@ -294,48 +871,420 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
         .toList();
   }
 
-  Widget _buildBannerPlaceholder() {
+  Widget _buildAboutSection(GameDetail game) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'About this Game',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          game.description ?? 'No description available.',
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.white70,
+            height: 1.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAboutSectionSkeleton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 20,
+          width: 140,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            color: Colors.white.withValues(alpha: 0.1),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          height: 60,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.white.withValues(alpha: 0.08),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDeveloperInfoSkeleton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 20,
+          width: 100,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            color: Colors.white.withValues(alpha: 0.1),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          height: 16,
+          width: 180,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            color: Colors.white.withValues(alpha: 0.08),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDeveloperInfo(GameDetail game) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Developer',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          game.gameTypeDesc ?? 'Unknown Developer',
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.white70,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReviewsSection(GameDetail game) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Ratings and reviews',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 15),
+        // Mock reviews for demo
+        _buildReviewItem('Ahmed K.', 5, 'Best game I\'ve played in months! Highly addictive gameplay.'),
+        const SizedBox(height: 10),
+        _buildReviewItem('Sarah M.', 5, 'Amazing graphics and smooth performance. Love it!'),
+        const SizedBox(height: 10),
+        _buildReviewItem('Mohammed R.', 4, 'Great story mode, but could use more characters.'),
+        const SizedBox(height: 10),
+        _buildReviewItem('Fatima H.', 4, 'Fun and entertaining. Would recommend to friends.'),
+        const SizedBox(height: 10),
+        _buildReviewItem('Omar B.', 5, 'Absolutely fantastic! Can\'t stop playing.'),
+      ],
+    );
+  }
+
+  Widget _buildReviewItem(String userName, int rating, String content) {
     return Container(
-      width: 260,
-      height: 160,
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        color: const Color(0xFF2A2A2A),
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
       ),
-      child: const Icon(
-        Icons.image,
-        size: 48,
-        color: Colors.white54,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                userName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.white,
+                ),
+              ),
+              const Spacer(),
+              Row(
+                children: List.generate(5, (index) {
+                  return Text(
+                    index < rating ? '★' : '☆',
+                    style: const TextStyle(
+                      color: Color(0xFFFFBB33),
+                      fontSize: 14,
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            content,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Colors.white70,
+              height: 1.4,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildBottomAction(
-      ThemeData theme, AppLocalizations l10n, GameDetail game) {
-    final actionText = game.isH5Game ? 'Start Playing' : 'Download';
+  Widget _buildRewardPopup() {
+    final game = _gameDetail;
+    if (game == null) return const SizedBox.shrink();
 
+    return GestureDetector(
+      onTap: _toggleRewardPopup,
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.5),
+        child: Center(
+          child: GestureDetector(
+            onTap: () {},
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.85,
+          constraints: const BoxConstraints(maxWidth: 400),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/images/img_reward.png',
+                    width: 166,
+                    height: 80,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 166,
+                      height: 80,
+                      color: const Color(0xFFF5F5F5),
+                      child: const Icon(Icons.card_giftcard, size: 40),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                        fontSize: 17,
+                        color: Color(0xFF333333),
+                        height: 24,
+                      ),
+                      children: [
+                        const TextSpan(text: 'We are collecting '),
+                        TextSpan(
+                          text: 'objective',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2B8C32),
+                          ),
+                        ),
+                        const TextSpan(text: ' reviews for this app'),
+                      ],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  _buildRewardAppInfo(game),
+                  const SizedBox(height: 15),
+                  _buildRewardDetails(),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        _toggleRewardPopup();
+                        _handlePlayAction();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF028760),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Install',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRewardAppInfo(GameDetail game) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(
-          top: BorderSide(
-            color: theme.dividerColor,
+        color: const Color(0xFFF9F9F9),
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: game.icon != null && game.icon!.isNotEmpty
+                ? Image.network(
+                    game.icon!,
+                    width: 70,
+                    height: 70,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _buildIconPlaceholder(),
+                  )
+                : _buildIconPlaceholder(),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        game.name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF222222),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Image.asset(
+                      'assets/images/gamename.png',
+                      width: 20,
+                      height: 20,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  game.description ?? 'Short drama series',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF777777),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Image.asset(
+                      'assets/images/dunpan.png',
+                      width: 10,
+                      height: 14,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Verified by Play Protect',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRewardDetails() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Image.asset(
+          'assets/images/google_play_img.png',
+          width: 70,
+          height: 70,
+          errorBuilder: (_, __, ___) => Container(
+            width: 70,
+            height: 70,
+            color: const Color(0xFFF5F5F5),
+            child: const Icon(Icons.card_giftcard, size: 30),
           ),
         ),
-      ),
-      child: SizedBox(
-        width: double.infinity,
-        child: FilledButton(
-          onPressed: _handlePlayAction,
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-            backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
+        const SizedBox(width: 12),
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF000000),
+                height: 18,
+              ),
+              children: [
+                const TextSpan(text: 'If you can '),
+                TextSpan(
+                  text: 'download the app',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const TextSpan(text: ' and leave an '),
+                TextSpan(
+                  text: 'objective',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const TextSpan(text: ' review and rating, you will have the chance to receive a '),
+                TextSpan(
+                  text: '\$20',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2B8C32),
+                  ),
+                ),
+                const TextSpan(text: ' Google Play gift card.'),
+              ],
+            ),
           ),
-          child: Text(actionText),
         ),
-      ),
+      ],
     );
   }
 }
