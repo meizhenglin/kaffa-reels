@@ -22,34 +22,11 @@ class LoginPage extends ConsumerStatefulWidget {
 class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserver {
   bool _appIsInForeground = true;
   bool _googleSignInInProgress = false;
-  bool _hasProcessedLogin = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-
-    // 监听登录状态变化 - 如果从 LoginEmailPage 返回时用户已登录，自动返回 ShortVideoPage
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.listenManual<AuthState>(
-        authProvider,
-        (previous, next) {
-          // 如果用户刚刚登录成功（从 LoginEmailPage 返回后），且还没有处理过
-          if (next.isAuthenticated &&
-              !(previous?.isAuthenticated ?? false) &&
-              !_hasProcessedLogin) {
-            _hasProcessedLogin = true;
-            debugPrint('[LoginPage] user just logged in, auto-popping to ShortVideoPage');
-            // 延迟执行，确保页面已经完全返回
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                context.pop();
-              }
-            });
-          }
-        },
-      );
-    });
   }
 
   @override
@@ -303,17 +280,33 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                     );
                                     // Auto close and navigate after 1 second
                                     Future.delayed(const Duration(seconds: 1), () {
-                                      if (mounted) {
-                                        // 关闭成功弹窗
-                                        Navigator.of(context, rootNavigator: true).pop();
-                                        // 直接 pop 返回，让原来的 ShortVideoPage 接收登录状态变化
-                                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                                          if (mounted) {
-                                            debugPrint('[LoginPage] Google login success, popping back');
-                                            context.pop();
-                                          }
+                                      if (!mounted) return;
+
+                                      // 关闭成功弹窗
+                                      Navigator.of(context).pop();
+
+                                      // 触发 loginReturnProvider，刷新 ShortVideoPage 的视频列表
+                                      if (widget.redirect != null && widget.redirect!.contains('/short-video')) {
+                                        Future.delayed(Duration.zero, () {
+                                          ref.read(loginReturnProvider.notifier).state++;
+                                          debugPrint('[LoginPage] Google triggered loginReturnProvider');
                                         });
                                       }
+
+                                      // 获取 root navigator 并连续 pop 两个页面回到 ShortVideoPage
+                                      final rootNav = Navigator.of(context, rootNavigator: true);
+
+                                      Future.delayed(const Duration(milliseconds: 100), () {
+                                        debugPrint('[LoginPage] Google step 1: pop LoginPage');
+                                        rootNav.pop();
+                                      }).then((_) {
+                                        return Future.delayed(Duration.zero, () {
+                                          debugPrint('[LoginPage] Google step 2: pop LoginEmailPage if exists');
+                                          if (Navigator.canPop(context)) {
+                                            rootNav.pop();
+                                          }
+                                        });
+                                      });
                                     });
                                     return;
                                   }
@@ -477,17 +470,33 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                       );
                                       // Auto close and navigate after 1 second
                                       Future.delayed(const Duration(seconds: 1), () {
-                                        if (mounted) {
-                                          // 关闭成功弹窗
-                                          Navigator.of(context, rootNavigator: true).pop();
-                                          // 直接 pop 返回，让原来的 ShortVideoPage 接收登录状态变化
-                                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                                            if (mounted) {
-                                              debugPrint('[LoginPage] Apple login success, popping back');
-                                              context.pop();
-                                            }
+                                        if (!mounted) return;
+
+                                        // 关闭成功弹窗
+                                        Navigator.of(context).pop();
+
+                                        // 触发 loginReturnProvider，刷新 ShortVideoPage 的视频列表
+                                        if (widget.redirect != null && widget.redirect!.contains('/short-video')) {
+                                          Future.delayed(Duration.zero, () {
+                                            ref.read(loginReturnProvider.notifier).state++;
+                                            debugPrint('[LoginPage] Apple triggered loginReturnProvider');
                                           });
                                         }
+
+                                        // 获取 root navigator 并连续 pop 两个页面回到 ShortVideoPage
+                                        final rootNav = Navigator.of(context, rootNavigator: true);
+
+                                        Future.delayed(const Duration(milliseconds: 100), () {
+                                          debugPrint('[LoginPage] Apple step 1: pop LoginPage');
+                                          rootNav.pop();
+                                        }).then((_) {
+                                          return Future.delayed(Duration.zero, () {
+                                            debugPrint('[LoginPage] Apple step 2: pop LoginEmailPage if exists');
+                                            if (Navigator.canPop(context)) {
+                                              rootNav.pop();
+                                            }
+                                          });
+                                        });
                                       });
                                       return;
                                     }

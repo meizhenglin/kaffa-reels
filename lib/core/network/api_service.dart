@@ -509,14 +509,16 @@ class ApiService {
   Future<ApiResponse> getUserPayEpisodes({
     required String videoId,
     required String episodesId,
-    required int goodsId,
+    required int episodesNum,
+    int? goodsId,
   }) {
     return request(
       ApiEndpoints.userPayEpisodes,
       data: {
         'videoId': videoId,
         'episodesId': episodesId,
-        'goodsId': goodsId,
+        'episodesNum': episodesNum,
+        if (goodsId != null && goodsId > 0) 'goodsId': goodsId,
       },
     );
   }
@@ -618,17 +620,19 @@ class ApiService {
     );
   }
 
-  /// 开通/充值会员
+  /// 开通/充值会员/购买整剧
   /// [payType] 3=抖音 2=微信 5=Android 6=iOS
   Future<ApiResponse> userRechange({
     required int payType,
     int? payConfigId,
+    String? videoId,
   }) {
     return request(
       ApiEndpoints.userRechange,
       data: {
         'payType': payType,
         if (payConfigId != null) 'payConfigId': payConfigId,
+        if (videoId != null) 'videoId': videoId,
       },
     );
   }

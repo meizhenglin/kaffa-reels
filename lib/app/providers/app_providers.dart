@@ -184,3 +184,15 @@ class LocaleNotifier extends StateNotifier<Locale> {
 
 /// 登录返回通知 Provider，用于通知视频页面从登录页返回
 final loginReturnProvider = StateProvider<int>((ref) => 0);
+
+/// 待解锁的剧集索引，用于登录后恢复解锁弹窗
+final pendingUnlockEpisodeIndexProvider = StateProvider<int?>((ref) => null);
+
+/// 待解锁的 videoId，用于登录后恢复解锁弹窗
+final pendingUnlockVideoIdProvider = StateProvider<String?>((ref) => null);
+
+/// 登录后要跳转到的视频索引
+final loginTargetVideoIndexProvider = StateProvider<int?>((ref) => null);
+
+/// 标记是否正在刷新视频列表（用于区分首次加载和登录后刷新）
+final isRefreshingAfterLoginProvider = StateProvider<bool>((ref) => false);

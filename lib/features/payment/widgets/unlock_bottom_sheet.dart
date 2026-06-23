@@ -19,6 +19,7 @@ class UnlockBottomSheet extends ConsumerStatefulWidget {
     super.key,
     required this.videoId,
     required this.episodeId,
+    required this.episodesNum,
     required this.episodeIndex,
     required this.dramaTitle,
     this.coverUrl,
@@ -29,6 +30,7 @@ class UnlockBottomSheet extends ConsumerStatefulWidget {
 
   final String videoId;
   final String episodeId;
+  final int episodesNum;
   final int episodeIndex;
   final String dramaTitle;
   final String? coverUrl;
@@ -40,6 +42,7 @@ class UnlockBottomSheet extends ConsumerStatefulWidget {
     required BuildContext context,
     required String videoId,
     required String episodeId,
+    required int episodesNum,
     required int episodeIndex,
     required String dramaTitle,
     String? coverUrl,
@@ -56,6 +59,7 @@ class UnlockBottomSheet extends ConsumerStatefulWidget {
       builder: (ctx) => UnlockBottomSheet(
         videoId: videoId,
         episodeId: episodeId,
+        episodesNum: episodesNum,
         episodeIndex: episodeIndex,
         dramaTitle: dramaTitle,
         coverUrl: coverUrl,
@@ -576,43 +580,59 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     _setProcessing(product.goodsId, true);
 
     try {
-      final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
-      coinNotifier.deductCoins(product.price.toInt());
-
-      // 调用后端API解锁剧集
       final apiService = ApiService(
         dioClient: ref.read(dioClientProvider),
         storage: ref.read(storageServiceProvider),
       );
-      final resp = await apiService.getUserPayEpisodes(
-        videoId: widget.videoId,
-        episodesId: widget.episodeId,
-        goodsId: product.goodsId,
-      );
 
-      if (mounted) {
-        _setProcessing(product.goodsId, false);
+      bool success = false;
 
-        if (resp.isSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.unlockSuccess),
-              backgroundColor: const Color(0xFFD9341C),
-            ),
-          );
-          Navigator.of(context).pop(UnlockResult.success(
-            episodeIndex: widget.episodeIndex,
-          ));
-        } else {
-          // 解锁失败，退款
-          coinNotifier.addCoins(product.price.toInt());
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(resp.error ?? l10n.unlockFailed),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      if (product.type == UnlockProductType.episode) {
+        // 单集解锁
+        final resp = await apiService.getUserPayEpisodes(
+          videoId: widget.videoId,
+          episodesId: widget.episodeId,
+          episodesNum: widget.episodesNum,
+          goodsId: product.goodsId,
+        );
+        success = resp.isSuccess;
+      } else if (product.type == UnlockProductType.season) {
+        // 整剧解锁
+        final resp = await apiService.userRechange(
+          payType: 5,
+          payConfigId: product.goodsId,
+          videoId: widget.videoId,
+        );
+        success = resp.isSuccess;
+      }
+
+      if (!mounted) return;
+      _setProcessing(product.goodsId, false);
+
+      if (success) {
+        // API成功后再扣本地余额
+        final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
+        coinNotifier.deductCoins(product.price.toInt());
+        // 刷新余额确保与后端同步
+        await coinNotifier.load();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.unlockSuccess),
+            backgroundColor: const Color(0xFFD9341C),
+          ),
+        );
+        Navigator.of(context).pop(UnlockResult.success(
+          episodeIndex: widget.episodeIndex,
+        ));
+      } else {
+        // API失败，不扣余额
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(resp.error ?? l10n.unlockFailed),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -656,38 +676,51 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       // 发起一次性购买
       final success = await paymentService.purchase(product: products.first);
 
-      if (mounted) {
-        _setProcessing(product.goodsId, false);
+      if (!mounted) return;
+      _setProcessing(product.goodsId, false);
 
-        if (success) {
-          // 购买成功后调用后端API解锁剧集
-          final apiService = ApiService(
-            dioClient: ref.read(dioClientProvider),
-            storage: ref.read(storageServiceProvider),
-          );
+      if (success) {
+        // 购买成功后调用后端API解锁
+        final apiService = ApiService(
+          dioClient: ref.read(dioClientProvider),
+          storage: ref.read(storageServiceProvider),
+        );
+
+        if (product.type == UnlockProductType.episode) {
           await apiService.getUserPayEpisodes(
             videoId: widget.videoId,
             episodesId: widget.episodeId,
+            episodesNum: widget.episodesNum,
             goodsId: product.goodsId,
           );
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.purchaseSuccess),
-              backgroundColor: const Color(0xFFD9341C),
-            ),
-          );
-          Navigator.of(context).pop(UnlockResult.success(
-            episodeIndex: widget.episodeIndex,
-          ));
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(paymentService.lastError ?? l10n.purchaseFailed),
-              backgroundColor: Colors.red,
-            ),
+        } else if (product.type == UnlockProductType.season) {
+          await apiService.userRechange(
+            payType: 5,
+            payConfigId: product.goodsId,
+            videoId: widget.videoId,
           );
         }
+
+        // 刷新K币余额确保与后端同步
+        final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
+        await coinNotifier.load();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.purchaseSuccess),
+            backgroundColor: const Color(0xFFD9341C),
+          ),
+        );
+        Navigator.of(context).pop(UnlockResult.success(
+          episodeIndex: widget.episodeIndex,
+        ));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(paymentService.lastError ?? l10n.purchaseFailed),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -743,25 +776,28 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         applicationUserName: ref.read(storageServiceProvider).getString('user_id'),
       );
 
-      if (mounted) {
-        _setProcessing(product.goodsId, false);
+      if (!mounted) return;
+      _setProcessing(product.goodsId, false);
 
-        if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.vipSubscriptionSuccess),
-              backgroundColor: const Color(0xFFD9341C),
-            ),
-          );
-          Navigator.of(context).pop();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(paymentService.lastError ?? l10n.vipSubscriptionFailed),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+      if (success) {
+        // 刷新K币余额确保与后端同步
+        final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
+        await coinNotifier.load();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.vipSubscriptionSuccess),
+            backgroundColor: const Color(0xFFD9341C),
+          ),
+        );
+        Navigator.of(context).pop();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(paymentService.lastError ?? l10n.vipSubscriptionFailed),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {

@@ -400,14 +400,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/short-video',
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>?;
-          final videoId = extra?['videoId'] as String? ?? '';
-          final initialIndex = extra?['initialIndex'] as int? ?? 0;
+          // 支持 query 参数 videoId 和 initialIndex
+          final videoId = extra?['videoId'] as String? ??
+              state.uri.queryParameters['videoId'] ?? '';
+          final initialIndex = extra?['initialIndex'] as int? ??
+              int.tryParse(state.uri.queryParameters['initialIndex'] ?? '') ?? 0;
           final seedVideoJson = extra?['seedVideo'] as Map<String, dynamic>?;
           final seedVideo = seedVideoJson == null
               ? null
               : VideoInfo.fromJson(seedVideoJson);
 
-          debugPrint('[router] /short-video videoId=$videoId initialIndex=$initialIndex');
+          debugPrint('[router] /short-video videoId=$videoId initialIndex=$initialIndex uri=${state.uri}');
           return ShortVideoPage(
             videoId: videoId,
             initialIndex: initialIndex,

@@ -159,11 +159,13 @@ class PayService {
   Future<bool> purchaseEpisode({
     required String videoId,
     required String episodesId,
+    required int episodesNum,
     required int goodsId,
   }) async {
     final resp = await _apiService.getUserPayEpisodes(
       videoId: videoId,
       episodesId: episodesId,
+      episodesNum: episodesNum,
       goodsId: goodsId,
     );
     return resp.isSuccess;

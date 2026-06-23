@@ -179,16 +179,32 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
         debugPrint('[LoginEmailPage] success handler: redirect=${widget.redirect}, mounted=$mounted');
         if (!mounted) return;
 
-        // 先关闭成功弹窗
-        Navigator.of(context, rootNavigator: true).pop();
+        // 关闭成功弹窗
+        Navigator.of(context).pop();
 
-        // 直接 pop 返回，让原来的 ShortVideoPage 接收登录状态变化
-        // LoginPage 会被自动 pop，回到 ShortVideoPage
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            debugPrint('[LoginEmailPage] popping back to ShortVideoPage');
-            context.pop();
-          }
+        // 触发 loginReturnProvider，ShortVideoPage 会处理滚动到正确的集
+        debugPrint('[LoginEmailPage] checking redirect condition: redirect=${widget.redirect}');
+        if (widget.redirect != null && widget.redirect!.contains('/short-video')) {
+          debugPrint('[LoginEmailPage] will trigger loginReturnProvider');
+          ref.read(loginReturnProvider.notifier).state++;
+          debugPrint('[LoginEmailPage] triggered loginReturnProvider');
+        } else {
+          debugPrint('[LoginEmailPage] redirect condition not met, skip loginReturnProvider');
+        }
+
+        // 获取 root navigator 并连续 pop 两个页面回到 ShortVideoPage
+        debugPrint('[LoginEmailPage] getting rootNav for pop');
+        final rootNav = Navigator.of(context, rootNavigator: true);
+        debugPrint('[LoginEmailPage] rootNav obtained, starting pop sequence');
+
+        Future.delayed(const Duration(milliseconds: 100), () {
+          debugPrint('[LoginEmailPage] step 1: pop LoginEmailPage');
+          rootNav.pop();
+        }).then((_) {
+          return Future.delayed(Duration.zero, () {
+            debugPrint('[LoginEmailPage] step 2: pop LoginPage');
+            rootNav.pop();
+          });
         });
       });
       return;

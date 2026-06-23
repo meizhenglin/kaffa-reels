@@ -14,6 +14,7 @@ import '../recommend/providers/video_action_provider.dart';
 import '../recommend/utils/drama_navigation.dart';
 import '../auth/providers/auth_provider.dart';
 import '../payment/providers/membership_provider.dart';
+import '../payment/providers/coin_record_provider.dart';
 import '../payment/widgets/unlock_bottom_sheet.dart';
 import '../payment/models/unlock_product.dart';
 import '../../app/providers/app_providers.dart';
@@ -222,6 +223,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   int? _pendingLockedEpisodeIndex;
   bool _showWatchNowOverlay = false;
   int? _preLoginLockedIndex;
+  bool _isShowingUnlockSheet = false;
+  String? _pendingVideoId;
 
   void _setCurrentIndex(int index) {
     debugPrint('[_shortVideoPage] _setCurrentIndex: $_currentIndex -> $index');
@@ -236,27 +239,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-
-    // 监听登录状态变化 - 登录成功后重新显示解锁半屏
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.listenManual<AuthState>(
-        authProvider,
-        (previous, next) {
-          debugPrint('[_shortVideoPage] auth changed: prev authenticated=${previous?.isAuthenticated}, prev tourist=${previous?.user?.isTourist}, next authenticated=${next.isAuthenticated}, next tourist=${next.user?.isTourist}, preLoginLockedIndex=$_preLoginLockedIndex, showOverlay=$_showWatchNowOverlay');
-          if (!mounted) return;
-          // 用户刚登录完成（有待解锁的索引）
-          if (next.isAuthenticated &&
-              !(previous?.isAuthenticated ?? false) &&
-              _preLoginLockedIndex != null) {
-            debugPrint('[_shortVideoPage] user just logged in, showing unlock sheet for index=$_preLoginLockedIndex');
-            final lockedIdx = _preLoginLockedIndex;
-            _preLoginLockedIndex = null;
-            // 重新显示解锁半屏
-            _showMembershipReminderDialog(lockedIndex: lockedIdx);
-          }
-        },
-      );
-    });
+    _pendingVideoId = widget.videoId;
+    _setupAuthListener();
 
     if (_usePreloadMode) {
       _preloadPageController = PreloadPageController(initialPage: _currentIndex);
@@ -290,6 +274,43 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         },
       );
     }
+  }
+
+  void _setupAuthListener() {
+    debugPrint('[_shortVideoPage] _setupAuthListener called, videoId=${widget.videoId}');
+
+    // 监听 loginReturnProvider 来处理登录返回
+    // 登录成功后刷新视频列表，确保 isCanPlay 状态是最新的
+    ref.listenManual<int>(
+      loginReturnProvider,
+      (previous, next) {
+        debugPrint('[_shortVideoPage] loginReturnProvider changed: prev=$previous, next=$next');
+        if (next <= (previous ?? 0)) return;
+        if (!mounted) return;
+
+        // 登录返回后，刷新视频列表以更新 isCanPlay 状态
+        debugPrint('[_shortVideoPage] refreshing video list after login');
+
+        // 获取登录前要跳转的索引
+        final targetIdx = ref.read(loginTargetVideoIndexProvider);
+        final lockedIdx = ref.read(pendingUnlockEpisodeIndexProvider);
+        debugPrint('[_shortVideoPage] login returned, targetIdx=$targetIdx, lockedIdx=$lockedIdx');
+
+        // 设置刷新标记，这样 _fetchByVideoId 会使用 targetIdx
+        ref.read(isRefreshingAfterLoginProvider.notifier).state = true;
+
+        // 刷新视频列表，完成后 _checkAndShowUnlockDialog 会处理解锁弹窗
+        _refreshVideoList();
+      },
+    );
+
+    // 同时监听 auth 状态用于其他用途（比如VIP状态变化）
+    ref.listenManual<AuthState>(
+      authProvider,
+      (previous, next) {
+        debugPrint('[_shortVideoPage] auth changed: prev=${previous?.isAuthenticated}, next=${next.isAuthenticated}');
+      },
+    );
   }
 
   @override
@@ -333,7 +354,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   Future<void> _fetchByVideoId() async {
     if (widget.videoId.isEmpty) return;
 
-    debugPrint('[$_tag] fetching by videoId=${widget.videoId}');
+    debugPrint('[$_tag] fetching by videoId=${widget.videoId}, _isDataLoaded=$_isDataLoaded');
     final l10n = AppLocalizations.of(context);
 
     try {
@@ -376,12 +397,22 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           .toList()
         ..sort((a, b) => a.serialNum.compareTo(b.serialNum));
 
+      debugPrint('[$_tag] fetched ${videos.length} videos, checking isCanPlay for each:');
+      for (int i = 0; i < videos.length && i < 15; i++) {
+        debugPrint('[$_tag]   episode[$i] serialNum=${videos[i].serialNum}, isCanPlay=${videos[i].isCanPlay}');
+      }
+
       if (videos.isEmpty) {
         _setError(l10n.noPlayableEpisodes);
         return;
       }
 
       videoInfoList = videos;
+
+      // 检查是否是登录后刷新
+      final isLoginRefresh = ref.read(isRefreshingAfterLoginProvider);
+      final loginTargetIdx = ref.read(loginTargetVideoIndexProvider);
+
       final seedEpisodeId = widget.seedVideo?.id ?? 0;
       final savedEpisodesNum = StorageService().getLastEpisodesNum(widget.videoId);
       final seedSerialNum = widget.seedVideo?.serialNum ?? savedEpisodesNum;
@@ -390,9 +421,16 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           : seedSerialNum > 0
               ? videoInfoList.indexWhere((item) => item.serialNum == seedSerialNum)
               : -1;
-      _currentIndex = resolvedInitialIndex >= 0
-          ? resolvedInitialIndex
-          : widget.initialIndex.clamp(0, videoInfoList.length - 1);
+
+      // 如果是登录后刷新，优先使用 loginTargetIdx
+      if (isLoginRefresh && loginTargetIdx != null && loginTargetIdx >= 0 && loginTargetIdx < videoInfoList.length) {
+        _currentIndex = loginTargetIdx;
+        debugPrint('[$_tag] login refresh: using loginTargetIdx=$loginTargetIdx for current index');
+      } else {
+        _currentIndex = resolvedInitialIndex >= 0
+            ? resolvedInitialIndex
+            : widget.initialIndex.clamp(0, videoInfoList.length - 1);
+      }
 
       if (_usePreloadMode) {
         _preloadPageController.removeListener(_handlePreloadPageChanged);
@@ -404,10 +442,11 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         _pageController = PageController(initialPage: _currentIndex);
       }
 
-      final newKeys = List.generate(
-        videoInfoList.length,
-        (_) => GlobalKey<WatchShortVideoItemState>(),
-      );
+      // 复用已有的 _itemKeys，只在需要时扩展
+      if (_itemKeys.length < videoInfoList.length) {
+        final needed = videoInfoList.length - _itemKeys.length;
+        _itemKeys.addAll(List.generate(needed, (_) => GlobalKey<WatchShortVideoItemState>()));
+      }
 
       _aliPlayerPreload?.destroy();
       _aliPlayerPreload = AliPlayerPreload(
@@ -423,9 +462,11 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         setState(() {
           _isLoading = false;
           _errorMessage = null;
-          _itemKeys = newKeys;
+          // _itemKeys 已经在上面扩展，不需要在这里重新赋值
         });
       }
+
+      debugPrint('[$_tag] fetchByVideoId completed successfully');
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -438,6 +479,11 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         _reportViewHistory(_currentIndex);
         _prefetchAround(_currentIndex);
         _resumeCurrent();
+
+        // 如果是登录后刷新，检查是否需要显示解锁弹窗
+        if (ref.read(isRefreshingAfterLoginProvider)) {
+          _checkAndShowUnlockDialog();
+        }
       });
     } catch (e) {
       debugPrint('[$_tag] fetchByVideoId error=$e');
@@ -449,6 +495,94 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     if (_isDataLoaded) return;
     _isDataLoaded = true;
     _fetchByVideoId();
+  }
+
+  void _refreshVideoList() {
+    debugPrint('[_refreshVideoList] called, mounted=$mounted');
+    // 标记为正在加载，防止重复调用
+    _isDataLoaded = true;
+    _fetchByVideoId();
+  }
+
+  /// 检查登录后是否需要显示解锁弹窗
+  /// 只有当目标剧集未解锁时才显示
+  void _checkAndShowUnlockDialog() {
+    debugPrint('[_checkAndShowUnlockDialog] called');
+
+    // 获取登录前的目标索引
+    final lockedIdx = ref.read(pendingUnlockEpisodeIndexProvider);
+    if (lockedIdx == null) {
+      debugPrint('[_checkAndShowUnlockDialog] no lockedIdx, skipping');
+      _clearLoginState();
+      return;
+    }
+
+    // 检查该剧集是否已经解锁（isCanPlay == 1 表示可播放）
+    if (videoInfoList.isNotEmpty && lockedIdx >= 0 && lockedIdx < videoInfoList.length) {
+      final isCanPlay = videoInfoList[lockedIdx].isCanPlay;
+      debugPrint('[_checkAndShowUnlockDialog] lockedIdx=$lockedIdx, isCanPlay=$isCanPlay');
+
+      if (isCanPlay == 1) {
+        // 已经解锁，不需要显示解锁弹窗
+        debugPrint('[_checkAndShowUnlockDialog] episode is already unlocked, skipping unlock dialog');
+        _clearLoginState();
+        return;
+      }
+    }
+
+    // 未解锁，显示解锁弹窗
+    debugPrint('[_checkAndShowUnlockDialog] showing unlock sheet');
+    _isShowingUnlockSheet = true;
+
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      _showMembershipReminderDialog(lockedIndex: lockedIdx).then((_) {
+        _isShowingUnlockSheet = false;
+        _clearLoginState();
+      });
+    });
+  }
+
+  /// 清除登录相关的状态
+  void _clearLoginState() {
+    ref.read(pendingUnlockEpisodeIndexProvider.notifier).state = null;
+    ref.read(pendingUnlockVideoIdProvider.notifier).state = null;
+    ref.read(loginTargetVideoIndexProvider.notifier).state = null;
+    ref.read(isRefreshingAfterLoginProvider.notifier).state = false;
+  }
+
+  /// 滚动到指定索引的视频
+  void _scrollToIndex(int index) {
+    debugPrint('[_scrollToIndex] scrolling to index $index');
+    if (!mounted) return;
+
+    if (index < 0) {
+      debugPrint('[_scrollToIndex] index $index is negative, skipping');
+      return;
+    }
+
+    // 如果列表还未加载完成，等待一下再尝试
+    if (!_isDataLoaded || videoInfoList.isEmpty) {
+      debugPrint('[_scrollToIndex] list not loaded yet, deferring...');
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (!mounted) return;
+        _scrollToIndex(index);
+      });
+      return;
+    }
+
+    final safeIndex = index.clamp(0, videoInfoList.length - 1);
+
+    if (_pageController.hasClients) {
+      debugPrint('[_scrollToIndex] jumping to page $safeIndex');
+      _pageController.jumpToPage(safeIndex);
+    } else {
+      debugPrint('[_scrollToIndex] pageController not ready, deferring...');
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (!mounted) return;
+        _scrollToIndex(index);
+      });
+    }
   }
 
   void _setError(String msg) {
@@ -560,7 +694,19 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     if (_pendingLockedDialogIndex == lockedIndex) return;
     _pendingLockedDialogIndex = lockedIndex;
 
-    // 显示新的解锁半屏组件
+    final index = lockedIndex ?? _currentIndex;
+
+    // 先尝试自动解锁
+    debugPrint('[_showMembershipReminderDialog] trying auto unlock first...');
+    final autoUnlockSuccess = await _tryAutoUnlockWithBalance(index);
+    debugPrint('[_showMembershipReminderDialog] autoUnlockSuccess=$autoUnlockSuccess');
+
+    if (autoUnlockSuccess) {
+      _pendingLockedDialogIndex = null;
+      return; // 自动解锁成功，不显示半屏
+    }
+
+    // 自动解锁失败，显示解锁半屏
     await _showUnlockBottomSheet(lockedIndex: lockedIndex);
 
     _pendingLockedDialogIndex = null;
@@ -641,6 +787,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       context: context,
       videoId: videoId,
       episodeId: episodeId,
+      episodesNum: videoInfo.serialNum,
       episodeIndex: index,
       dramaTitle: dramaTitle,
       coverUrl: videoInfo.coverUrl,
@@ -708,16 +855,18 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       // 用户取消
       debugPrint('[_showUnlockBottomSheet] result.isCancelled');
     } else if (result.isLoginRequired) {
-      // 游客需要登录，记录当前锁定的集索引
+      // 游客需要登录，记录当前锁定的集索引和 videoId 到全局状态
       debugPrint('[_showUnlockBottomSheet] result.isLoginRequired, setting _preLoginLockedIndex=$index');
       _preLoginLockedIndex = index;
+      ref.read(pendingUnlockEpisodeIndexProvider.notifier).state = index;
+      ref.read(pendingUnlockVideoIdProvider.notifier).state = widget.videoId;
+      ref.read(loginTargetVideoIndexProvider.notifier).state = index;
+      debugPrint('[_showUnlockBottomSheet] saved to providers: idx=$index, videoId=${widget.videoId}');
       if (mounted) {
-        // 使用 microtask 延迟导航，确保 bottom sheet 完全关闭
-        Future.microtask(() {
-          if (!mounted) return;
-          final currentPath = '/short-video';
-          context.push('/auth/login?redirect=${Uri.encodeComponent(currentPath)}');
-        });
+        // 使用 push 导航到登录页，ShortVideoPage 会保留在栈中
+        final redirectUrl = '/short-video?videoId=${Uri.encodeComponent(widget.videoId)}&initialIndex=$index';
+        debugPrint('[_showUnlockBottomSheet] going to login with redirect: $redirectUrl');
+        context.push('/auth/login?redirect=${Uri.encodeComponent(redirectUrl)}');
       }
     }
   }
@@ -730,7 +879,10 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
   Future<bool> _guardLockedEpisode(int index, {int? previousIndex}) async {
     debugPrint('[_guardLockedEpisode] called with index=$index');
-    if (!_isEpisodeLocked(index)) return true;
+    if (!_isEpisodeLocked(index)) {
+      debugPrint('[_guardLockedEpisode] episode not locked, returning true');
+      return true;
+    }
     final sourceIndex = previousIndex ?? _currentIndex;
     _pauseNearbyItems(sourceIndex);
     if (_currentIndex != index) {
@@ -745,9 +897,105 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         _showWatchNowOverlay = true;
       });
     }
-    debugPrint('[_guardLockedEpisode] calling _showMembershipReminderDialog');
+
+    // 检查 K币余额，如果足够则自动解锁
+    debugPrint('[_guardLockedEpisode] trying auto unlock...');
+    final autoUnlockSuccess = await _tryAutoUnlockWithBalance(index);
+    debugPrint('[_guardLockedEpisode] autoUnlockSuccess=$autoUnlockSuccess');
+    if (autoUnlockSuccess) {
+      return true; // 自动解锁成功，继续播放
+    }
+
+    // 余额不足，显示解锁半屏
+    debugPrint('[_guardLockedEpisode] balance insufficient, showing unlock sheet');
     await _showMembershipReminderDialog(lockedIndex: index);
     return false;
+  }
+
+  /// 尝试使用 K币余额自动解锁剧集
+  /// 返回 true 表示解锁成功，false 表示余额不足
+  Future<bool> _tryAutoUnlockWithBalance(int index) async {
+    debugPrint('[_tryAutoUnlockWithBalance] START - index=$index');
+    if (index < 0 || index >= videoInfoList.length) {
+      debugPrint('[_tryAutoUnlockWithBalance] FAIL: index out of range');
+      return false;
+    }
+
+    // 检查是否已登录
+    final authState = ref.read(authProvider);
+    if (!authState.isAuthenticated || (authState.user?.isTourist ?? true)) {
+      debugPrint('[_tryAutoUnlockWithBalance] FAIL: not logged in');
+      return false;
+    }
+
+    final episode = videoInfoList[index];
+    final episodePrice = episode.unlockPrice ?? 0;
+    debugPrint('[_tryAutoUnlockWithBalance] episode id=${episode.id}, price=$episodePrice');
+
+    // 获取当前余额
+    final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
+    await coinNotifier.load();
+    final balance = ref.read(coinBalanceInfoProvider).balance;
+    debugPrint('[_tryAutoUnlockWithBalance] balance=$balance, episodePrice=$episodePrice');
+
+    // 检查余额是否足够
+    if (balance < episodePrice) {
+      debugPrint('[_tryAutoUnlockWithBalance] FAIL: insufficient balance');
+      return false;
+    }
+
+    // 余额足够，自动解锁
+    debugPrint('[_tryAutoUnlockWithBalance] auto unlocking...');
+
+    try {
+      final apiService = ApiService(
+        dioClient: ref.read(dioClientProvider),
+        storage: ref.read(storageServiceProvider),
+      );
+
+      // 调用后端 API 解锁
+      final unlockResp = await apiService.getUserPayEpisodes(
+        videoId: widget.videoId,
+        episodesId: episode.id.toString(),
+        episodesNum: episode.serialNum,
+      );
+
+      debugPrint('[_tryAutoUnlockWithBalance] unlockResp.isSuccess=${unlockResp.isSuccess}, error=${unlockResp.error}');
+
+      if (unlockResp.isSuccess) {
+        // 解锁成功，扣减余额并刷新
+        coinNotifier.deductCoins(episodePrice);
+        await coinNotifier.load();
+
+        // 更新本地视频状态
+        setState(() {
+          videoInfoList[index] = episode.copyWith(isCanPlay: 1);
+          _pendingLockedEpisodeIndex = null;
+          _showWatchNowOverlay = false;
+        });
+
+        // 显示成功提示
+        if (mounted) {
+          final l10n = AppLocalizations.of(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${l10n.unlockSuccess} -$episodePrice K Coin'),
+              backgroundColor: const Color(0xFFD9341C),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+        debugPrint('[_tryAutoUnlockWithBalance] SUCCESS');
+        return true;
+      } else {
+        debugPrint('[_tryAutoUnlockWithBalance] FAIL: unlock API failed');
+        return false;
+      }
+    } catch (e, stack) {
+      debugPrint('[_tryAutoUnlockWithBalance] FAIL: exception $e');
+      debugPrint('[_tryAutoUnlockWithBalance] stack: $stack');
+      return false;
+    }
   }
 
   void _clearPendingLockedOverlay() {
