@@ -481,7 +481,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
             ),
             _buildIconButton(
               context,
-              imagePath: 'assets/images/share.png',
+              imagePath: 'assets/images/recharge_icon.png',
               label: l10n.rechargeRecords,
               onTap: () => context.push('/coin-records/recharge'),
             ),
@@ -494,13 +494,13 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
           children: [
             _buildIconButton(
               context,
-              imagePath: 'assets/images/share.png',
+              imagePath: 'assets/images/usege_icon.png',
               label: l10n.usageRecords,
               onTap: () => context.push('/coin-records/consume'),
             ),
             _buildIconButton(
               context,
-              imagePath: 'assets/images/share.png',
+              imagePath: 'assets/images/gift_icon.png',
               label: l10n.giftRecords,
               onTap: () => context.push('/coin-records/give'),
             ),

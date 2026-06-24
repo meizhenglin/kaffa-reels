@@ -293,15 +293,15 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         bottomBackgroundColor: _membershipBottomColor,
         body: Container(
           color: _membershipBottomColor,
-          child: const Center(
+          child: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 CircularProgressIndicator(color: Colors.white),
                 SizedBox(height: 16),
                 Text(
-                  'Checking payment status...',
-                  style: TextStyle(color: Colors.white70),
+                  l10n.checkingPaymentStatus,
+                  style: const TextStyle(color: Colors.white70),
                 ),
               ],
             ),
@@ -413,9 +413,9 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         width: double.infinity,
         color: const Color(0xFF121212),
         padding: const EdgeInsets.fromLTRB(15, 16, 15, 0),
-        child: const Text(
-          'No membership plans available right now.',
-          style: TextStyle(
+        child: Text(
+          l10n.noMembershipPlans,
+          style: const TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w400,
             color: Colors.white70,
@@ -681,9 +681,9 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Recharge Coins',
-            style: TextStyle(
+          Text(
+            l10n.rechargeCoinsTitle,
+            style: const TextStyle(
               fontWeight: FontWeight.w500,
               fontSize: 14,
               color: Colors.white,

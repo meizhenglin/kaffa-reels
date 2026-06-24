@@ -1808,6 +1808,36 @@ abstract class AppLocalizations {
   /// **'Sign-in successful! +{coins} coins'**
   String signInSuccessful(int coins);
 
+  /// No description provided for @signInUpper.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign In'**
+  String get signInUpper;
+
+  /// No description provided for @tapToSign.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to Sign'**
+  String get tapToSign;
+
+  /// No description provided for @signInNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign In Now'**
+  String get signInNow;
+
+  /// No description provided for @signedInToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed In Today'**
+  String get signedInToday;
+
+  /// No description provided for @signedTodayLower.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed Today'**
+  String get signedTodayLower;
+
   /// No description provided for @day.
   ///
   /// In en, this message translates to:
@@ -1873,6 +1903,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Usage Records'**
   String get usageRecords;
+
+  /// No description provided for @kCoin.
+  ///
+  /// In en, this message translates to:
+  /// **'K-Coin'**
+  String get kCoin;
+
+  /// No description provided for @kCoinDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Platform currency for premium content'**
+  String get kCoinDescription;
 
   /// No description provided for @kCoinRecords.
   ///
@@ -2053,6 +2095,456 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Submitting...'**
   String get submitting;
+
+  /// No description provided for @gamesCenter.
+  ///
+  /// In en, this message translates to:
+  /// **'Games Center'**
+  String get gamesCenter;
+
+  /// No description provided for @gamesCenterSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discover exciting games'**
+  String get gamesCenterSubtitle;
+
+  /// No description provided for @allGames.
+  ///
+  /// In en, this message translates to:
+  /// **'All Games'**
+  String get allGames;
+
+  /// No description provided for @noGamesAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No games available'**
+  String get noGamesAvailable;
+
+  /// No description provided for @checkBackLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Check back later for new games'**
+  String get checkBackLater;
+
+  /// No description provided for @playUpper.
+  ///
+  /// In en, this message translates to:
+  /// **'PLAY'**
+  String get playUpper;
+
+  /// No description provided for @verifiedByPlayProtect.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified by Play Protect'**
+  String get verifiedByPlayProtect;
+
+  /// No description provided for @reviewsCount.
+  ///
+  /// In en, this message translates to:
+  /// **'reviews'**
+  String get reviewsCount;
+
+  /// No description provided for @downloadsLower.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloads'**
+  String get downloadsLower;
+
+  /// No description provided for @editorsChoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Editor\'s Choice'**
+  String get editorsChoice;
+
+  /// No description provided for @install.
+  ///
+  /// In en, this message translates to:
+  /// **'Install'**
+  String get install;
+
+  /// No description provided for @playNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Play Now'**
+  String get playNow;
+
+  /// No description provided for @shareLower.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get shareLower;
+
+  /// No description provided for @addToWishlist.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to wishlist'**
+  String get addToWishlist;
+
+  /// No description provided for @screenshots.
+  ///
+  /// In en, this message translates to:
+  /// **'Screenshots'**
+  String get screenshots;
+
+  /// No description provided for @aboutThisGame.
+  ///
+  /// In en, this message translates to:
+  /// **'About this Game'**
+  String get aboutThisGame;
+
+  /// No description provided for @noDescriptionAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No description available.'**
+  String get noDescriptionAvailable;
+
+  /// No description provided for @developer.
+  ///
+  /// In en, this message translates to:
+  /// **'Developer'**
+  String get developer;
+
+  /// No description provided for @unknownDeveloper.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown Developer'**
+  String get unknownDeveloper;
+
+  /// No description provided for @ratingsAndReviews.
+  ///
+  /// In en, this message translates to:
+  /// **'Ratings and reviews'**
+  String get ratingsAndReviews;
+
+  /// No description provided for @loadingLower.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading'**
+  String get loadingLower;
+
+  /// No description provided for @failedToLoadGameDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load game details'**
+  String get failedToLoadGameDetails;
+
+  /// No description provided for @rewardCollectingReviews.
+  ///
+  /// In en, this message translates to:
+  /// **'We are collecting {objective} reviews for this app'**
+  String rewardCollectingReviews(String objective);
+
+  /// No description provided for @rewardDownloadApp.
+  ///
+  /// In en, this message translates to:
+  /// **'download the app'**
+  String get rewardDownloadApp;
+
+  /// No description provided for @rewardLeaveReview.
+  ///
+  /// In en, this message translates to:
+  /// **'leave an {objective} review and rating'**
+  String rewardLeaveReview(String objective);
+
+  /// No description provided for @rewardChance.
+  ///
+  /// In en, this message translates to:
+  /// **'you will have the chance to receive a {amount} Google Play gift card'**
+  String rewardChance(String amount);
+
+  /// No description provided for @rewardGooglePlayGiftCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Play gift card'**
+  String get rewardGooglePlayGiftCard;
+
+  /// No description provided for @rechargeCoinsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recharge Coins'**
+  String get rechargeCoinsTitle;
+
+  /// No description provided for @choosePackage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a package to recharge'**
+  String get choosePackage;
+
+  /// No description provided for @noRechargePackages.
+  ///
+  /// In en, this message translates to:
+  /// **'No recharge packages available'**
+  String get noRechargePackages;
+
+  /// No description provided for @checkingPaymentStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking payment status...'**
+  String get checkingPaymentStatus;
+
+  /// No description provided for @noMembershipPlans.
+  ///
+  /// In en, this message translates to:
+  /// **'No membership plans available right now.'**
+  String get noMembershipPlans;
+
+  /// No description provided for @purchaseFailedPleaseRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase failed. Please try again.'**
+  String get purchaseFailedPleaseRetry;
+
+  /// No description provided for @payPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Pay {price}'**
+  String payPrice(String price);
+
+  /// No description provided for @deleteAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get deleteAccount;
+
+  /// No description provided for @deleteAccountConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete your account?'**
+  String get deleteAccountConfirm;
+
+  /// No description provided for @deleteAccountWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'After deletion, all your data will be permanently erased and cannot be recovered.'**
+  String get deleteAccountWarning;
+
+  /// No description provided for @personalInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Personal Info'**
+  String get personalInfo;
+
+  /// No description provided for @changeName.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Name'**
+  String get changeName;
+
+  /// No description provided for @nameField.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get nameField;
+
+  /// No description provided for @newName.
+  ///
+  /// In en, this message translates to:
+  /// **'New Name'**
+  String get newName;
+
+  /// No description provided for @pleaseEnter.
+  ///
+  /// In en, this message translates to:
+  /// **'Please Enter'**
+  String get pleaseEnter;
+
+  /// No description provided for @skip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get skip;
+
+  /// No description provided for @noAds.
+  ///
+  /// In en, this message translates to:
+  /// **'No Ads'**
+  String get noAds;
+
+  /// No description provided for @hdQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'HD Quality'**
+  String get hdQuality;
+
+  /// No description provided for @downloadFeature.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get downloadFeature;
+
+  /// No description provided for @arabic.
+  ///
+  /// In en, this message translates to:
+  /// **'العربية'**
+  String get arabic;
+
+  /// No description provided for @english.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get english;
+
+  /// No description provided for @failedToDeleteAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete account'**
+  String get failedToDeleteAccount;
+
+  /// No description provided for @registrationSessionExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Registration session expired. Please register again.'**
+  String get registrationSessionExpired;
+
+  /// No description provided for @failedToVerifyAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to verify current account'**
+  String get failedToVerifyAccount;
+
+  /// No description provided for @loginSessionMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Current login session does not match the newly registered account. Please log in again and retry.'**
+  String get loginSessionMismatch;
+
+  /// No description provided for @missingRegistrationContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing registration context'**
+  String get missingRegistrationContext;
+
+  /// No description provided for @failedToUpdateName.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to update name'**
+  String get failedToUpdateName;
+
+  /// No description provided for @searchDramas.
+  ///
+  /// In en, this message translates to:
+  /// **'Search dramas...'**
+  String get searchDramas;
+
+  /// No description provided for @failedToLoadFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load favorites'**
+  String get failedToLoadFavorites;
+
+  /// No description provided for @failedToLoadHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load history'**
+  String get failedToLoadHistory;
+
+  /// No description provided for @failedToLoadRecords.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load records'**
+  String get failedToLoadRecords;
+
+  /// No description provided for @failedToLoadSignInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load sign info'**
+  String get failedToLoadSignInfo;
+
+  /// No description provided for @signFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign failed'**
+  String get signFailed;
+
+  /// No description provided for @failedToRefreshSignInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to refresh sign info'**
+  String get failedToRefreshSignInfo;
+
+  /// No description provided for @reportPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Report'**
+  String get reportPageTitle;
+
+  /// No description provided for @rechargeAgreementTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recharge Agreement'**
+  String get rechargeAgreementTitle;
+
+  /// No description provided for @rechargeAgreementContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recharge Agreement content goes here...'**
+  String get rechargeAgreementContent;
+
+  /// No description provided for @contactUsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact Us:'**
+  String get contactUsLabel;
+
+  /// No description provided for @premiumContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium Content'**
+  String get premiumContent;
+
+  /// No description provided for @adFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Ad-free'**
+  String get adFree;
+
+  /// No description provided for @offlineDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline Download'**
+  String get offlineDownload;
+
+  /// No description provided for @earlyAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Early Access'**
+  String get earlyAccess;
+
+  /// No description provided for @trialContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Trial Content'**
+  String get trialContent;
+
+  /// No description provided for @quarterly.
+  ///
+  /// In en, this message translates to:
+  /// **'Quarterly'**
+  String get quarterly;
+
+  /// No description provided for @unlockClarityLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock the clarity level'**
+  String get unlockClarityLevel;
+
+  /// No description provided for @shortDramaSeries.
+  ///
+  /// In en, this message translates to:
+  /// **'Short drama series'**
+  String get shortDramaSeries;
+
+  /// No description provided for @content.
+  ///
+  /// In en, this message translates to:
+  /// **'Content'**
+  String get content;
+
+  /// No description provided for @noEpisodesAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No episodes available'**
+  String get noEpisodesAvailable;
 }
 
 class _AppLocalizationsDelegate

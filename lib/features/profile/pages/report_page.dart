@@ -182,9 +182,9 @@ class _ReportPageState extends ConsumerState<ReportPage> {
                                 },
                               ),
                               const SizedBox(height: 15),
-                              const Text(
-                                'Complaint and Report',
-                                style: TextStyle(
+                              Text(
+                                l10n.complaintAndReport,
+                                style: const TextStyle(
                                   fontWeight: FontWeight.w400,
                                   fontSize: 15,
                                   color: Colors.white,
@@ -198,14 +198,14 @@ class _ReportPageState extends ConsumerState<ReportPage> {
                               ),
                               const SizedBox(height: 10),
                               RichText(
-                                text: const TextSpan(
-                                  style: TextStyle(
+                                text: TextSpan(
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.w400,
                                     fontSize: 14,
                                     color: Color(0xFF999999),
                                   ),
                                   children: [
-                                    TextSpan(text: 'Contact Us:'),
+                                    TextSpan(text: '${l10n.contactUsLabel} '),
                                     TextSpan(text: 'gahwatv register@gahwatv.com'),
                                   ],
                                 ),

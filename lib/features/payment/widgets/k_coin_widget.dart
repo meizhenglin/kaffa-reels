@@ -69,9 +69,9 @@ class _KCoinWidgetState extends ConsumerState<KCoinWidget> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'K-Coin',
-                      style: TextStyle(
+                    Text(
+                      l10n.kCoin,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -79,9 +79,9 @@ class _KCoinWidgetState extends ConsumerState<KCoinWidget> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Platform currency for premium content',
+                      l10n.kCoinDescription,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.6),
+                        color: Colors.white.withValues(alpha: 0.6),
                         fontSize: 11,
                       ),
                     ),

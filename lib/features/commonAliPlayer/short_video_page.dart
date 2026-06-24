@@ -1167,6 +1167,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   }
 
   void _showQualityPicker(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final hasPremium = ref.watch(featureAccessProvider(Feature.hdQuality));
     final isVip = hasPremium;
     final screenWidth = MediaQuery.of(context).size.width;
@@ -1197,9 +1198,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text(
-                          'Unlock the clarity level',
-                          style: TextStyle(
+                        Text(
+                          l10n.unlockClarityLevel,
+                          style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 16,
                             color: Color(0xFFFFFFFF),
@@ -1608,6 +1609,7 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final mediaQuery = MediaQuery.of(context);
     final safeIndex = widget.currentIndex.clamp(0, widget.episodes.isEmpty ? 0 : widget.episodes.length - 1);
     final currentEpisode = widget.episodes.isNotEmpty ? widget.episodes[safeIndex] : null;
@@ -1644,9 +1646,10 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
   }
 
   Widget _buildHeader(BuildContext context, VideoInfo currentEpisode) {
+    final l10n = AppLocalizations.of(context);
     final subtitle = currentEpisode.content.trim().isNotEmpty
         ? currentEpisode.content.trim()
-        : 'Short drama series';
+        : l10n.shortDramaSeries;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1769,7 +1772,7 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
         const SizedBox(width: 15),
         Expanded(
           child: _buildTabButton(
-            label: 'Content',
+            label: l10n.content,
             isActive: _activeTab == _EpisodeSheetTab.content,
             onTap: () => setState(() => _activeTab = _EpisodeSheetTab.content),
           ),
@@ -1806,12 +1809,13 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
   }
 
   Widget _buildEpisodesPanel() {
+    final l10n = AppLocalizations.of(context);
     final segments = _episodeSegments;
     if (segments.isEmpty || widget.episodes.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
-          'No episodes available',
-          style: TextStyle(color: Colors.white54),
+          l10n.noEpisodesAvailable,
+          style: const TextStyle(color: Colors.white54),
         ),
       );
     }

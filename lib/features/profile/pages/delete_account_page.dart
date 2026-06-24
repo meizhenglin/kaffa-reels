@@ -21,6 +21,7 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return GradientScaffold(
       body: SafeArea(
         child: Column(
@@ -33,11 +34,11 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
                     onPressed: () => context.pop(),
                     color: Colors.white,
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Center(
                       child: Text(
-                        'Delete account',
-                        style: TextStyle(
+                        l10n.deleteAccount,
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -62,18 +63,18 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 20),
-                    const Text(
-                      'Are you sure you want to delete your account?',
-                      style: TextStyle(
+                    Text(
+                      l10n.deleteAccountConfirm,
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'After deletion, all your data will be permanently erased and cannot be recovered.',
-                      style: TextStyle(
+                    Text(
+                      l10n.deleteAccountWarning,
+                      style: const TextStyle(
                         color: Color(0xFF999999),
                         fontSize: 14,
                       ),
@@ -120,6 +121,7 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
   }
 
   Future<void> _deleteAccount() async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _isLoading = true);
 
     final messenger = ScaffoldMessenger.of(context);
@@ -131,7 +133,7 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
       setState(() => _isLoading = false);
       messenger.showSnackBar(
         SnackBar(
-          content: Text(response.error ?? 'Failed to delete account'),
+          content: Text(response.error ?? l10n.failedToDeleteAccount),
           backgroundColor: const Color(0xFFFF6B6B),
         ),
       );

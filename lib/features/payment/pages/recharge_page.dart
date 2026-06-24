@@ -131,18 +131,18 @@ class _RechargePageState extends ConsumerState<RechargePage> {
                           ],
                         ),
                         const SizedBox(height: 20),
-                        const Text(
-                          'Recharge Coins',
-                          style: TextStyle(
+                        Text(
+                          l10n.rechargeCoinsTitle,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          'Choose a package to recharge',
-                          style: TextStyle(color: Colors.white70),
+                        Text(
+                          l10n.choosePackage,
+                          style: const TextStyle(color: Colors.white70),
                         ),
                       ],
                     ),
@@ -177,11 +177,11 @@ class _RechargePageState extends ConsumerState<RechargePage> {
                     ),
                   )
                 else
-                  const SliverFillRemaining(
+                  SliverFillRemaining(
                     child: Center(
                       child: Text(
-                        'No recharge packages available',
-                        style: TextStyle(color: Colors.white70),
+                        l10n.noRechargePackages,
+                        style: const TextStyle(color: Colors.white70),
                       ),
                     ),
                   ),

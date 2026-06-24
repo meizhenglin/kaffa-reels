@@ -332,6 +332,11 @@
       "coins": {"type": "int"}
     }
   },
+  "signInUpper": "Sign In",
+  "tapToSign": "Tap to Sign",
+  "signInNow": "Sign In Now",
+  "signedInToday": "Signed In Today",
+  "signedTodayLower": "Signed Today",
   "day": "Day {day}",
   "@day": {
     "placeholders": {
@@ -354,6 +359,8 @@
   "recharge": "Recharge",
   "rechargeRecords": "Recharge Records",
   "usageRecords": "Usage Records",
+  "kCoin": "K-Coin",
+  "kCoinDescription": "Platform currency for premium content",
 
   "kCoinRecords": "K-Coin Records",
   "rechargeHistory": "View your K-Coin recharge history",
@@ -387,5 +394,105 @@
   "pleaseEnterFeedback": "Please enter your feedback",
   "failedToSubmitFeedback": "Failed to submit feedback",
   "submitReport": "Submit Report",
-  "submitting": "Submitting..."
+  "submitting": "Submitting...",
+
+  "gamesCenter": "Games Center",
+  "gamesCenterSubtitle": "Discover exciting games",
+  "allGames": "All Games",
+  "noGamesAvailable": "No games available",
+  "checkBackLater": "Check back later for new games",
+  "playUpper": "PLAY",
+  "verifiedByPlayProtect": "Verified by Play Protect",
+  "reviewsCount": "reviews",
+  "downloadsLower": "Downloads",
+  "editorsChoice": "Editor's Choice",
+  "install": "Install",
+  "playNow": "Play Now",
+  "shareLower": "Share",
+  "addToWishlist": "Add to wishlist",
+  "screenshots": "Screenshots",
+  "aboutThisGame": "About this Game",
+  "noDescriptionAvailable": "No description available.",
+  "developer": "Developer",
+  "unknownDeveloper": "Unknown Developer",
+  "ratingsAndReviews": "Ratings and reviews",
+  "loadingLower": "Loading",
+  "failedToLoadGameDetails": "Failed to load game details",
+
+  "rewardCollectingReviews": "We are collecting {objective} reviews for this app",
+  "@rewardCollectingReviews": {
+    "placeholders": {
+      "objective": {"type": "String"}
+    }
+  },
+  "rewardDownloadApp": "download the app",
+  "rewardLeaveReview": "leave an {objective} review and rating",
+  "@rewardLeaveReview": {
+    "placeholders": {
+      "objective": {"type": "String"}
+    }
+  },
+  "rewardChance": "you will have the chance to receive a {amount} Google Play gift card",
+  "@rewardChance": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "rewardGooglePlayGiftCard": "Google Play gift card",
+
+  "rechargeCoinsTitle": "Recharge Coins",
+  "choosePackage": "Choose a package to recharge",
+  "noRechargePackages": "No recharge packages available",
+  "checkingPaymentStatus": "Checking payment status...",
+  "noMembershipPlans": "No membership plans available right now.",
+  "purchaseFailedPleaseRetry": "Purchase failed. Please try again.",
+  "payPrice": "Pay {price}",
+  "@payPrice": {
+    "placeholders": {
+      "price": {"type": "String"}
+    }
+  },
+  "deleteAccount": "Delete account",
+  "deleteAccountConfirm": "Are you sure you want to delete your account?",
+  "deleteAccountWarning": "After deletion, all your data will be permanently erased and cannot be recovered.",
+  "personalInfo": "Personal Info",
+  "changeName": "Change Name",
+  "nameField": "Name",
+  "newName": "New Name",
+  "pleaseEnter": "Please Enter",
+  "skip": "Skip",
+  "noAds": "No Ads",
+  "hdQuality": "HD Quality",
+  "downloadFeature": "Download",
+  "arabic": "العربية",
+  "english": "English",
+  "failedToDeleteAccount": "Failed to delete account",
+  "registrationSessionExpired": "Registration session expired. Please register again.",
+  "failedToVerifyAccount": "Failed to verify current account",
+  "loginSessionMismatch": "Current login session does not match the newly registered account. Please log in again and retry.",
+  "missingRegistrationContext": "Missing registration context",
+  "failedToUpdateName": "Failed to update name",
+  "searchDramas": "Search dramas...",
+  "failedToLoadFavorites": "Failed to load favorites",
+  "failedToLoadHistory": "Failed to load history",
+  "failedToLoadRecords": "Failed to load records",
+  "failedToLoadSignInfo": "Failed to load sign info",
+  "signFailed": "Sign failed",
+  "failedToRefreshSignInfo": "Failed to refresh sign info",
+  "reportPageTitle": "Report",
+  "rechargeAgreementTitle": "Recharge Agreement",
+  "rechargeAgreementContent": "Recharge Agreement content goes here...",
+  "contactUsLabel": "Contact Us:",
+  "premiumContent": "Premium Content",
+  "adFree": "Ad-free",
+  "offlineDownload": "Offline Download",
+  "earlyAccess": "Early Access",
+  "trialContent": "Trial Content",
+  "quarterly": "Quarterly",
+  "monthly": "Monthly",
+  "yearly": "Yearly",
+  "unlockClarityLevel": "Unlock the clarity level",
+  "shortDramaSeries": "Short drama series",
+  "content": "Content",
+  "noEpisodesAvailable": "No episodes available"
 }

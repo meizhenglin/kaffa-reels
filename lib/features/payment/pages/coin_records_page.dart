@@ -162,17 +162,17 @@ class _CoinRecordsPageState extends ConsumerState<CoinRecordsPage>
                   _RecordListView(
                     provider: rechargeRecordsProvider,
                     emptyText: l10n.noRechargeRecords,
-                    emptyIcon: Icons.account_balance_wallet,
+                    emptyIcon: Icons.add_circle_outline,
                   ),
                   _RecordListView(
                     provider: consumeRecordsProvider,
                     emptyText: l10n.noUsageRecords,
-                    emptyIcon: Icons.shopping_cart,
+                    emptyIcon: Icons.receipt_long,
                   ),
                   _RecordListView(
                     provider: giveRecordsProvider,
                     emptyText: l10n.noGiftRecords,
-                    emptyIcon: Icons.card_giftcard,
+                    emptyIcon: Icons.volunteer_activism,
                   ),
                 ],
               ),
@@ -284,14 +284,28 @@ class _RecordListViewState extends ConsumerState<_RecordListView> {
   }
 }
 
-class _RecordItem extends StatelessWidget {
+class _RecordItem extends ConsumerWidget {
   final CoinRecord record;
 
   const _RecordItem({required this.record});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final isPositive = record.amount > 0;
+
+    String _getTitle(AppLocalizations l10n) {
+      switch (record.type) {
+        case 'recharge':
+          return l10n.kCoinRecharge;
+        case 'consume':
+          return l10n.kCoinUsed;
+        case 'give':
+          return l10n.kCoinGift;
+        default:
+          return l10n.kCoinTransaction;
+      }
+    }
     
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -325,7 +339,7 @@ class _RecordItem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _getTitle(),
+                  _getTitle(l10n),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -370,7 +384,7 @@ class _RecordItem extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Balance: ${record.balance}',
+                '${l10n.balance}: ${record.balance}',
                 style: const TextStyle(
                   color: Colors.white54,
                   fontSize: 11,
@@ -406,19 +420,6 @@ class _RecordItem extends StatelessWidget {
         return Icons.card_giftcard;
       default:
         return Icons.monetization_on;
-    }
-  }
-
-  String _getTitle() {
-    switch (record.type) {
-      case 'recharge':
-        return l10n.kCoinRecharge;
-      case 'consume':
-        return l10n.kCoinUsed;
-      case 'give':
-        return l10n.kCoinGift;
-      default:
-        return l10n.kCoinTransaction;
     }
   }
 

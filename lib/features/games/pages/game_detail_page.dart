@@ -56,12 +56,14 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
           _isLoading = false;
         });
       } else {
+        final l10n = AppLocalizations.of(context);
         setState(() {
-          _errorMessage = response.error ?? 'Failed to load game details';
+          _errorMessage = response.error ?? l10n.failedToLoadGameDetails;
           _isLoading = false;
         });
       }
     } catch (e) {
+      final l10n = AppLocalizations.of(context);
       setState(() {
         _errorMessage = e.toString();
         _isLoading = false;
@@ -136,7 +138,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
       body: Stack(
         children: [
           _buildMainContent(theme, l10n),
-          if (_showRewardPopup) _buildRewardPopup(),
+          if (_showRewardPopup) _buildRewardPopup(l10n),
         ],
       ),
     );
@@ -160,21 +162,21 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (game != null) ...[
-                        _buildHeader(game),
+                        _buildHeader(game, l10n),
                         const SizedBox(height: 20),
-                        _buildRatingsDownload(game),
+                        _buildRatingsDownload(game, l10n),
                         const SizedBox(height: 20),
-                        _buildInstallButton(game),
+                        _buildInstallButton(game, l10n),
                         const SizedBox(height: 24),
-                        _buildShareRow(),
+                        _buildShareRow(l10n),
                         const SizedBox(height: 24),
-                        _buildScreenshots(game),
+                        _buildScreenshots(game, l10n),
                         const SizedBox(height: 24),
-                        _buildAboutSection(game),
+                        _buildAboutSection(game, l10n),
                         const SizedBox(height: 24),
-                        _buildDeveloperInfo(game),
+                        _buildDeveloperInfo(game, l10n),
                         const SizedBox(height: 24),
-                        _buildReviewsSection(game),
+                        _buildReviewsSection(game, l10n),
                         const SizedBox(height: 24),
                       ] else ...[
                         _buildHeaderSkeleton(),
@@ -183,7 +185,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
                         const SizedBox(height: 20),
                         _buildInstallButtonSkeleton(),
                         const SizedBox(height: 24),
-                        _buildShareRow(),
+                        _buildShareRow(l10n),
                         const SizedBox(height: 24),
                         _buildScreenshotsSkeleton(),
                         const SizedBox(height: 24),
@@ -222,7 +224,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     );
   }
 
-  Widget _buildLoadingOverlay() {
+  Widget _buildLoadingOverlay(AppLocalizations l10n) {
     return Container(
       color: const Color(0xFF13131A),
       child: Center(
@@ -244,9 +246,9 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
-                'Loading',
-                style: TextStyle(color: Colors.white, fontSize: 14),
+              Text(
+                l10n.loadingLower,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
               ),
             ],
           ),
@@ -279,7 +281,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     );
   }
 
-  Widget _buildHeader(GameDetail? game) {
+  Widget _buildHeader(GameDetail? game, AppLocalizations l10n) {
     final iconUrl = game?.icon;
 
     return Row(
@@ -379,9 +381,9 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const Text(
-                    'Verified by Play Protect',
-                    style: TextStyle(
+                  Text(
+                    l10n.verifiedByPlayProtect,
+                    style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w400,
                       color: Color(0xFF555555),
@@ -462,7 +464,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     );
   }
 
-  Widget _buildRatingsDownload(GameDetail game) {
+  Widget _buildRatingsDownload(GameDetail game, AppLocalizations l10n) {
     // Generate mock data for demo
     const rating = '5.0';
     const reviewCount = '193';
@@ -477,11 +479,11 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _buildRatingItem(rating, reviewCount),
+          _buildRatingItem(rating, reviewCount, l10n),
           _buildDivider(),
-          _buildDownloadItem(downloadCount),
+          _buildDownloadItem(downloadCount, l10n),
           _buildDivider(),
-          _buildEditorChoice(),
+          _buildEditorChoice(l10n),
         ],
       ),
     );
@@ -539,7 +541,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     );
   }
 
-  Widget _buildRatingItem(String rating, String reviewCount) {
+  Widget _buildRatingItem(String rating, String reviewCount, AppLocalizations l10n) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -567,7 +569,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
         ),
         const SizedBox(height: 2),
         Text(
-          '$reviewCount reviews',
+          '$reviewCount ${l10n.reviewsCount}',
           style: const TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w400,
@@ -578,7 +580,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     );
   }
 
-  Widget _buildDownloadItem(String count) {
+  Widget _buildDownloadItem(String count, AppLocalizations l10n) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -591,9 +593,9 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
           ),
         ),
         const SizedBox(height: 2),
-        const Text(
-          'Downloads',
-          style: TextStyle(
+        Text(
+          l10n.downloadsLower,
+          style: const TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w400,
             color: Colors.white70,
@@ -603,7 +605,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     );
   }
 
-  Widget _buildEditorChoice() {
+  Widget _buildEditorChoice(AppLocalizations l10n) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -619,9 +621,9 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
           ),
         ),
         const SizedBox(height: 2),
-        const Text(
-          "Editor's Choice",
-          style: TextStyle(
+        Text(
+          l10n.editorsChoice,
+          style: const TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w400,
             color: Colors.white70,
@@ -639,9 +641,9 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     );
   }
 
-  Widget _buildInstallButton(GameDetail game) {
+  Widget _buildInstallButton(GameDetail game, AppLocalizations l10n) {
     final isDownload = game.isAppGame;
-    final buttonText = isDownload ? 'Install' : 'Play Now';
+    final buttonText = isDownload ? l10n.install : l10n.playNow;
 
     return SizedBox(
       width: double.infinity,
@@ -687,13 +689,13 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     );
   }
 
-  Widget _buildShareRow() {
+  Widget _buildShareRow(AppLocalizations l10n) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _buildShareItem('assets/images/share.png', 'Share'),
+        _buildShareItem('assets/images/share.png', l10n.shareLower),
         const SizedBox(width: 24),
-        _buildShareItem('assets/images/addwishlist.png', 'Add to wishlist'),
+        _buildShareItem('assets/images/addwishlist.png', l10n.addToWishlist),
       ],
     );
   }
@@ -727,18 +729,18 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     );
   }
 
-  Widget _buildScreenshots(GameDetail game) {
+  Widget _buildScreenshots(GameDetail game, AppLocalizations l10n) {
     final urls = _parseBannerUrls(game.banner);
     if (urls.isEmpty) {
-      return _buildMockScreenshots();
+      return _buildMockScreenshots(l10n);
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Screenshots',
-          style: TextStyle(
+        Text(
+          l10n.screenshots,
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -785,13 +787,13 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     );
   }
 
-  Widget _buildMockScreenshots() {
+  Widget _buildMockScreenshots(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Screenshots',
-          style: TextStyle(
+        Text(
+          l10n.screenshots,
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -871,13 +873,13 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
         .toList();
   }
 
-  Widget _buildAboutSection(GameDetail game) {
+  Widget _buildAboutSection(GameDetail game, AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'About this Game',
-          style: TextStyle(
+        Text(
+          l10n.aboutThisGame,
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -885,7 +887,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
         ),
         const SizedBox(height: 10),
         Text(
-          game.description ?? 'No description available.',
+          game.description ?? l10n.noDescriptionAvailable,
           style: const TextStyle(
             fontSize: 14,
             color: Colors.white70,
@@ -945,13 +947,13 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     );
   }
 
-  Widget _buildDeveloperInfo(GameDetail game) {
+  Widget _buildDeveloperInfo(GameDetail game, AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Developer',
-          style: TextStyle(
+        Text(
+          l10n.developer,
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -959,7 +961,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
         ),
         const SizedBox(height: 10),
         Text(
-          game.gameTypeDesc ?? 'Unknown Developer',
+          game.gameTypeDesc ?? l10n.unknownDeveloper,
           style: const TextStyle(
             fontSize: 14,
             color: Colors.white70,
@@ -969,13 +971,13 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     );
   }
 
-  Widget _buildReviewsSection(GameDetail game) {
+  Widget _buildReviewsSection(GameDetail game, AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Ratings and reviews',
-          style: TextStyle(
+        Text(
+          l10n.ratingsAndReviews,
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -1044,7 +1046,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     );
   }
 
-  Widget _buildRewardPopup() {
+  Widget _buildRewardPopup(AppLocalizations l10n) {
     final game = _gameDetail;
     if (game == null) return const SizedBox.shrink();
 
@@ -1093,15 +1095,9 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
                         height: 24,
                       ),
                       children: [
-                        const TextSpan(text: 'We are collecting '),
                         TextSpan(
-                          text: 'objective',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2B8C32),
-                          ),
+                          text: l10n.rewardCollectingReviews('objective'),
                         ),
-                        const TextSpan(text: ' reviews for this app'),
                       ],
                     ),
                     textAlign: TextAlign.center,
@@ -1109,7 +1105,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
                   const SizedBox(height: 20),
                   _buildRewardAppInfo(game),
                   const SizedBox(height: 15),
-                  _buildRewardDetails(),
+                  _buildRewardDetails(l10n),
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
@@ -1127,9 +1123,9 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
                         ),
                         elevation: 0,
                       ),
-                      child: const Text(
-                        'Install',
-                        style: TextStyle(
+                      child: Text(
+                        l10n.install,
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1236,7 +1232,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     );
   }
 
-  Widget _buildRewardDetails() {
+  Widget _buildRewardDetails(AppLocalizations l10n) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1261,25 +1257,18 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
                 height: 18,
               ),
               children: [
-                const TextSpan(text: 'If you can '),
                 TextSpan(
-                  text: 'download the app',
+                  text: l10n.rewardDownloadApp,
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                const TextSpan(text: ' and leave an '),
                 TextSpan(
-                  text: 'objective',
+                  text: ' ${l10n.rewardLeaveReview('objective')}',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                const TextSpan(text: ' review and rating, you will have the chance to receive a '),
                 TextSpan(
-                  text: '\$20',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2B8C32),
-                  ),
+                  text: ', ${l10n.rewardChance('\$20')}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                const TextSpan(text: ' Google Play gift card.'),
               ],
             ),
           ),

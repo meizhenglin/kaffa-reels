@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../core/network/api_service.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../home/pages/main_page.dart' show currentTabIndexProvider;
 import '../../auth/models/user_model.dart';
 import '../../auth/pages/photo_setting_page.dart' show RegistrationFlowContext;
@@ -68,6 +69,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
   }
 
   Future<void> _ensureRegistrationIdentity(RegistrationFlowContext registrationContext) async {
+    final l10n = AppLocalizations.of(context);
     final authNotifier = ref.read(authProvider.notifier);
     final authState = ref.read(authProvider);
     final session = authState.registrationSession;
@@ -83,7 +85,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
         .toLowerCase();
 
     if (session == null) {
-      throw Exception('Registration session expired. Please register again.');
+      throw Exception(l10n.registrationSessionExpired);
     }
 
     bool matchesCurrentUser(UserModel? user) {
@@ -99,18 +101,19 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
 
     final resp = await apiServiceProvider.getUserCenter();
     if (!resp.isSuccess || resp.data == null) {
-      throw Exception(resp.error ?? 'Failed to verify current account');
+      throw Exception(resp.error ?? l10n.failedToVerifyAccount);
     }
 
     await authNotifier.updateUserFromData(resp.data as Map<String, dynamic>);
 
     final refreshedUser = ref.read(authProvider).user;
     if (!matchesCurrentUser(refreshedUser)) {
-      throw Exception('Current login session does not match the newly registered account. Please log in again and retry.');
+      throw Exception(l10n.loginSessionMismatch);
     }
   }
 
   Future<void> _onConfirm() async {
+    final l10n = AppLocalizations.of(context);
     final newName = _newNameController.text.trim();
     if (newName.isEmpty || _isSubmitting) return;
 
@@ -120,7 +123,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
       if (widget.fromRegister) {
         final registrationContext = widget.registrationContext;
         if (registrationContext == null) {
-          throw Exception('Missing registration context');
+          throw Exception(l10n.missingRegistrationContext);
         }
         await _ensureRegistrationIdentity(registrationContext);
       }
@@ -129,7 +132,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
 
       final resp = await apiServiceProvider.getUserCenter();
       if (!resp.isSuccess) {
-        throw Exception(resp.error ?? 'Failed to update name');
+        throw Exception(resp.error ?? l10n.failedToUpdateName);
       }
 
       if (resp.data != null && mounted) {
@@ -152,7 +155,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
       }
       final message = error is Exception
           ? error.toString().replaceFirst('Exception: ', '')
-          : 'Failed to update name';
+      : l10n.failedToUpdateName;
       _showErrorMessage(message);
     } finally {
       if (mounted) {
@@ -163,6 +166,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final auth = ref.watch(authProvider);
 
     // 游客直接跳转登录；注册补全流程允许临时放行
@@ -195,11 +199,11 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
                     },
                     constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Change Name',
+                      l10n.changeName,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
@@ -225,7 +229,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
                   children: [
                     _buildInlineField(
                       context,
-                      title: 'Name',
+                      title: l10n.nameField,
                       value: _nameController.text,
                       valueColor: Colors.white54,
                     ),
@@ -247,15 +251,15 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
                     border: Border.all(color: const Color(0xFF8F4EFF), width: 1),
                     borderRadius: BorderRadius.circular(24),
                   ),
-                  child: const Text(
-                    'Skip',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Color(0xFF8F4EFF),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                    child: Text(
+                      l10n.skip,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Color(0xFF8F4EFF),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -276,7 +280,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Text(
-                  'confirm',
+                  l10n.confirm,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: _canConfirm ? Colors.white : Colors.white38,
@@ -338,6 +342,7 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
   }
 
   Widget _buildEditableInlineField(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final textDirection = Directionality.of(context);
     final hintTextAlign = textDirection == TextDirection.rtl ? TextAlign.start : TextAlign.end;
 
@@ -351,9 +356,9 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
       child: Row(
         textDirection: textDirection,
         children: [
-          const Text(
-            'New Name',
-            style: TextStyle(
+          Text(
+            l10n.newName,
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 14,
               fontWeight: FontWeight.w400,
@@ -373,9 +378,9 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
                   fontWeight: FontWeight.w400,
                   height: 1.0,
                 ),
-                decoration: const InputDecoration(
-                  hintText: 'Please Enter',
-                  hintStyle: TextStyle(
+                decoration: InputDecoration(
+                  hintText: l10n.pleaseEnter,
+                  hintStyle: const TextStyle(
                     color: Colors.white38,
                     fontSize: 14,
                     fontWeight: FontWeight.w400,

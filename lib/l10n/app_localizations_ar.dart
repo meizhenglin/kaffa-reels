@@ -192,10 +192,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get activate => 'تفعيل';
 
   @override
-  String get monthly => 'Monthly';
+  String get monthly => 'شهري';
 
   @override
-  String get yearly => 'Yearly';
+  String get yearly => 'سنوي';
 
   @override
   String get games => 'ألعاب';
@@ -888,7 +888,7 @@ class AppLocalizationsAr extends AppLocalizations {
   }
 
   @override
-  String get signInDailyHint => 'سجّل الدخول يومياً للحصول على المكافآت';
+  String get signInDailyHint => 'سجّل الدخول يومياً للحصول على مكافآت';
 
   @override
   String get signed => 'تم التوقيع';
@@ -900,6 +900,21 @@ class AppLocalizationsAr extends AppLocalizations {
   String signInSuccessful(int coins) {
     return 'تم التوقيع بنجاح! +$coins عملات';
   }
+
+  @override
+  String get signInUpper => 'تسجيل الدخول';
+
+  @override
+  String get tapToSign => 'انقر للتوقيع';
+
+  @override
+  String get signInNow => 'سجّل الآن';
+
+  @override
+  String get signedInToday => 'تم التوقيع اليوم';
+
+  @override
+  String get signedTodayLower => 'تم التوقيع اليوم';
 
   @override
   String day(int day) {
@@ -937,6 +952,12 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get usageRecords => 'سجلات الاستخدام';
+
+  @override
+  String get kCoin => 'عملات K';
+
+  @override
+  String get kCoinDescription => 'عملة المنصة للمحتوى المميز';
 
   @override
   String get kCoinRecords => 'سجلات K-Coin';
@@ -1027,4 +1048,240 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get submitting => 'جار الإرسال...';
+
+  @override
+  String get gamesCenter => 'مركز الألعاب';
+
+  @override
+  String get gamesCenterSubtitle => 'اكتشف ألعابًا مثيرة';
+
+  @override
+  String get allGames => 'جميع الألعاب';
+
+  @override
+  String get noGamesAvailable => 'لا توجد ألعاب متاحة';
+
+  @override
+  String get checkBackLater => 'تحقق لاحقًا من الألعاب الجديدة';
+
+  @override
+  String get playUpper => 'لعب';
+
+  @override
+  String get verifiedByPlayProtect => 'موثق بواسطة Play Protect';
+
+  @override
+  String get reviewsCount => 'مراجعات';
+
+  @override
+  String get downloadsLower => 'التنزيلات';
+
+  @override
+  String get editorsChoice => 'اختيار المحرر';
+
+  @override
+  String get install => 'تثبيت';
+
+  @override
+  String get playNow => 'العب الآن';
+
+  @override
+  String get shareLower => 'مشاركة';
+
+  @override
+  String get addToWishlist => 'إضافة إلى قائمة الأمنيات';
+
+  @override
+  String get screenshots => 'لقطات الشاشة';
+
+  @override
+  String get aboutThisGame => 'حول هذه اللعبة';
+
+  @override
+  String get noDescriptionAvailable => 'لا يوجد وصف متاح.';
+
+  @override
+  String get developer => 'المطور';
+
+  @override
+  String get unknownDeveloper => 'مطور غير معروف';
+
+  @override
+  String get ratingsAndReviews => 'التقييمات والمراجعات';
+
+  @override
+  String get loadingLower => 'جاري التحميل';
+
+  @override
+  String get failedToLoadGameDetails => 'فشل تحميل تفاصيل اللعبة';
+
+  @override
+  String rewardCollectingReviews(String objective) {
+    return 'نحن نجمع $objective مراجعات لهذا التطبيق';
+  }
+
+  @override
+  String get rewardDownloadApp => 'تحميل التطبيق';
+
+  @override
+  String rewardLeaveReview(String objective) {
+    return 'ترك $objective مراجعة وتقييم';
+  }
+
+  @override
+  String rewardChance(String amount) {
+    return 'ستحصل على فرصة للحصول على بطاقة هدايا $amount Google Play';
+  }
+
+  @override
+  String get rewardGooglePlayGiftCard => 'بطاقة هدايا Google Play';
+
+  @override
+  String get rechargeCoinsTitle => 'شحن العملات';
+
+  @override
+  String get choosePackage => 'اختر حزمة للشحن';
+
+  @override
+  String get noRechargePackages => 'لا توجد حزم شحن متاحة';
+
+  @override
+  String get checkingPaymentStatus => 'جارٍ التحقق من حالة الدفع...';
+
+  @override
+  String get noMembershipPlans => 'لا توجد خطط عضوية متاحة حالياً.';
+
+  @override
+  String get purchaseFailedPleaseRetry => 'فشل الشراء. يرجى المحاولة مرة أخرى.';
+
+  @override
+  String payPrice(String price) {
+    return 'دفع $price';
+  }
+
+  @override
+  String get deleteAccount => 'حذف الحساب';
+
+  @override
+  String get deleteAccountConfirm => 'هل أنت متأكد أنك تريد حذف حسابك؟';
+
+  @override
+  String get deleteAccountWarning =>
+      'بعد الحذف، سيتم محو جميع بياناتك بشكل دائم ولا يمكن استعادتها.';
+
+  @override
+  String get personalInfo => 'المعلومات الشخصية';
+
+  @override
+  String get changeName => 'تغيير الاسم';
+
+  @override
+  String get nameField => 'الاسم';
+
+  @override
+  String get newName => 'الاسم الجديد';
+
+  @override
+  String get pleaseEnter => 'يرجى الإدخال';
+
+  @override
+  String get skip => 'تخطي';
+
+  @override
+  String get noAds => 'بدون إعلانات';
+
+  @override
+  String get hdQuality => 'جودة عالية';
+
+  @override
+  String get downloadFeature => 'تحميل';
+
+  @override
+  String get arabic => 'العربية';
+
+  @override
+  String get english => 'English';
+
+  @override
+  String get failedToDeleteAccount => 'فشل حذف الحساب';
+
+  @override
+  String get registrationSessionExpired =>
+      'انتهت جلسة التسجيل. يرجى التسجيل مرة أخرى.';
+
+  @override
+  String get failedToVerifyAccount => 'فشل التحقق من الحساب الحالي';
+
+  @override
+  String get loginSessionMismatch =>
+      'جلسة تسجيل الدخول الحالية لا تتطابق مع الحساب المسجل حديثاً. يرجى تسجيل الدخول مرة أخرى وإعادة المحاولة.';
+
+  @override
+  String get missingRegistrationContext => 'محتوى التسجيل مفقود';
+
+  @override
+  String get failedToUpdateName => 'فشل تحديث الاسم';
+
+  @override
+  String get searchDramas => 'البحث عن المسلسلات...';
+
+  @override
+  String get failedToLoadFavorites => 'فشل تحميل المفضلة';
+
+  @override
+  String get failedToLoadHistory => 'فشل تحميل السجل';
+
+  @override
+  String get failedToLoadRecords => 'فشل تحميل السجلات';
+
+  @override
+  String get failedToLoadSignInfo => 'فشل تحميل معلومات التوقيع';
+
+  @override
+  String get signFailed => 'فشل التوقيع';
+
+  @override
+  String get failedToRefreshSignInfo => 'فشل تحديث معلومات التوقيع';
+
+  @override
+  String get reportPageTitle => 'إبلاغ';
+
+  @override
+  String get rechargeAgreementTitle => 'اتفاقية الشحن';
+
+  @override
+  String get rechargeAgreementContent => 'محتوى اتفاقية الشحن هنا...';
+
+  @override
+  String get contactUsLabel => 'اتصل بنا:';
+
+  @override
+  String get premiumContent => 'محتوى مميز';
+
+  @override
+  String get adFree => 'بدون إعلانات';
+
+  @override
+  String get offlineDownload => 'تحميل بدون إنترنت';
+
+  @override
+  String get earlyAccess => 'وصول مبكر';
+
+  @override
+  String get trialContent => 'محتوى تجريبي';
+
+  @override
+  String get quarterly => 'ربع سنوي';
+
+  @override
+  String get unlockClarityLevel => 'فتح مستوى الوضوح';
+
+  @override
+  String get shortDramaSeries => 'مسلسل قصير';
+
+  @override
+  String get content => 'المحتوى';
+
+  @override
+  String get noEpisodesAvailable => 'لا توجد حلقات متاحة';
 }

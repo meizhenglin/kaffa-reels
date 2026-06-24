@@ -90,7 +90,7 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
       final success = await handler.purchase(product);
 
       if (!success && mounted) {
-        final reason = handler.lastError ?? 'Purchase failed. Please try again.';
+        final reason = handler.lastError ?? l10n.purchaseFailedPleaseRetry;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(reason),
@@ -135,7 +135,7 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Recharge K-Coin',
+                      l10n.kCoinRecharge,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: Colors.white,
@@ -284,7 +284,7 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
                         ),
                       )
                     : Text(
-                        'Pay ${product.price}',
+                        l10n.payPrice(product.price),
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,

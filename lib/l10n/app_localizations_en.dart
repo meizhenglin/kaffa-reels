@@ -903,6 +903,21 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get signInUpper => 'Sign In';
+
+  @override
+  String get tapToSign => 'Tap to Sign';
+
+  @override
+  String get signInNow => 'Sign In Now';
+
+  @override
+  String get signedInToday => 'Signed In Today';
+
+  @override
+  String get signedTodayLower => 'Signed Today';
+
+  @override
   String day(int day) {
     return 'Day $day';
   }
@@ -938,6 +953,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get usageRecords => 'Usage Records';
+
+  @override
+  String get kCoin => 'K-Coin';
+
+  @override
+  String get kCoinDescription => 'Platform currency for premium content';
 
   @override
   String get kCoinRecords => 'K-Coin Records';
@@ -1028,4 +1049,242 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get submitting => 'Submitting...';
+
+  @override
+  String get gamesCenter => 'Games Center';
+
+  @override
+  String get gamesCenterSubtitle => 'Discover exciting games';
+
+  @override
+  String get allGames => 'All Games';
+
+  @override
+  String get noGamesAvailable => 'No games available';
+
+  @override
+  String get checkBackLater => 'Check back later for new games';
+
+  @override
+  String get playUpper => 'PLAY';
+
+  @override
+  String get verifiedByPlayProtect => 'Verified by Play Protect';
+
+  @override
+  String get reviewsCount => 'reviews';
+
+  @override
+  String get downloadsLower => 'Downloads';
+
+  @override
+  String get editorsChoice => 'Editor\'s Choice';
+
+  @override
+  String get install => 'Install';
+
+  @override
+  String get playNow => 'Play Now';
+
+  @override
+  String get shareLower => 'Share';
+
+  @override
+  String get addToWishlist => 'Add to wishlist';
+
+  @override
+  String get screenshots => 'Screenshots';
+
+  @override
+  String get aboutThisGame => 'About this Game';
+
+  @override
+  String get noDescriptionAvailable => 'No description available.';
+
+  @override
+  String get developer => 'Developer';
+
+  @override
+  String get unknownDeveloper => 'Unknown Developer';
+
+  @override
+  String get ratingsAndReviews => 'Ratings and reviews';
+
+  @override
+  String get loadingLower => 'Loading';
+
+  @override
+  String get failedToLoadGameDetails => 'Failed to load game details';
+
+  @override
+  String rewardCollectingReviews(String objective) {
+    return 'We are collecting $objective reviews for this app';
+  }
+
+  @override
+  String get rewardDownloadApp => 'download the app';
+
+  @override
+  String rewardLeaveReview(String objective) {
+    return 'leave an $objective review and rating';
+  }
+
+  @override
+  String rewardChance(String amount) {
+    return 'you will have the chance to receive a $amount Google Play gift card';
+  }
+
+  @override
+  String get rewardGooglePlayGiftCard => 'Google Play gift card';
+
+  @override
+  String get rechargeCoinsTitle => 'Recharge Coins';
+
+  @override
+  String get choosePackage => 'Choose a package to recharge';
+
+  @override
+  String get noRechargePackages => 'No recharge packages available';
+
+  @override
+  String get checkingPaymentStatus => 'Checking payment status...';
+
+  @override
+  String get noMembershipPlans => 'No membership plans available right now.';
+
+  @override
+  String get purchaseFailedPleaseRetry => 'Purchase failed. Please try again.';
+
+  @override
+  String payPrice(String price) {
+    return 'Pay $price';
+  }
+
+  @override
+  String get deleteAccount => 'Delete account';
+
+  @override
+  String get deleteAccountConfirm =>
+      'Are you sure you want to delete your account?';
+
+  @override
+  String get deleteAccountWarning =>
+      'After deletion, all your data will be permanently erased and cannot be recovered.';
+
+  @override
+  String get personalInfo => 'Personal Info';
+
+  @override
+  String get changeName => 'Change Name';
+
+  @override
+  String get nameField => 'Name';
+
+  @override
+  String get newName => 'New Name';
+
+  @override
+  String get pleaseEnter => 'Please Enter';
+
+  @override
+  String get skip => 'Skip';
+
+  @override
+  String get noAds => 'No Ads';
+
+  @override
+  String get hdQuality => 'HD Quality';
+
+  @override
+  String get downloadFeature => 'Download';
+
+  @override
+  String get arabic => 'العربية';
+
+  @override
+  String get english => 'English';
+
+  @override
+  String get failedToDeleteAccount => 'Failed to delete account';
+
+  @override
+  String get registrationSessionExpired =>
+      'Registration session expired. Please register again.';
+
+  @override
+  String get failedToVerifyAccount => 'Failed to verify current account';
+
+  @override
+  String get loginSessionMismatch =>
+      'Current login session does not match the newly registered account. Please log in again and retry.';
+
+  @override
+  String get missingRegistrationContext => 'Missing registration context';
+
+  @override
+  String get failedToUpdateName => 'Failed to update name';
+
+  @override
+  String get searchDramas => 'Search dramas...';
+
+  @override
+  String get failedToLoadFavorites => 'Failed to load favorites';
+
+  @override
+  String get failedToLoadHistory => 'Failed to load history';
+
+  @override
+  String get failedToLoadRecords => 'Failed to load records';
+
+  @override
+  String get failedToLoadSignInfo => 'Failed to load sign info';
+
+  @override
+  String get signFailed => 'Sign failed';
+
+  @override
+  String get failedToRefreshSignInfo => 'Failed to refresh sign info';
+
+  @override
+  String get reportPageTitle => 'Report';
+
+  @override
+  String get rechargeAgreementTitle => 'Recharge Agreement';
+
+  @override
+  String get rechargeAgreementContent =>
+      'Recharge Agreement content goes here...';
+
+  @override
+  String get contactUsLabel => 'Contact Us:';
+
+  @override
+  String get premiumContent => 'Premium Content';
+
+  @override
+  String get adFree => 'Ad-free';
+
+  @override
+  String get offlineDownload => 'Offline Download';
+
+  @override
+  String get earlyAccess => 'Early Access';
+
+  @override
+  String get trialContent => 'Trial Content';
+
+  @override
+  String get quarterly => 'Quarterly';
+
+  @override
+  String get unlockClarityLevel => 'Unlock the clarity level';
+
+  @override
+  String get shortDramaSeries => 'Short drama series';
+
+  @override
+  String get content => 'Content';
+
+  @override
+  String get noEpisodesAvailable => 'No episodes available';
 }

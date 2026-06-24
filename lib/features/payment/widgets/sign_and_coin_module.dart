@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../l10n/app_localizations.dart';
 import '../providers/coin_record_provider.dart';
 import '../providers/sign_provider.dart';
 import '../models/sign_model.dart';
@@ -53,6 +54,7 @@ class _KCoinModule extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final coinBalance = ref.watch(coinBalanceInfoProvider);
 
     return GestureDetector(
@@ -92,10 +94,10 @@ class _KCoinModule extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'K-Coin',
-                    style: TextStyle(
+                    l10n.kCoin,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -130,9 +132,9 @@ class _KCoinModule extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 4),
-            const Text(
-              'Balance',
-              style: TextStyle(
+            Text(
+              l10n.balance,
+              style: const TextStyle(
                 color: Colors.white70,
                 fontSize: 11,
               ),
@@ -154,6 +156,7 @@ class _SignInModule extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final config = signState.config;
     final isTodaySigned = config?.isTodaySigned ?? false;
     final continueDay = config?.continueDay ?? 0;
@@ -195,10 +198,10 @@ class _SignInModule extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Daily Check-in',
-                    style: TextStyle(
+                    l10n.dailyCheckIn,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -226,7 +229,7 @@ class _SignInModule extends ConsumerWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      isTodaySigned ? '✓ Signed' : 'Sign In',
+                      isTodaySigned ? l10n.signed : l10n.signInUpper,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: Color(0xFF5D4391),
@@ -237,7 +240,7 @@ class _SignInModule extends ConsumerWidget {
                     if (isTodaySigned && continueDay > 0) ...[
                       const SizedBox(height: 1),
                       Text(
-                        '$continueDay days',
+                        l10n.consecutiveDays(continueDay),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Color(0xFF5D4391),
@@ -250,9 +253,9 @@ class _SignInModule extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
-              'Tap to Sign',
-              style: TextStyle(
+            Text(
+              l10n.tapToSign,
+              style: const TextStyle(
                 color: Colors.white70,
                 fontSize: 11,
               ),

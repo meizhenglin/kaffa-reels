@@ -82,7 +82,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final l10n = AppLocalizations.of(context);
     final currentLocale = ref.watch(localeProvider);
     final currentLanguageLabel =
-        currentLocale.languageCode.toLowerCase() == 'ar' ? 'العربية' : 'English';
+        currentLocale.languageCode.toLowerCase() == 'ar' ? l10n.arabic : l10n.english;
     // 监听 authProvider，游客状态变化时自动刷新 UI
     final auth = ref.watch(authProvider);
 

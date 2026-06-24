@@ -222,7 +222,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           Padding(
             padding: const EdgeInsets.only(left: 60),
             child: Text(
-              'Episode ${widget.episodeIndex + 1} - ${widget.dramaTitle}',
+              '${l10n.episode} ${widget.episodeIndex + 1} - ${widget.dramaTitle}',
               style: const TextStyle(
                 color: Colors.white70,
                 fontSize: 11,
@@ -258,7 +258,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
             ),
           ),
           Text(
-            '${episodePrice.toInt()} K Coin',
+            '${episodePrice.toInt()} ${l10n.kCoin}',
             style: const TextStyle(
               color: Colors.red,
               fontSize: 13,
@@ -274,7 +274,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
             ),
           ),
           Text(
-            '$balance K Coin',
+            '$balance ${l10n.kCoin}',
             style: const TextStyle(
               color: Colors.red,
               fontSize: 13,

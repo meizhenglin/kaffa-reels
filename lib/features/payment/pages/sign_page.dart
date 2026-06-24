@@ -78,7 +78,7 @@ class _SignPageState extends ConsumerState<SignPage> {
                     const SizedBox(height: 20),
                     
                     // Sign-in button
-                    _buildActionButton(isTodaySigned),
+                    _buildActionButton(isTodaySigned, l10n),
                     
                     const SizedBox(height: 24),
                     
@@ -170,7 +170,7 @@ class _SignPageState extends ConsumerState<SignPage> {
     return config.rewards[dayIndex - 1].coins;
   }
 
-  Widget _buildActionButton(bool isTodaySigned) {
+  Widget _buildActionButton(bool isTodaySigned, AppLocalizations l10n) {
     final button = Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -195,7 +195,7 @@ class _SignPageState extends ConsumerState<SignPage> {
             ),
             const SizedBox(width: 8),
             Text(
-              isTodaySigned ? 'Signed In Today' : 'Sign In Now',
+              isTodaySigned ? l10n.signedInToday : l10n.signInNow,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white,

@@ -2,6 +2,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/router/router_config.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../l10n/app_localizations.dart';
 import '../models/game_list_item.dart';
 import '../providers/game_provider.dart';
 import '../widgets/game_carousel.dart';
@@ -31,6 +32,7 @@ class _GamesPageState extends ConsumerState<GamesPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final gameState = ref.watch(gameProvider);
     final carouselItems = gameState.carouselItems;
     final allGames = gameState.recommendedGames;
@@ -42,7 +44,7 @@ class _GamesPageState extends ConsumerState<GamesPage> {
           child: CustomScrollView(
             slivers: [
               const SliverToBoxAdapter(child: SizedBox(height: 8)),
-              SliverToBoxAdapter(child: _buildHeader()),
+              SliverToBoxAdapter(child: _buildHeader(l10n)),
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
               if (carouselItems.isNotEmpty)
                 SliverToBoxAdapter(
@@ -59,7 +61,7 @@ class _GamesPageState extends ConsumerState<GamesPage> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
-                  child: Text('All Games (${allGames.length})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                  child: Text('${l10n.allGames} (${allGames.length})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
                 ),
               ),
               if (allGames.isEmpty)
@@ -69,7 +71,7 @@ class _GamesPageState extends ConsumerState<GamesPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) => _buildGameRow(allGames[index]),
+                      (context, index) => _buildGameRow(allGames[index], l10n),
                       childCount: allGames.length,
                     ),
                   ),
@@ -82,7 +84,7 @@ class _GamesPageState extends ConsumerState<GamesPage> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
@@ -114,9 +116,9 @@ class _GamesPageState extends ConsumerState<GamesPage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Games Center',
-                style: TextStyle(
+              Text(
+                l10n.gamesCenter,
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -124,7 +126,7 @@ class _GamesPageState extends ConsumerState<GamesPage> {
                 ),
               ),
               Text(
-                'Discover exciting games',
+                l10n.gamesCenterSubtitle,
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.white.withValues(alpha: 0.6),
@@ -223,7 +225,7 @@ class _GamesPageState extends ConsumerState<GamesPage> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(AppLocalizations l10n) {
     return SliverToBoxAdapter(
       child: Container(
         margin: const EdgeInsets.all(32),
@@ -250,9 +252,9 @@ class _GamesPageState extends ConsumerState<GamesPage> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'No games available',
-              style: TextStyle(
+            Text(
+              l10n.noGamesAvailable,
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -260,7 +262,7 @@ class _GamesPageState extends ConsumerState<GamesPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Check back later for new games',
+              l10n.checkBackLater,
               style: TextStyle(
                 fontSize: 14,
                 color: Colors.white.withValues(alpha: 0.6),
@@ -272,10 +274,10 @@ class _GamesPageState extends ConsumerState<GamesPage> {
     );
   }
 
-  Widget _buildGameRow(GameListItem game) {
+  Widget _buildGameRow(GameListItem game, AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: _GameCardList(game: game, onTap: () => _navigateToGame(game)),
+      child: _GameCardList(game: game, onTap: () => _navigateToGame(game), l10n: l10n),
     );
   }
 
@@ -307,10 +309,11 @@ class _GamesPageState extends ConsumerState<GamesPage> {
 }
 
 class _GameCardList extends StatelessWidget {
-  const _GameCardList({required this.game, required this.onTap});
+  const _GameCardList({required this.game, required this.onTap, required this.l10n});
 
   final GameListItem game;
   final VoidCallback onTap;
+  final AppLocalizations l10n;
 
   @override
   Widget build(BuildContext context) {
@@ -381,9 +384,9 @@ class _GameCardList extends StatelessWidget {
                 ),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Text(
-                'PLAY',
-                style: TextStyle(
+              child: Text(
+                l10n.playUpper,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,

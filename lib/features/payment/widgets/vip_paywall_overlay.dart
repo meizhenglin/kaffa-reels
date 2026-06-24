@@ -46,6 +46,7 @@ class VipPaywallOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
     return Container(
@@ -137,11 +138,11 @@ class VipPaywallOverlay extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _BenefitChip(icon: Icons.block, label: 'No Ads'),
+                  _BenefitChip(icon: Icons.block, label: l10n.noAds),
                   const SizedBox(width: 12),
-                  _BenefitChip(icon: Icons.hd, label: 'HD Quality'),
+                  _BenefitChip(icon: Icons.hd, label: l10n.hdQuality),
                   const SizedBox(width: 12),
-                  _BenefitChip(icon: Icons.download, label: 'Download'),
+                  _BenefitChip(icon: Icons.download, label: l10n.downloadFeature),
                 ],
               ),
             ),

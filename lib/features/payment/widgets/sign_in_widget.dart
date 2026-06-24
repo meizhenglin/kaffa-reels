@@ -95,7 +95,7 @@ class _SignInWidgetState extends ConsumerState<SignInWidget> {
               else if ((config?.isTodaySigned ?? false))
                 _buildSignedBadge(l10n)
               else
-                _buildSignButton(),
+                _buildSignButton(l10n),
             ],
           ),
 
@@ -131,7 +131,7 @@ class _SignInWidgetState extends ConsumerState<SignInWidget> {
     );
   }
 
-  Widget _buildSignButton() {
+  Widget _buildSignButton(AppLocalizations l10n) {
     return GestureDetector(
       onTap: _handleSign,
       child: Container(
@@ -142,9 +142,9 @@ class _SignInWidgetState extends ConsumerState<SignInWidget> {
           ),
           borderRadius: BorderRadius.all(Radius.circular(20)),
         ),
-        child: const Text(
-          'Sign In',
-          style: TextStyle(
+        child: Text(
+          l10n.signInUpper,
+          style: const TextStyle(
             color: Color(0xFF1A1A1A),
             fontSize: 13,
             fontWeight: FontWeight.bold,

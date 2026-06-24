@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/preload_network_image.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class PersonalInfoPage extends ConsumerWidget {
@@ -12,6 +13,7 @@ class PersonalInfoPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
     final auth = ref.watch(authProvider);
     final user = auth.user;
 
@@ -46,11 +48,11 @@ class PersonalInfoPage extends ConsumerWidget {
                     },
                     constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Personal Info',
+                      l10n.personalInfo,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 17,
                         fontWeight: FontWeight.w600,
@@ -109,9 +111,7 @@ class PersonalInfoPage extends ConsumerWidget {
                     const SizedBox(height: 32),
                     _InfoItem(title: 'ID', value: user.id),
                     const SizedBox(height: 16),
-                    _InfoItem(
-                      title: 'Name',
-                      value: user.userNickname ?? '-',
+                    _InfoItem(title: l10n.nameField, value: user.userNickname ?? '-',
                       trailing: Transform(
                         alignment: Alignment.center,
                         transform: Matrix4.identity()
@@ -121,7 +121,7 @@ class PersonalInfoPage extends ConsumerWidget {
                       onTap: () => context.push('/change-name'),
                     ),
                     const SizedBox(height: 16),
-                    _InfoItem(title: 'Email', value: email),
+                    _InfoItem(title: l10n.email, value: email),
                   ],
                 ),
               ),
