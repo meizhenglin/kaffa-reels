@@ -110,7 +110,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         : mediaQuery.padding.bottom + 16;
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFFFFF5F0),
+        color: Color(0xFF2D2440),
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SingleChildScrollView(
@@ -184,7 +184,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
               ),
               child: const Icon(
                 Icons.close,
-                color: Color(0xFF666666),
+                color: Colors.white,
                 size: 20,
               ),
             ),
@@ -202,12 +202,19 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         children: [
           Padding(
             padding: const EdgeInsets.only(left: 60, top: 4),
-            child: Text(
-              l10n.unlockToContinue,
-              style: const TextStyle(
-                color: Color(0xFFD9341C),
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+            child: ShaderMask(
+              shaderCallback: (bounds) => const LinearGradient(
+                colors: [Color(0xFF8B4513), Color(0xFFD2691E)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ).createShader(bounds),
+              child: Text(
+                l10n.unlockToContinue,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -217,7 +224,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
             child: Text(
               'Episode ${widget.episodeIndex + 1} - ${widget.dramaTitle}',
               style: const TextStyle(
-                color: Color(0xFF666666),
+                color: Colors.white70,
                 fontSize: 11,
               ),
               maxLines: 1,
@@ -244,7 +251,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            l10n.episodePrice,
+            '${l10n.episodePrice}: ',
             style: const TextStyle(
               color: Color(0xFF333333),
               fontSize: 12,
@@ -253,14 +260,14 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           Text(
             '${episodePrice.toInt()} K Coin',
             style: const TextStyle(
-              color: Color(0xFFD9341C),
+              color: Colors.red,
               fontSize: 13,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(width: 12),
           Text(
-            l10n.accountBalance,
+            '${l10n.accountBalance}: ',
             style: const TextStyle(
               color: Color(0xFF333333),
               fontSize: 12,
@@ -268,10 +275,8 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           ),
           Text(
             '$balance K Coin',
-            style: TextStyle(
-              color: balance >= episodePrice
-                  ? const Color(0xFFD9341C)
-                  : const Color(0xFFE34D27),
+            style: const TextStyle(
+              color: Colors.red,
               fontSize: 13,
               fontWeight: FontWeight.bold,
             ),
@@ -292,7 +297,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         padding: const EdgeInsets.all(20),
         child: Text(
           l10n.noProductsAvailable,
-          style: const TextStyle(color: Colors.black54, fontSize: 14),
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
         ),
       );
     }
@@ -348,7 +353,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: tagLabel != null
-                ? const Color(0xFFD9341C)
+                ? const Color(0xFF5D4391)
                 : const Color(0xFFE0E0E0),
             width: tagLabel != null ? 1.2 : 0.8,
           ),
@@ -382,7 +387,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
                       Text(
                         mainLabel,
                         style: const TextStyle(
-                          color: Color(0xFFD9341C),
+                          color: Colors.red,
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -392,7 +397,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
                         Text(
                           '¥${originalPrice.toStringAsFixed(2)}',
                           style: const TextStyle(
-                            color: Color(0xFF999999),
+                            color: Colors.red,
                             fontSize: 11,
                             decoration: TextDecoration.lineThrough,
                           ),
@@ -409,9 +414,13 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
                 right: 0,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFD9341C),
-                    borderRadius: BorderRadius.only(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: const BorderRadius.only(
                       topRight: Radius.circular(5),
                       bottomLeft: Radius.circular(6),
                     ),
@@ -438,7 +447,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
                     height: 16,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Color(0xFFD9341C),
+                      color: Color(0xFF5D4391),
                     ),
                   ),
                 ),
@@ -459,7 +468,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           Text(
             l10n.chargingAgreement,
             style: const TextStyle(
-              color: Color(0xFF666666),
+              color: Colors.white70,
               fontSize: 11,
             ),
           ),
@@ -467,21 +476,21 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           Text(
             l10n.chargingRule1,
             style: const TextStyle(
-              color: Color(0xFF999999),
+              color: Colors.white60,
               fontSize: 10,
             ),
           ),
           Text(
             l10n.chargingRule2,
             style: const TextStyle(
-              color: Color(0xFF999999),
+              color: Colors.white60,
               fontSize: 10,
             ),
           ),
           Text(
             l10n.chargingRule3,
             style: const TextStyle(
-              color: Color(0xFF999999),
+              color: Colors.white60,
               fontSize: 10,
             ),
           ),
@@ -533,7 +542,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
             onPressed: () => Navigator.pop(context, true),
             child: Text(
               l10n.confirm,
-              style: const TextStyle(color: Color(0xFFD9341C)),
+              style: const TextStyle(color: Color(0xFF5D4391)),
             ),
           ),
         ],
@@ -562,7 +571,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
             onPressed: () => Navigator.pop(context, true),
             child: Text(
               l10n.buy,
-              style: const TextStyle(color: Color(0xFFD9341C)),
+              style: const TextStyle(color: Color(0xFF5D4391)),
             ),
           ),
         ],
@@ -586,10 +595,11 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       );
 
       bool success = false;
+      ApiResponse? resp;
 
       if (product.type == UnlockProductType.episode) {
         // 单集解锁
-        final resp = await apiService.getUserPayEpisodes(
+        resp = await apiService.getUserPayEpisodes(
           videoId: widget.videoId,
           episodesId: widget.episodeId,
           episodesNum: widget.episodesNum,
@@ -598,7 +608,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         success = resp.isSuccess;
       } else if (product.type == UnlockProductType.season) {
         // 整剧解锁
-        final resp = await apiService.userRechange(
+        resp = await apiService.userRechange(
           payType: 5,
           payConfigId: product.goodsId,
           videoId: widget.videoId,
@@ -619,7 +629,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(l10n.unlockSuccess),
-            backgroundColor: const Color(0xFFD9341C),
+            backgroundColor: const Color(0xFF5D4391),
           ),
         );
         Navigator.of(context).pop(UnlockResult.success(
@@ -629,7 +639,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         // API失败，不扣余额
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(resp.error ?? l10n.unlockFailed),
+            content: Text(resp?.error ?? l10n.unlockFailed),
             backgroundColor: Colors.red,
           ),
         );
@@ -708,7 +718,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(l10n.purchaseSuccess),
-            backgroundColor: const Color(0xFFD9341C),
+            backgroundColor: const Color(0xFF5D4391),
           ),
         );
         Navigator.of(context).pop(UnlockResult.success(
@@ -787,7 +797,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(l10n.vipSubscriptionSuccess),
-            backgroundColor: const Color(0xFFD9341C),
+            backgroundColor: const Color(0xFF5D4391),
           ),
         );
         Navigator.of(context).pop();
