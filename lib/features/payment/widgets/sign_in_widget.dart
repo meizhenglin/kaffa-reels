@@ -221,9 +221,9 @@ class _SignInWidgetState extends ConsumerState<SignInWidget> {
     final signState = ref.read(signStateProvider);
     final config = signState.config;
     final todayReward = config?.rewards.isNotEmpty == true
-        ? config!.rewards[config.isTodaySigned ? config.continueDay : config.continueDay]
+        ? config!.rewards[config.isTodaySigned ? config.continueDay : config.continueDay + 1]
         : null;
-    
+
     final success = await ref.read(signStateProvider.notifier).sign();
     if (success && mounted) {
       AppSnackBar.show(context, message: l10n.signInSuccessful(todayReward?.coins ?? 0));

@@ -25,8 +25,67 @@ class AppSnackBar {
     required String message,
     Duration duration = const Duration(seconds: 2),
   }) {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(standard(message: message, duration: duration));
+    final overlay = Navigator.of(context, rootNavigator: true).overlay;
+    if (overlay == null) {
+      return;
+    }
+
+    late OverlayEntry entry;
+
+    Widget buildSnackBarWidget() {
+      return Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () {
+                entry.remove();
+              },
+              child: Container(
+                color: Colors.transparent,
+              ),
+            ),
+          ),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: MediaQuery.of(context).viewPadding.bottom + 60,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFFFF),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF000000).withValues(alpha: 0.15),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    entry = OverlayEntry(
+      builder: (context) => buildSnackBarWidget(),
+    );
+
+    overlay.insert(entry);
+    Future.delayed(duration, () {
+      entry.remove();
+    });
   }
 }

@@ -9,6 +9,7 @@ import '../services/payment_service.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/service/pay_service.dart';
+import '../../../core/widgets/app_snack_bar.dart';
 
 /// 解锁剧集弹窗组件
 /// 显示当前K币余额、解锁当前集需要的K币
@@ -302,8 +303,13 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       );
     }
 
-    // 根据商品数量决定布局：2列或3列
-    final crossAxisCount = allProducts.length <= 4 ? 2 : 3;
+    // 根据商品数量决定布局：1个商品时单列，2-4个商品时2列，5个及以上3列
+    final crossAxisCount = allProducts.length == 1
+        ? 1
+        : (allProducts.length <= 4 ? 2 : 3);
+    final childAspectRatio = crossAxisCount == 1
+        ? 3.2
+        : (crossAxisCount == 2 ? 1.6 : 1.4);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -314,7 +320,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           crossAxisCount: crossAxisCount,
           mainAxisSpacing: 6,
           crossAxisSpacing: 6,
-          childAspectRatio: crossAxisCount == 2 ? 1.6 : 1.4,
+          childAspectRatio: childAspectRatio,
         ),
         itemCount: allProducts.length,
         itemBuilder: (context, index) {
@@ -626,33 +632,18 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         // 刷新余额确保与后端同步
         await coinNotifier.load();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.unlockSuccess),
-            backgroundColor: const Color(0xFF5D4391),
-          ),
-        );
+        AppSnackBar.show(context, message: l10n.unlockSuccess);
         Navigator.of(context).pop(UnlockResult.success(
           episodeIndex: widget.episodeIndex,
         ));
       } else {
         // API失败，不扣余额
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(resp?.error ?? l10n.unlockFailed),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.show(context, message: resp?.error ?? l10n.unlockFailed);
       }
     } catch (e) {
       if (mounted) {
         _setProcessing(product.goodsId, false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${l10n.unlockFailed}: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.show(context, message: '${l10n.unlockFailed}: $e');
       }
     }
   }
@@ -673,12 +664,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       if (products.isEmpty) {
         if (mounted) {
           _setProcessing(product.goodsId, false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.productUnavailable),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppSnackBar.show(context, message: l10n.productUnavailable);
         }
         return;
       }
@@ -715,32 +701,17 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
         await coinNotifier.load();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.purchaseSuccess),
-            backgroundColor: const Color(0xFF5D4391),
-          ),
-        );
+        AppSnackBar.show(context, message: l10n.purchaseSuccess);
         Navigator.of(context).pop(UnlockResult.success(
           episodeIndex: widget.episodeIndex,
         ));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(paymentService.lastError ?? l10n.purchaseFailed),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.show(context, message: paymentService.lastError ?? l10n.purchaseFailed);
       }
     } catch (e) {
       if (mounted) {
         _setProcessing(product.goodsId, false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${l10n.purchaseFailed}: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.show(context, message: '${l10n.purchaseFailed}: $e');
       }
     }
   }
@@ -770,12 +741,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       if (products.isEmpty) {
         if (mounted) {
           _setProcessing(product.goodsId, false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(l10n.vipProductUnavailable),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppSnackBar.show(context, message: l10n.vipProductUnavailable);
         }
         return;
       }
@@ -794,30 +760,15 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
         await coinNotifier.load();
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.vipSubscriptionSuccess),
-            backgroundColor: const Color(0xFF5D4391),
-          ),
-        );
+        AppSnackBar.show(context, message: l10n.vipSubscriptionSuccess);
         Navigator.of(context).pop();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(paymentService.lastError ?? l10n.vipSubscriptionFailed),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.show(context, message: paymentService.lastError ?? l10n.vipSubscriptionFailed);
       }
     } catch (e) {
       if (mounted) {
         _setProcessing(product.goodsId, false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${l10n.vipSubscriptionFailed}: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.show(context, message: '${l10n.vipSubscriptionFailed}: $e');
       }
     }
   }

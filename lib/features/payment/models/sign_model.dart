@@ -1,5 +1,10 @@
 /// Sign-in data models
 
+int? _toInt(Object? value) {
+  if (value is int) return value;
+  return int.tryParse('$value');
+}
+
 List<int> _toIntList(List<dynamic> list) {
   return list.map((dynamic e) {
     if (e is int) return e;
@@ -70,9 +75,9 @@ class SignDayReward {
 
   factory SignDayReward.fromJson(Map<String, dynamic> json) {
     return SignDayReward(
-      day: json['signInSort'] as int? ?? json['day'] as int? ?? 0,
-      signGoodsId: json['signGoodsId'] as int? ?? json['goodsId'] as int? ?? 0,
-      coins: json['giveGoodsNum'] as int? ?? json['coins'] as int? ?? 0,
+      day: _toInt(json['signInSort']) ?? _toInt(json['day']) ?? 0,
+      signGoodsId: _toInt(json['signGoodsId']) ?? _toInt(json['goodsId']) ?? 0,
+      coins: _toInt(json['giveGoodsNum']) ?? _toInt(json['coins']) ?? 0,
     );
   }
 }
@@ -122,23 +127,27 @@ class SignState {
   final bool isLoading;
   final String? errorMessage;
   final SignConfig? config;
+  final int todayRewardCoins;
 
   const SignState({
     this.isLoading = false,
     this.errorMessage,
     this.config,
+    this.todayRewardCoins = 0,
   });
 
   SignState copyWith({
     bool? isLoading,
     String? errorMessage,
     SignConfig? config,
+    int? todayRewardCoins,
     bool clearError = false,
   }) {
     return SignState(
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       config: config ?? this.config,
+      todayRewardCoins: todayRewardCoins ?? this.todayRewardCoins,
     );
   }
 }

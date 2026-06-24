@@ -64,10 +64,17 @@ class SignStateNotifier extends StateNotifier<SignState> {
         final previousBalance = _ref.read(coinBalanceInfoProvider).balance;
         final configResp = await _apiService.getSignConfig();
         SignConfig? config;
-        if (configResp.isSuccess && configResp.data != null) {
+        int todayRewardCoins = 0;
+        if (configResp.isSuccess) {
           config = SignConfig.fromJson(configResp.data as Map<String, dynamic>);
+          if (config.rewards.isNotEmpty) {
+            final dayIndex = config.isTodaySigned ? config.continueDay : config.continueDay + 1;
+            if (dayIndex > 0 && dayIndex <= config.rewards.length) {
+              todayRewardCoins = config.rewards[dayIndex - 1].coins;
+            }
+          }
         }
-        state = state.copyWith(config: config, isLoading: false);
+        state = state.copyWith(config: config, isLoading: false, todayRewardCoins: todayRewardCoins);
 
         await _ref.read(coinBalanceInfoProvider.notifier).load();
         await _refreshUserCenterIfCoinBalanceChanged(previousBalance);

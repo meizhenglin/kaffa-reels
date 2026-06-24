@@ -165,8 +165,8 @@ class _SignPageState extends ConsumerState<SignPage> {
 
   int _getTodayReward(SignConfig? config) {
     if (config == null || config.rewards.isEmpty) return 0;
-    // Today is day (continueDay + 1) or day 1 if not signed
-    final dayIndex = config.isTodaySigned ? config.continueDay : config.continueDay;
+    // Today is day (continueDay + 1) or day continueDay if already signed today
+    final dayIndex = config.isTodaySigned ? config.continueDay : config.continueDay + 1;
     if (dayIndex <= 0 || dayIndex > config.rewards.length) return 0;
     return config.rewards[dayIndex - 1].coins;
   }
@@ -336,9 +336,12 @@ class _SignPageState extends ConsumerState<SignPage> {
       return;
     }
     
+    final configBeforeSign = ref.read(signStateProvider).config;
     final success = await ref.read(signStateProvider.notifier).sign();
     if (success && mounted) {
-      AppSnackBar.show(context, message: l10n.signInSuccessful(0));
+      final configAfterSign = ref.read(signStateProvider).config;
+      final rewardCoins = _getTodayReward(configAfterSign ?? configBeforeSign);
+      AppSnackBar.show(context, message: l10n.signInSuccessful(rewardCoins));
     }
   }
 }
