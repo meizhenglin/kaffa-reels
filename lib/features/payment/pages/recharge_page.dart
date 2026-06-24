@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../../core/widgets/app_snack_bar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../providers/recharge_provider.dart';
 
@@ -72,15 +73,11 @@ class _RechargePageState extends ConsumerState<RechargePage> {
 
     if (success) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.purchaseStarted)),
-        );
+        AppSnackBar.show(context, message: l10n.purchaseStarted);
       }
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.failedToStartPurchase)),
-        );
+        AppSnackBar.show(context, message: l10n.failedToStartPurchase);
       }
     }
   }

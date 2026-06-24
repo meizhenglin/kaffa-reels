@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/network/api_service.dart';
+import '../../../core/widgets/app_snack_bar.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../home/pages/main_page.dart' show currentTabIndexProvider;
@@ -41,9 +42,7 @@ class _PhotoSettingPageState extends ConsumerState<PhotoSettingPage> {
   bool _isSubmitting = false;
 
   void _showErrorMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    AppSnackBar.show(context, message: message);
   }
 
   @override

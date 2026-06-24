@@ -4,6 +4,7 @@ import 'package:flutter_aliplayer/flutter_aliplayer.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../../core/widgets/app_snack_bar.dart';
 import '../utils/drama_navigation.dart';
 import 'mini_player_controller.dart';
 import 'episode_selection_sheet.dart';
@@ -264,13 +265,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayerWidget>
   }
 
   void _showToast(BuildContext context, String action) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$action tapped'),
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    AppSnackBar.show(context, message: '$action tapped');
   }
 }
 

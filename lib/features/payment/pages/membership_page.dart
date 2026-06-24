@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/widgets/app_snack_bar.dart';
 import '../../../core/utils/localized_badge_assets.dart';
 import '../../../components/preload_network_image.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
@@ -42,29 +43,12 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
           message.isNotEmpty &&
           message != previous?.errorMessage &&
           mounted) {
-        // Map special error codes to localized messages
         String displayMessage = message;
         if (message == 'itemAlreadyOwned') {
           final l10n = AppLocalizations.of(context);
           displayMessage = l10n.membershipItemAlreadyOwned;
         }
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(
-                displayMessage,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.black),
-              ),
-              backgroundColor: const Color(0xFFFFFFFF),
-              duration: const Duration(seconds: 2),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          );
+        AppSnackBar.show(context, message: displayMessage);
       }
     });
     Future.microtask(() async {
@@ -219,9 +203,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       _isPurchasing = false;
       if (mounted) {
         setState(() {});
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.membershipWebPurchaseUnsupported)),
-        );
+        AppSnackBar.show(context, message: l10n.membershipWebPurchaseUnsupported);
       }
       return;
     }

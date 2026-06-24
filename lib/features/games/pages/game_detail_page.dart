@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../core/widgets/app_snack_bar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../models/game_detail.dart';
 
@@ -94,12 +95,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
           }
         } catch (e) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${l10n.error}: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppSnackBar.show(context, message: '${l10n.error}: $e');
         }
       }
     } else if (game.isAppGame) {
@@ -112,12 +108,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
           }
         } catch (e) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${l10n.error}: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppSnackBar.show(context, message: '${l10n.error}: $e');
         }
       }
     }

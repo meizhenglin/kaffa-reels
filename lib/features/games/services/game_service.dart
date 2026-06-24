@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/widgets/app_snack_bar.dart';
 import '../../../l10n/app_localizations.dart';
 
 class GameService {
@@ -76,12 +77,7 @@ class GameService {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to open download link: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.show(context, message: 'Failed to open download link: $e');
       }
     }
   }
@@ -93,12 +89,7 @@ class GameService {
     String? gameUrl,
   ) async {
     if (gameUrl == null || gameUrl.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.networkError),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppSnackBar.show(context, message: l10n.networkError);
       return;
     }
 
@@ -117,12 +108,7 @@ class GameService {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${l10n.error}: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.show(context, message: '${l10n.error}: $e');
       }
     }
   }

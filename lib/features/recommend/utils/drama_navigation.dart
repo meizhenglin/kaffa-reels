@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/widgets/app_snack_bar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../models/drama.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -27,11 +28,7 @@ Future<bool> openMembershipPage(
 
   if (isGuest) {
     if (showLoginPrompt) {
-      final messenger = ScaffoldMessenger.of(context);
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context).membershipLoginBeforeSubscribe)),
-      );
+      AppSnackBar.show(context, message: AppLocalizations.of(context).membershipLoginBeforeSubscribe);
     }
     final loginBackTarget = Uri.encodeComponent(backTarget ?? GoRouterState.of(context).uri.toString());
     await context.push('/auth/login?redirect=$redirect&back=$loginBackTarget');

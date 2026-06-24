@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/widgets/app_snack_bar.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../../core/network/api_service.dart' show apiServiceProvider;
@@ -80,9 +81,7 @@ class _ReportPageState extends ConsumerState<ReportPage> {
 
     final content = _reportController.text.trim();
     if (content.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.pleaseEnterFeedback)),
-      );
+      AppSnackBar.show(context, message: l10n.pleaseEnterFeedback);
       return;
     }
 

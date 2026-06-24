@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../../core/widgets/app_snack_bar.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 import '../../../features/home/models/home_card_layout.dart';
 import '../../../features/recommend/utils/drama_navigation.dart';
@@ -337,12 +338,7 @@ class _SignPageState extends ConsumerState<SignPage> {
     
     final success = await ref.read(signStateProvider.notifier).sign();
     if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.signInSuccessful(0)),
-          backgroundColor: Colors.green,
-        ),
-      );
+      AppSnackBar.show(context, message: l10n.signInSuccessful(0));
     }
   }
 }

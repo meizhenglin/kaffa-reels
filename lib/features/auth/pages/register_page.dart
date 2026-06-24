@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../../core/network/api_service.dart';
+import '../../../core/widgets/app_snack_bar.dart';
 import '../providers/auth_provider.dart';
 import 'photo_setting_page.dart' show RegistrationFlowContext;
 import '../../payment/providers/membership_provider.dart' show memberStateProvider;
@@ -71,12 +72,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
       if (!loginSuccess) {
         final errorMsg = ref.read(authProvider).errorMessage;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMsg ?? 'Registration succeeded, but login failed'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.show(context, message: errorMsg ?? 'Registration succeeded, but login failed');
         return;
       }
 
@@ -117,12 +113,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       GoRouter.of(context).go('/auth/photo-setting', extra: registrationContext);
     } else {
       final errorMsg = ref.read(authProvider).errorMessage;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMsg ?? 'Registration failed'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppSnackBar.show(context, message: errorMsg ?? 'Registration failed');
     }
   }
 
@@ -181,12 +172,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       _startCountdown();
     } else {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.message ?? 'Failed to send code'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppSnackBar.show(context, message: result.message ?? 'Failed to send code');
     }
   }
 
@@ -214,12 +200,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       });
     } else {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.message ?? 'Verification failed'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppSnackBar.show(context, message: result.message ?? 'Verification failed');
     }
   }
 

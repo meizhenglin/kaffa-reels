@@ -9,6 +9,7 @@ import '../home/pages/main_page.dart';
 import '../home/providers/last_watched_provider.dart';
 import '../../core/network/api_service.dart';
 import '../../core/storage/storage_service.dart';
+import '../../core/widgets/app_snack_bar.dart';
 import '../recommend/models/video_info.dart';
 import '../recommend/providers/video_action_provider.dart';
 import '../recommend/utils/drama_navigation.dart';
@@ -827,13 +828,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         });
         // 显示成功提示
         final l10n = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.unlockSuccess),
-            backgroundColor: Colors.green.shade400,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppSnackBar.show(context, message: l10n.unlockSuccess);
         // 重试播放
         final retryIndex = lockedIndex ?? _pendingLockedEpisodeIndex;
         if (retryIndex != null) {
@@ -843,13 +838,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     } else if (result.isFailed) {
       // 失败，显示错误消息
       if (result.errorMessage != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result.errorMessage!),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        AppSnackBar.show(context, message: result.errorMessage!);
       }
     } else if (result.isCancelled) {
       // 用户取消
@@ -977,13 +966,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         // 显示成功提示
         if (mounted) {
           final l10n = AppLocalizations.of(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${l10n.unlockSuccess} -$episodePrice K Coin'),
-              backgroundColor: const Color(0xFFD9341C),
-              duration: const Duration(seconds: 2),
-            ),
-          );
+          AppSnackBar.show(context, message: '${l10n.unlockSuccess} -$episodePrice K Coin');
         }
         debugPrint('[_tryAutoUnlockWithBalance] SUCCESS');
         return true;

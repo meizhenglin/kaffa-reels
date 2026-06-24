@@ -7,6 +7,7 @@ import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 import '../../../features/recommend/utils/drama_navigation.dart';
+import '../../../core/widgets/app_snack_bar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../home/models/home_card_layout.dart';
 import '../models/recharge_product.dart';
@@ -91,19 +92,9 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
 
       if (!success && mounted) {
         final reason = handler.lastError ?? l10n.purchaseFailedPleaseRetry;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(reason),
-            backgroundColor: const Color(0xFFFF6B6B),
-          ),
-        );
+        AppSnackBar.show(context, message: reason);
       } else if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.purchaseSuccessful),
-            backgroundColor: const Color(0xFF4CAF50),
-          ),
-        );
+        AppSnackBar.show(context, message: l10n.purchaseSuccessful);
         // 刷新余额
         await ref.read(coinBalanceInfoProvider.notifier).load();
       }

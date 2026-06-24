@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/widgets/app_snack_bar.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/preload_network_image.dart';
 import '../../../l10n/app_localizations.dart';
@@ -292,12 +293,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
   Future<void> _pickAvatar(BuildContext context) async {
     final auth = ref.read(authProvider);
     if (auth.user == null || auth.user!.isTourist) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).profileLoginFirst),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppSnackBar.show(context, message: AppLocalizations.of(context).profileLoginFirst);
       return;
     }
     context.push('/auth/photo-setting');
@@ -306,12 +302,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
   Future<void> _goToPersonalInfo(BuildContext context) async {
     final auth = ref.read(authProvider);
     if (auth.user == null || auth.user!.isTourist) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).profileLoginFirst),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppSnackBar.show(context, message: AppLocalizations.of(context).profileLoginFirst);
       return;
     }
     context.push('/personal-info');

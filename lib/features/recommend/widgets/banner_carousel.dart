@@ -10,6 +10,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../../home/models/home_card_layout.dart';
 import '../../home/providers/last_watched_provider.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../core/widgets/app_snack_bar.dart';
 import '../models/banner.dart';
 import '../utils/drama_navigation.dart';
 
@@ -203,21 +204,7 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
                     final authState = ref.read(authProvider);
                     final isTourist = authState.user == null || authState.user!.isTourist;
                     if (isTourist) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            AppLocalizations.of(context).loginSubtitle,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.black),
-                          ),
-                          backgroundColor: const Color(0xFFFFFFFF),
-                          duration: const Duration(seconds: 2),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      );
+                      AppSnackBar.show(context, message: AppLocalizations.of(context).loginSubtitle);
                       return;
                     }
                     openMembershipPage(context, ref);

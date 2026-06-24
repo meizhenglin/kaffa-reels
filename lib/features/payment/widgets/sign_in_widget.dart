@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/app_snack_bar.dart';
 import '../../../features/auth/providers/auth_provider.dart';
 import '../../../features/recommend/utils/drama_navigation.dart';
 import '../../../l10n/app_localizations.dart';
@@ -225,12 +226,7 @@ class _SignInWidgetState extends ConsumerState<SignInWidget> {
     
     final success = await ref.read(signStateProvider.notifier).sign();
     if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.signInSuccessful(todayReward?.coins ?? 0)),
-          backgroundColor: Colors.green,
-        ),
-      );
+      AppSnackBar.show(context, message: l10n.signInSuccessful(todayReward?.coins ?? 0));
     }
   }
 
