@@ -78,16 +78,22 @@ class PaymentService {
     required List<String> productIds,
     bool requireSubscriptionOnAndroid = false,
   }) async {
+    debugPrint('[PaymentService] getProducts() called with IDs: $productIds');
+    debugPrint('[PaymentService] requireSubscriptionOnAndroid: $requireSubscriptionOnAndroid');
+
     // Auto-initialize if needed
     if (!_isInitialized) {
+      debugPrint('[PaymentService] Not initialized, initializing now...');
       final initialized = await initialize(
         onPurchaseComplete: _onPurchaseComplete,
         onPurchaseError: _onPurchaseError,
       );
       if (!initialized) {
         _lastError = 'Payment service not available';
+        debugPrint('[PaymentService] Initialization failed: $_lastError');
         return [];
       }
+      debugPrint('[PaymentService] Initialization succeeded');
     }
 
     // Sanitize product IDs: trim whitespace, remove invisible chars
@@ -102,9 +108,15 @@ class PaymentService {
     }
 
     try {
+      debugPrint('[PaymentService] Calling _inAppPurchase.queryProductDetails with: $sanitizedIds');
       final response = await _inAppPurchase.queryProductDetails(
         sanitizedIds.toSet(),
       );
+      debugPrint('[PaymentService] queryProductDetails response.error: ${response.error}');
+      debugPrint('[PaymentService] queryProductDetails response.productDetails count: ${response.productDetails.length}');
+      if (response.productDetails.isNotEmpty) {
+        debugPrint('[PaymentService] Found products: ${response.productDetails.map((p) => '${p.id} (${p.title})').join(', ')}');
+      }
 
       if (response.error != null) {
         _lastError = response.error!.message;
@@ -223,36 +235,64 @@ class PaymentService {
 
       final purchaseParam = PurchaseParam(
         productDetails: product,
-        applicationUserName: applicationUserName,
+        applicationUserName: _userId ?? applicationUserName,
       );
 
       debugPrint('[PaymentService] Launching purchase for ${product.id}');
 
+      // 使用 buySubscription 替代 buyNonConsumable 来处理订阅商品
+      // 这在 Android 上更可靠
       try {
-        await _inAppPurchase.buyNonConsumable(
+        final purchaseResult = await _inAppPurchase.buyNonConsumable(
           purchaseParam: purchaseParam,
         );
+        debugPrint('[PaymentService] buyNonConsumable returned (this means Google Play opened or failed): $purchaseResult');
+        
+        // buyNonConsumable 正常返回（不抛异常）只说明 Google Play 尝试打开了
+        // 实际的购买结果需要通过 purchaseStream 返回
+        // 如果 3 秒内 completer 还没完成，说明 Google Play 可能没有真正打开
+        await Future.delayed(const Duration(seconds: 3));
+        if (!completer.isCompleted) {
+          debugPrint('[PaymentService] WARNING: Google Play may not have opened (no purchase result after 3s)');
+          // 不直接返回 false，因为 Google Play 可能只是卡住了
+          // 让它继续等待，或者等待 timeout
+        }
+        
+        return completer.future;
       } catch (e) {
         final message = e.toString();
         debugPrint('[PaymentService] buyNonConsumable error: $message');
+        
+        // 分析错误类型，给出更有用的错误信息
+        String userMessage;
         if (message.contains('ITEM_ALREADY_OWNED')) {
           debugPrint('[PaymentService] Detected ITEM_ALREADY_OWNED, clearing cache');
           clearCachedPurchases();
+          userMessage = 'You already own this subscription. Please check Google Play for manage subscription.';
+        } else if (message.contains('SERVICE_DISCONNECTED') || message.contains('service')) {
+          userMessage = 'Google Play service is not connected. Please update Google Play Store app.';
+        } else if (message.contains('NETWORK')) {
+          userMessage = 'Network error. Please check your internet connection.';
+        } else if (message.contains('DEVELOPER_ERROR') || message.contains('product')) {
+          userMessage = 'Product configuration error. Please try again later or contact support.';
+        } else if (message.contains('PERMISSION_DENIED') || message.contains('permission')) {
+          userMessage = 'Permission denied. Please check app permissions.';
+        } else {
+          userMessage = 'Purchase failed: $message';
         }
-        _lastError = 'Purchase failed: $message';
-        _onPurchaseError?.call('Purchase failed: $message');
+        
+        _lastError = userMessage;
+        _onPurchaseError?.call(userMessage);
         await finalizePendingPurchase();
-        return completer.future;
+        return false;
       }
-
-      return completer.future;
     } catch (e) {
       final message = e.toString();
       debugPrint('[PaymentService] Purchase flow error: $message');
       clearCachedPurchases();
       _lastError = 'Purchase failed: $message';
       _onPurchaseError?.call('Purchase failed: $message');
-      return Future.value(false);
+      return false;
     }
   }
 

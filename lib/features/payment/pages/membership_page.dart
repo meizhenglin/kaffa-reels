@@ -241,11 +241,23 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         ),
       );
     } else if (!success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.membershipPurchaseOpened),
-        ),
-      );
+      // 显示真实的错误信息，而不是误导性的 "Google Play opened" 提示
+      final memberState = ref.read(memberStateProvider);
+      final errorMsg = memberState.errorMessage;
+      if (errorMsg != null && errorMsg.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.membershipPurchaseOpened),
+          ),
+        );
+      }
     }
   }
 

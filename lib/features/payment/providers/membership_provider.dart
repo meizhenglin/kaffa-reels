@@ -638,12 +638,20 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
       debugPrint('[Purchase] Step 2: Querying Google Play products');
       final products = await getProducts([selectedProduct]);
       debugPrint('[Purchase] Step 2: Found ${products.length} products');
+      if (products.isNotEmpty) {
+        debugPrint('[Purchase] Products: ${products.map((p) => '${p.id} (${p.title})').join(', ')}');
+      } else {
+        final expectedId = selectedProduct.getProductId(_paymentService.currentPlatform);
+        debugPrint('[Purchase] WARNING: No products found from Google Play!');
+        debugPrint('[Purchase] This means the product ID "$expectedId" is not configured in Google Play Console');
+      }
       final platformProductId = selectedProduct.getProductId(_paymentService.currentPlatform).trim();
+      debugPrint('[Purchase] Looking for product ID: "$platformProductId"');
 
       if (products.isEmpty) {
         state = state.copyWith(
           isLoading: false,
-          errorMessage: 'Subscription product is unavailable or not configured as subs in Google Play.',
+          errorMessage: 'Subscription product is unavailable. Please check Google Play Console configuration.',
           clearPendingOrder: true,
         );
         return false;
