@@ -79,5 +79,19 @@
 	<string>YOUR_ALIYUN_LICENSE_KEY</string>
 	<key>AlivcLicenseFile</key>
 	<string>license.crt</string>
+	<!-- Universal Links: 允许 App 处理 qahwatv.com 链接 -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.qahwatv.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>qahwatv</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

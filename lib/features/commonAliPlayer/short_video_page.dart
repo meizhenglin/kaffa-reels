@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:preload_page_view/preload_page_view.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../home/pages/main_page.dart';
@@ -200,11 +201,26 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         );
   }
 
-  void _shareVideo() {
+  Future<void> _shareVideo() async {
     final videoInfo = videoInfoList[_currentIndex];
-    final shareCount = videoInfo.shareNum;
-    if (shareCount > 0) {
-      // TODO: implement share functionality
+
+    // 构建分享文案
+    final String shareText = '''🎬 ${videoInfo.title}
+
+https://qahwatv.com/video/${videoInfo.videoId}
+
+#QahwaTV''';
+
+    try {
+      // 分享文字（链接 + 标题，让平台自动渲染预览图）
+      await Share.share(shareText, subject: videoInfo.title);
+    } catch (e) {
+      debugPrint('Error sharing video: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to share. Please try again.')),
+        );
+      }
     }
   }
 
@@ -1380,14 +1396,13 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
               onTap: () => _toggleCollect(videoInfo),
               isActive: isCollected,
             ),
-            // TODO: 待实现分享功能
-            // const SizedBox(height: 16),
-            // _buildSideImageButton(
-            //   activeImage: 'assets/images/share.png',
-            //   inactiveImage: 'assets/images/share.png',
-            //   label: l10n.share,
-            //   onTap: _shareVideo,
-            // ),
+            const SizedBox(height: 16),
+            _buildSideImageButton(
+              activeImage: 'assets/images/share.png',
+              inactiveImage: 'assets/images/share.png',
+              label: l10n.share,
+              onTap: _shareVideo,
+            ),
             const SizedBox(height: 16),
             _buildSideImageButton(
               activeImage: 'assets/images/series.png',
