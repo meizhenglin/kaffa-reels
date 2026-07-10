@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:preload_page_view/preload_page_view.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../home/pages/main_page.dart';
@@ -20,6 +19,7 @@ import '../payment/providers/coin_record_provider.dart';
 import '../payment/widgets/unlock_bottom_sheet.dart';
 import '../payment/models/unlock_product.dart';
 import '../../app/providers/app_providers.dart';
+import '../../core/widgets/share_button.dart';
 import 'ali_player_preload.dart';
 import 'watch_short_video_item.dart';
 
@@ -203,25 +203,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
   Future<void> _shareVideo() async {
     final videoInfo = videoInfoList[_currentIndex];
-
-    // 构建分享文案
-    final String shareText = '''🎬 ${videoInfo.title}
-
-https://qahwatv.com/video/${videoInfo.videoId}
-
-#QahwaTV''';
-
-    try {
-      // 分享文字（链接 + 标题，让平台自动渲染预览图）
-      await Share.share(shareText, subject: videoInfo.title);
-    } catch (e) {
-      debugPrint('Error sharing video: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to share. Please try again.')),
-        );
-      }
-    }
+    await showShareSheet(context, ShareContent.fromVideo(videoInfo));
   }
 
   late List<VideoInfo> videoInfoList;

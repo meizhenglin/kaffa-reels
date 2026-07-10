@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<DevInfor>
+<Facebook Id="8" SortId="8" ShareByAppClient="true" Enable="true" ConsumerKey="1602047324111532" ConsumerSecret="e77eb31c1d2881c8148c81768075df68" RedirectUrl="https://mob.com" />
+<Twitter Id="9" SortId="9" ShareByAppClient="true" Enable="true" ConsumerKey="ODUydGdxWUtvZ3JKOFJpYXFwdXk6MTpjaQ" ConsumerSecret="HcjJCkMJnBwfvMe__Cf8KDhakKIzTNgn2414EYeoqilVWZeuxE" CallbackUrl="http://mob.com" />
+</DevInfor>

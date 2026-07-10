@@ -1,0 +1,29 @@
+apply plugin: 'com.mob.sdk'
+
+MobSDK {
+    appKey "3af2042fb3728"
+    appSecret "4d69d99c1640ae37a8a535effa74fdca"
+
+    ShareSDK {
+        devInfo {
+            Facebook {
+                id 8
+                sortId 8
+                appKey "1602047324111532"
+                appSecret "e77eb31c1d2881c8148c81768075df68"
+                callbackUri "https://mob.com"
+                shareByAppClient true
+                enable true
+            }
+            Twitter {
+                id 9
+                sortId 9
+                appKey "ODUydGdxWUtvZ3JKOFJpYXFwdXk6MTpjaQ"
+                appSecret "HcjJCkMJnBwfvMe__Cf8KDhakKIzTNgn2414EYeoqilVWZeuxE"
+                callbackUri "http://mob.com"
+                shareByAppClient true
+                enable true
+            }
+        }
+    }
+}

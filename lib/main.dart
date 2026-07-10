@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mobcommonlib/mobcommonlib.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qahwa_tv/l10n/app_localizations.dart';
 
@@ -21,6 +22,7 @@ import 'core/constants/app_constants.dart';
 import 'core/firebase/firebase_service.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'core/storage/storage_service.dart';
+import 'services/share_service.dart';
 
 Future<void> _withTimeout(Future<void> future, Duration timeout) async {
   try {
@@ -82,18 +84,16 @@ Future<void> main() async {
   await storage.init();
   debugPrint('[MAIN] StorageService initialized');
 
-  // 关闭阿里云播放器日志（仅非 Web 平台）
   await aliplayer_impl.AliPlayerLog.init();
   await _initializeAliPlayerWidgetGlobalSettings();
 
-  // Web：不在这里 await Firebase 初始化，避免被远端脚本超时阻塞首屏。
-  // Firebase 会在首帧渲染后后台初始化。
-  // 非 Web 平台：本地初始化，不需要网络，直接 await。
   if (!kIsWeb) {
     await _withTimeout(
       FirebaseService.initialize(),
       const Duration(seconds: 15),
     );
+    Mobcommonlib.submitPolicyGrantResult(true, null);
+    ShareService.init();
   }
 
   runApp(
@@ -132,7 +132,6 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
   @override
   void initState() {
     super.initState();
-    // 延迟初始化认证和设置，后台处理，不阻塞首屏渲染
     Future.microtask(() async {
       await Future.delayed(const Duration(milliseconds: 100));
       ref.read(authProvider);

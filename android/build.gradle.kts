@@ -1,7 +1,21 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("https://mvn.mob.com/android") }
+        maven { url = uri("https://mvn.zztfly.com/android") }
+    }
+    dependencies {
+        classpath("com.mob.sdk:MobSDK:+")
+    }
+}
+
 allprojects {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://mvn.mob.com/android") }
+        maven { url = uri("https://mvn.zztfly.com/android") }
     }
 }
 
