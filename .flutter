@@ -1,0 +1,4 @@
+{
+  "renderer": "html",
+  "canvasKitBaseUrl": "canvaskit/"
+}

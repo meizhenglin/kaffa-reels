@@ -1,11 +1,15 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../models/unlock_product.dart';
+import '../models/payment_channel.dart';
+import '../models/subscription_product.dart';
 import '../providers/coin_record_provider.dart';
 import '../services/payment_service.dart';
+import '../services/unified_payment_handler.dart';
+import '../widgets/payment_channel_selector.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/service/pay_service.dart';
@@ -94,7 +98,6 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   @override
   void initState() {
     super.initState();
-    // 从API加载K币余额
     Future.microtask(() {
       ref.read(coinBalanceInfoProvider.notifier).load();
     });
@@ -288,7 +291,6 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   }
 
   Widget _buildProductsGrid(AppLocalizations l10n) {
-    // 直接使用所有返回的商品，不按类型过滤
     final allProducts = widget.config.allProducts;
     debugPrint('[UnlockBottomSheet] allProducts length: ${allProducts.length}');
     debugPrint('[UnlockBottomSheet] allProducts: $allProducts');
@@ -303,7 +305,6 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       );
     }
 
-    // 根据商品数量决定布局：1个商品时单列，2-4个商品时2列，5个及以上3列
     final crossAxisCount = allProducts.length == 1
         ? 1
         : (allProducts.length <= 4 ? 2 : 3);
@@ -337,7 +338,6 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     final originalPrice = product.originalPrice;
     final hasDiscount = originalPrice != null && originalPrice > price;
 
-    // 价格显示：如果价格是整数（如100.00），显示为整数
     final priceInt = price.toInt();
     final mainLabel = price - priceInt == 0 ? '¥$priceInt' : '¥${price.toStringAsFixed(2)}';
     final subLabel = product.goodsName.isNotEmpty ? product.goodsName : '';
@@ -506,27 +506,22 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   }
 
   Future<void> _handleProductTap(UnlockProduct product) async {
-    // 检查是否是游客，游客需要登录后才能支付
     final authState = ref.read(authProvider);
     if (!authState.isAuthenticated || (authState.user?.isTourist ?? true)) {
-      // 游客不能支付，关闭弹窗返回需要登录
       Navigator.of(context).pop(UnlockResult.loginRequired());
       return;
     }
 
     final balance = _userBalance;
 
-    // VIP商品 → 走订阅购买
     if (product.type == UnlockProductType.vip) {
       await _handleVipPurchase(product);
       return;
     }
 
-    // 单集/整剧解锁：余额足够 → 扣余额解锁
     if (balance >= product.price) {
       await _confirmAndUnlockByBalance(product);
     } else {
-      // 余额不足 → 走一次性购买（Google Play）
       await _confirmAndUnlockByPurchase(product);
     }
   }
@@ -560,7 +555,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     await _performUnlockByBalance(product);
   }
 
-  /// 余额不足，走Google Play一次性购买
+  /// 余额不足，弹出渠道选择（Google Play 或 HaiPay）
   Future<void> _confirmAndUnlockByPurchase(UnlockProduct product) async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
@@ -586,7 +581,19 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
     if (confirmed != true) return;
 
-    await _performUnlockByPurchase(product);
+    final channel = await PaymentChannelSelector.show(
+      context: context,
+      price: product.price.toStringAsFixed(2),
+      productName: product.goodsName,
+    );
+
+    if (channel == null) return;
+
+    if (channel == PaymentChannel.googlePlay) {
+      await _performUnlockByGooglePlay(product);
+    } else {
+      await _performUnlockByHaiPay(product);
+    }
   }
 
   /// 扣余额解锁
@@ -604,7 +611,6 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       ApiResponse? resp;
 
       if (product.type == UnlockProductType.episode) {
-        // 单集解锁
         resp = await apiService.getUserPayEpisodes(
           videoId: widget.videoId,
           episodesId: widget.episodeId,
@@ -613,7 +619,6 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         );
         success = resp.isSuccess;
       } else if (product.type == UnlockProductType.season) {
-        // 整剧解锁
         resp = await apiService.userRechange(
           payType: 5,
           payConfigId: product.goodsId,
@@ -626,10 +631,8 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       _setProcessing(product.goodsId, false);
 
       if (success) {
-        // API成功后再扣本地余额
         final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
         coinNotifier.deductCoins(product.price.toInt());
-        // 刷新余额确保与后端同步
         await coinNotifier.load();
 
         AppSnackBar.show(context, message: l10n.unlockSuccess);
@@ -637,7 +640,6 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           episodeIndex: widget.episodeIndex,
         ));
       } else {
-        // API失败，不扣余额
         AppSnackBar.show(context, message: resp?.error ?? l10n.unlockFailed);
       }
     } catch (e) {
@@ -648,15 +650,13 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     }
   }
 
-  /// 通过Google Play购买解锁
-  Future<void> _performUnlockByPurchase(UnlockProduct product) async {
+  /// 通过 Google Play 购买解锁
+  Future<void> _performUnlockByGooglePlay(UnlockProduct product) async {
     final l10n = AppLocalizations.of(context);
     _setProcessing(product.goodsId, true);
 
     try {
       final paymentService = PaymentService.instance;
-
-      // 获取Google Play商品信息
       final products = await paymentService.getProducts(
         productIds: [product.googlePlayId ?? ''],
       );
@@ -669,14 +669,12 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         return;
       }
 
-      // 发起一次性购买
       final success = await paymentService.purchase(product: products.first);
 
       if (!mounted) return;
       _setProcessing(product.goodsId, false);
 
       if (success) {
-        // 购买成功后调用后端API解锁
         final apiService = ApiService(
           dioClient: ref.read(dioClientProvider),
           storage: ref.read(storageServiceProvider),
@@ -697,7 +695,6 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           );
         }
 
-        // 刷新K币余额确保与后端同步
         final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
         await coinNotifier.load();
 
@@ -716,22 +713,86 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     }
   }
 
-  /// VIP商品 → 走Google Play订阅购买
+  /// 通过 HaiPay H5 购买解锁
+  Future<void> _performUnlockByHaiPay(UnlockProduct product) async {
+    final l10n = AppLocalizations.of(context);
+    _setProcessing(product.goodsId, true);
+
+    try {
+      final handler = ref.read(unifiedPaymentHandlerProvider);
+      final success = await handler.unlockEpisode(
+        product: product,
+        price: product.price.toStringAsFixed(2),
+        context: context,
+        videoId: widget.videoId,
+        episodeId: widget.episodeId,
+        episodesNum: widget.episodesNum,
+      );
+
+      if (!mounted) return;
+      _setProcessing(product.goodsId, false);
+
+      if (success) {
+        final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
+        await coinNotifier.load();
+
+        AppSnackBar.show(context, message: l10n.purchaseSuccess);
+        Navigator.of(context).pop(UnlockResult.success(
+          episodeIndex: widget.episodeIndex,
+        ));
+      } else {
+        AppSnackBar.show(context, message: handler.lastError ?? l10n.purchaseFailed);
+      }
+    } catch (e) {
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+        AppSnackBar.show(context, message: '${l10n.purchaseFailed}: $e');
+      }
+    }
+  }
+
+  /// VIP商品 → 弹出渠道选择（Google Play 或 HaiPay）
   Future<void> _handleVipPurchase(UnlockProduct product) async {
     final l10n = AppLocalizations.of(context);
     _setProcessing(product.goodsId, true);
 
     try {
-      // Step 1: 创建后端订单
-      final payService = payServiceProvider;
+      final channel = await PaymentChannelSelector.show(
+        context: context,
+        price: product.price.toStringAsFixed(2),
+        productName: product.goodsName,
+      );
 
+      if (channel == null) {
+        _setProcessing(product.goodsId, false);
+        return;
+      }
+
+      if (channel == PaymentChannel.googlePlay) {
+        await _performVipByGooglePlay(product);
+      } else {
+        await _performVipByHaiPay(product);
+      }
+    } catch (e) {
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+        AppSnackBar.show(context, message: '${l10n.vipSubscriptionFailed}: $e');
+      }
+    }
+  }
+
+  /// VIP 订阅购买 - Google Play
+  Future<void> _performVipByGooglePlay(UnlockProduct product) async {
+    final l10n = AppLocalizations.of(context);
+
+    try {
+      final payService = payServiceProvider;
       try {
         await payService.createOrder(payConfigId: product.goodsId);
       } catch (e) {
-        debugPrint('[Unlock] Create order failed: $e');
+        debugPrint('[Unlock] Create VIP order failed: $e');
       }
 
-      // Step 2: 查询 Google Play 商品
       final paymentService = PaymentService.instance;
       final products = await paymentService.getProducts(
         productIds: [product.googlePlayId ?? ''],
@@ -746,7 +807,6 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         return;
       }
 
-      // Step 3: 发起订阅购买
       final success = await paymentService.purchase(
         product: products.first,
         applicationUserName: ref.read(storageServiceProvider).getString('user_id'),
@@ -756,7 +816,6 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       _setProcessing(product.goodsId, false);
 
       if (success) {
-        // 刷新K币余额确保与后端同步
         final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
         await coinNotifier.load();
 
@@ -764,6 +823,51 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         Navigator.of(context).pop();
       } else {
         AppSnackBar.show(context, message: paymentService.lastError ?? l10n.vipSubscriptionFailed);
+      }
+    } catch (e) {
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+        AppSnackBar.show(context, message: '${l10n.vipSubscriptionFailed}: $e');
+      }
+    }
+  }
+
+  /// VIP 订阅购买 - HaiPay
+  Future<void> _performVipByHaiPay(UnlockProduct product) async {
+    final l10n = AppLocalizations.of(context);
+
+    try {
+      final handler = ref.read(unifiedPaymentHandlerProvider);
+      final subProduct = SubscriptionProduct(
+        id: 'vip_haipay_${product.goodsId}',
+        type: SubscriptionPeriod.monthly,
+        googlePlayId: '',
+        appStoreId: '',
+        price: product.price.toStringAsFixed(2),
+        priceCn: product.price.toStringAsFixed(2),
+        originalPrice: '',
+        originalPriceCn: '',
+        benefits: const [],
+        displayName: product.goodsName,
+        goodsId: product.goodsId,
+      );
+      final success = await handler.purchaseVip(
+        product: subProduct,
+        price: product.price.toStringAsFixed(2),
+        context: context,
+      );
+
+      if (!mounted) return;
+      _setProcessing(product.goodsId, false);
+
+      if (success) {
+        final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
+        await coinNotifier.load();
+
+        AppSnackBar.show(context, message: l10n.vipSubscriptionSuccess);
+        Navigator.of(context).pop();
+      } else {
+        AppSnackBar.show(context, message: handler.lastError ?? l10n.vipSubscriptionFailed);
       }
     } catch (e) {
       if (mounted) {

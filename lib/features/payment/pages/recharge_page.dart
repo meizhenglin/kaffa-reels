@@ -1,11 +1,15 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
+import '../../../app/providers/app_providers.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../../core/widgets/app_snack_bar.dart';
 import '../../../l10n/app_localizations.dart';
+import '../models/payment_channel.dart';
 import '../providers/recharge_provider.dart';
+import '../services/unified_payment_handler.dart';
+import '../widgets/payment_channel_selector.dart';
 
 /// Recharge coins page (K币充值)
 class RechargePage extends ConsumerStatefulWidget {
@@ -67,9 +71,30 @@ class _RechargePageState extends ConsumerState<RechargePage> {
 
     if (confirmed != true) return;
 
-    // Start purchase
-    final handler = ref.read(rechargePurchaseHandlerProvider);
-    final success = await handler.purchase(product);
+    // Step 1: Let user select payment channel (Google Play or HaiPay)
+    final channel = await PaymentChannelSelector.show(
+      context: context,
+      price: product.price,
+      productName: product.name,
+    );
+
+    if (channel == null) return;
+
+    bool success = false;
+
+    if (channel == PaymentChannel.googlePlay) {
+      // Google Play flow (original logic)
+      final handler = ref.read(rechargePurchaseHandlerProvider);
+      success = await handler.purchase(product);
+    } else {
+      // HaiPay H5 flow
+      final handler = ref.read(unifiedPaymentHandlerProvider);
+      success = await handler.purchaseRecharge(
+        product: product,
+        price: product.price,
+        context: context,
+      );
+    }
 
     if (success) {
       if (mounted) {
