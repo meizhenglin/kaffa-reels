@@ -6,6 +6,7 @@ import '../../../app/providers/app_providers.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../../core/widgets/app_snack_bar.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../core/config/build_flavor.dart';
 import '../models/payment_channel.dart';
 import '../providers/recharge_provider.dart';
 import '../services/unified_payment_handler.dart';
@@ -71,28 +72,42 @@ class _RechargePageState extends ConsumerState<RechargePage> {
 
     if (confirmed != true) return;
 
-    // Step 1: Let user select payment channel (Google Play or HaiPay)
+    // Google flavor: skip HaiPay entirely — go straight to Google Play.
+    if (BuildFlavor.isGoogle) {
+      final handler = ref.read(rechargePurchaseHandlerProvider);
+      await handler.purchase(product);
+      return;
+    }
+
+    // Step 1: Let user select payment channel (Google Play or HaiPay sub-methods)
+    final unifiedHandler = ref.read(unifiedPaymentHandlerProvider);
+    final haiPayMethods = await unifiedHandler.fetchHaiPayMethods(
+      price: product.price,
+      productName: product.name,
+    );
+
     final channel = await PaymentChannelSelector.show(
       context: context,
       price: product.price,
       productName: product.name,
+      haiPayMethods: haiPayMethods,
     );
 
     if (channel == null) return;
 
     bool success = false;
 
-    if (channel == PaymentChannel.googlePlay) {
+    if (channel.isGooglePlay) {
       // Google Play flow (original logic)
       final handler = ref.read(rechargePurchaseHandlerProvider);
       success = await handler.purchase(product);
     } else {
       // HaiPay H5 flow
-      final handler = ref.read(unifiedPaymentHandlerProvider);
-      success = await handler.purchaseRecharge(
+      success = await unifiedHandler.purchaseRecharge(
         product: product,
         price: product.price,
         context: context,
+        channel: channel,
       );
     }
 

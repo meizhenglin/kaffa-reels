@@ -10,14 +10,14 @@ class ShareService {
     try {
       final register = ShareSDKRegister();
       register.setupFacebook(
-        '1602047324111532',
-        'e77eb31c1d2881c8148c81768075df68',
-        'shareSDK',
+        '1869879543763549',
+        '0140b1faea8a36984552693d00b5592a',
+        'https://qahwatv.com',
       );
       register.setupTwitter(
-        'ODUydGdxWUtvZ3JKOFJpYXFwdXk6MTpjaQ',
-        'HcjJCkMJnBwfvMe__Cf8KDhakKIzTNgn2414EYeoqilVWZeuxE',
-        'http://mob.com',
+        'ZUV2bEZaNWtVYmFPUTljeDZhUzc6MTpjaQ',
+        'TcZfOscMGrfbMwt84ceA7goYGYlZ173mKFHlurgxkco0ymOu3z',
+        'https://qahwatv.com/twitter/callback',
       );
       SharesdkPlugin.regist(register);
     } catch (e) {

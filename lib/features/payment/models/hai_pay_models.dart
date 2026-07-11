@@ -1,25 +1,47 @@
+import 'dart:ui';
+
 import 'package:equatable/equatable.dart';
-import 'payment_channel.dart';
 
 /// Payment method from HaiPay backend (equivalent to Android's PaytypeBean)
 class HaiPayMethod extends Equatable {
   const HaiPayMethod({
     required this.id,
     required this.name,
-    required this.img,
-    required this.jumpType,
+    required this.icon,
+    required this.payType,
+    required this.inBankCode,
+    required this.countryCode,
+    required this.description,
+    required this.nameI18n,
+    this.jumpType = 1,
   });
 
   /// Payment method ID
   final int id;
 
-  /// Display name (e.g., "Mada", "STCPay", "Credit Card")
+  /// Backend raw name (e.g. "STCPAY", "CARD_PAYMENT", "HAIPAY_STCPAY")
   final String name;
 
-  /// Icon URL or asset path
-  final String img;
+  /// Icon URL or asset path (relative to backend base, e.g. "/uploads/pay/stcpay.png")
+  final String icon;
 
-  /// 1 = in-app WebView, 2 = external browser
+  /// Backend `payType` (e.g. "PAYMENT_GATEWAY")
+  final String payType;
+
+  /// Bank/channel identifier (e.g. "STCPAY", "CARD")
+  final String inBankCode;
+
+  /// ISO country code (e.g. "SAR")
+  final String countryCode;
+
+  /// Human-readable description
+  final String description;
+
+  /// Localized display names: { "zh-CN": ..., "en-US": ..., "ar-SA": ... }
+  final Map<String, String> nameI18n;
+
+  /// 1 = in-app WebView, 2 = external browser (kept for compat; backend
+  /// currently has no `jumpType` so default to 1)
   final int jumpType;
 
   /// Whether this opens in external browser
@@ -28,41 +50,103 @@ class HaiPayMethod extends Equatable {
   /// Whether this opens in in-app WebView
   bool get isInAppWebView => jumpType == 1;
 
+  /// True if this method is routed through HaiPay (`HAIPAY_*` ids in our backend)
+  bool get isHaiPayRouted =>
+      name.startsWith('HAIPAY_') || inBankCode.startsWith('HAIPAY_');
+
+  /// Resolve the best display name for the given locale.
+  /// Falls back to English, then backend raw name.
+  String localizedName(Locale locale) {
+    // Try exact language-region match first
+    final tag = _tagFor(locale);
+    final exact = nameI18n[tag];
+    if (exact != null && exact.isNotEmpty) return exact;
+
+    // Try language-only match (e.g. "ar")
+    final lang = locale.languageCode;
+    for (final entry in nameI18n.entries) {
+      if (entry.key.toLowerCase().startsWith('${lang.toLowerCase()}-') ||
+          entry.key.toLowerCase() == lang.toLowerCase()) {
+        if (entry.value.isNotEmpty) return entry.value;
+      }
+    }
+
+    // English fallback
+    final en = nameI18n['en-US'] ?? nameI18n['en'];
+    if (en != null && en.isNotEmpty) return en;
+
+    return name;
+  }
+
+  String _tagFor(Locale locale) {
+    final lang = locale.languageCode.toLowerCase();
+    final region = (locale.countryCode ?? '').toUpperCase();
+    switch (lang) {
+      case 'zh':
+        return region.isNotEmpty ? 'zh-$region' : 'zh-CN';
+      case 'ar':
+        return region.isNotEmpty ? 'ar-$region' : 'ar-SA';
+      case 'en':
+      default:
+        return region.isNotEmpty ? 'en-$region' : 'en-US';
+    }
+  }
+
   factory HaiPayMethod.fromJson(Map<String, dynamic> json) {
+    final rawName = json['name'] as String? ?? '';
+    final rawI18n = json['nameI18n'];
+    final i18n = <String, String>{};
+    if (rawI18n is Map) {
+      rawI18n.forEach((k, v) {
+        if (k is String && v is String) i18n[k] = v;
+      });
+    }
+
     return HaiPayMethod(
-      id: json['id'] as int? ?? 0,
-      name: json['name'] as String? ?? '',
-      img: json['img'] as String? ?? '',
-      jumpType: json['jumpType'] as int? ?? 1,
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      name: rawName,
+      icon: json['icon'] as String? ?? json['img'] as String? ?? '',
+      payType: json['payType'] as String? ?? '',
+      inBankCode: json['inBankCode'] as String? ?? '',
+      countryCode: json['countryCode'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      nameI18n: i18n,
+      jumpType: (json['jumpType'] as num?)?.toInt() ?? 1,
     );
   }
 
   @override
-  List<Object?> get props => [id, name, img, jumpType];
+  List<Object?> get props =>
+      [id, name, icon, payType, inBankCode, countryCode, description];
 }
 
-/// HaiPay order response (equivalent to Android's PayInfoBean)
+/// HaiPay order response (returned by POST /api/pay/userRechange and /api/pay/initPay)
 class HaiPayOrder extends Equatable {
   const HaiPayOrder({
     required this.payInfo,
     required this.orderNo,
+    this.merchantOrderNo = '',
   });
 
-  /// H5 payment URL to open
+  /// H5 payment URL to open (`payUrl` field from backend)
   final String payInfo;
 
-  /// Backend order number
+  /// HaiPay (HiPay) platform order number
   final String orderNo;
+
+  /// Merchant-side order number returned by backend
+  final String merchantOrderNo;
 
   factory HaiPayOrder.fromJson(Map<String, dynamic> json) {
     return HaiPayOrder(
-      payInfo: json['payInfo'] as String? ?? '',
+      payInfo: json['payUrl'] as String? ?? json['payInfo'] as String? ?? '',
       orderNo: json['orderNo'] as String? ?? '',
+      merchantOrderNo: json['merchantOrderNo'] as String? ?? '',
     );
   }
 
   @override
-  List<Object?> get props => [payInfo, orderNo];
+  List<Object?> get props => [payInfo, orderNo, merchantOrderNo];
 }
 
 /// HaiPay payment status poll result (equivalent to Android's PayReaBean)
@@ -99,21 +183,23 @@ class HaiPayMethodsResponse extends Equatable {
   static const List<HaiPayMethod> fallbackMethods = [
     HaiPayMethod(
       id: 1,
-      name: 'Credit Card',
-      img: '',
-      jumpType: 1,
+      name: 'CARD_PAYMENT',
+      icon: '',
+      payType: 'PAYMENT_GATEWAY',
+      inBankCode: 'CARD',
+      countryCode: 'SAR',
+      description: 'Credit/Debit card payment',
+      nameI18n: {'en-US': 'Credit/Debit Card', 'ar-SA': 'بطاقة ائتمان/خصم'},
     ),
     HaiPayMethod(
       id: 2,
-      name: 'Mada',
-      img: '',
-      jumpType: 1,
-    ),
-    HaiPayMethod(
-      id: 3,
-      name: 'STCPay',
-      img: '',
-      jumpType: 1,
+      name: 'STCPAY',
+      icon: '',
+      payType: 'PAYMENT_GATEWAY',
+      inBankCode: 'STCPAY',
+      countryCode: 'SAR',
+      description: 'STC Pay electronic payment',
+      nameI18n: {'en-US': 'STC Pay', 'ar-SA': 'STC باي'},
     ),
   ];
 

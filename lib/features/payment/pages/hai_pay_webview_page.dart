@@ -43,8 +43,13 @@ class HaiPayWebViewPage extends StatefulWidget {
     required String productType,
     void Function(bool success)? onPaymentComplete,
   }) {
-    return Navigator.of(context).push<bool>(
+    debugPrint(
+        '[HaiPayWebView] show paymentUrl=$paymentUrl orderNo=$orderNo productType=$productType');
+    // ignore: avoid_print
+    print('[HaiPayWebView] show paymentUrl=$paymentUrl orderNo=$orderNo productType=$productType');
+    return Navigator.of(context, rootNavigator: true).push<bool>(
       MaterialPageRoute(
+        fullscreenDialog: true,
         builder: (_) => HaiPayWebViewPage(
           paymentUrl: paymentUrl,
           orderNo: orderNo,

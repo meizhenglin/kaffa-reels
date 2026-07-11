@@ -18,10 +18,12 @@ MobSDK {
             Twitter {
                 id 9
                 sortId 9
-                appKey "ODUydGdxWUtvZ3JKOFJpYXFwdXk6MTpjaQ"
-                appSecret "HcjJCkMJnBwfvMe__Cf8KDhakKIzTNgn2414EYeoqilVWZeuxE"
-                callbackUri "http://mob.com"
-                shareByAppClient true
+                appKey "ZUV2bEZaNWtVYmFPUTljeDZhUzc6MTpjaQ"
+                appSecret "TcZfOscMGrfbMwt84ceA7goYGYtZ173mKFHlurgxkco0ymOu3z"
+                callbackUri "twittersdk://callback"
+                IsUseV2 true
+                shareByAppClient false
+                bypassApproval true
                 enable true
             }
         }

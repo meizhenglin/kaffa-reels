@@ -11,6 +11,7 @@ import '../services/payment_service.dart';
 import '../services/unified_payment_handler.dart';
 import '../widgets/payment_channel_selector.dart';
 import '../../../app/providers/app_providers.dart';
+import '../../../core/config/build_flavor.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/service/pay_service.dart';
 import '../../../core/widgets/app_snack_bar.dart';
@@ -581,18 +582,33 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
     if (confirmed != true) return;
 
+    // Google flavor: skip HaiPay entirely — there is only one channel
+    // and we go straight to the Google Play billing flow.
+    if (BuildFlavor.isGoogle) {
+      await _performUnlockByGooglePlay(product);
+      return;
+    }
+
+    final handler = ref.read(unifiedPaymentHandlerProvider);
+    final price = product.price.toStringAsFixed(2);
+    final haiPayMethods = await handler.fetchHaiPayMethods(
+      price: price,
+      productName: product.goodsName,
+    );
+
     final channel = await PaymentChannelSelector.show(
       context: context,
-      price: product.price.toStringAsFixed(2),
+      price: price,
       productName: product.goodsName,
+      haiPayMethods: haiPayMethods,
     );
 
     if (channel == null) return;
 
-    if (channel == PaymentChannel.googlePlay) {
+    if (channel.isGooglePlay) {
       await _performUnlockByGooglePlay(product);
     } else {
-      await _performUnlockByHaiPay(product);
+      await _performUnlockByHaiPay(product, channel);
     }
   }
 
@@ -714,32 +730,28 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   }
 
   /// 通过 HaiPay H5 购买解锁
-  Future<void> _performUnlockByHaiPay(UnlockProduct product) async {
+  Future<void> _performUnlockByHaiPay(UnlockProduct product, PaymentChannel channel) async {
     final l10n = AppLocalizations.of(context);
     _setProcessing(product.goodsId, true);
 
     try {
       final handler = ref.read(unifiedPaymentHandlerProvider);
-      final success = await handler.unlockEpisode(
+      // opened=true means "payment page was launched" — do NOT pop sheet.
+      final opened = await handler.unlockEpisode(
         product: product,
         price: product.price.toStringAsFixed(2),
         context: context,
         videoId: widget.videoId,
         episodeId: widget.episodeId,
         episodesNum: widget.episodesNum,
+        channel: channel,
       );
 
       if (!mounted) return;
       _setProcessing(product.goodsId, false);
 
-      if (success) {
-        final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
-        await coinNotifier.load();
-
-        AppSnackBar.show(context, message: l10n.purchaseSuccess);
-        Navigator.of(context).pop(UnlockResult.success(
-          episodeIndex: widget.episodeIndex,
-        ));
+      if (opened) {
+        // WebView pushed. Do nothing — wait for WebView to pop itself.
       } else {
         AppSnackBar.show(context, message: handler.lastError ?? l10n.purchaseFailed);
       }
@@ -757,10 +769,25 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     _setProcessing(product.goodsId, true);
 
     try {
+      // Google flavor: skip HaiPay entirely — there is only one channel
+      // and we go straight to the Google Play billing flow.
+      if (BuildFlavor.isGoogle) {
+        await _performVipByGooglePlay(product);
+        return;
+      }
+
+      final handler = ref.read(unifiedPaymentHandlerProvider);
+      final price = product.price.toStringAsFixed(2);
+      final haiPayMethods = await handler.fetchHaiPayMethods(
+        price: price,
+        productName: product.goodsName,
+      );
+
       final channel = await PaymentChannelSelector.show(
         context: context,
-        price: product.price.toStringAsFixed(2),
+        price: price,
         productName: product.goodsName,
+        haiPayMethods: haiPayMethods,
       );
 
       if (channel == null) {
@@ -768,10 +795,10 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         return;
       }
 
-      if (channel == PaymentChannel.googlePlay) {
+      if (channel.isGooglePlay) {
         await _performVipByGooglePlay(product);
       } else {
-        await _performVipByHaiPay(product);
+        await _performVipByHaiPay(product, channel);
       }
     } catch (e) {
       if (mounted) {
@@ -833,7 +860,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   }
 
   /// VIP 订阅购买 - HaiPay
-  Future<void> _performVipByHaiPay(UnlockProduct product) async {
+  Future<void> _performVipByHaiPay(UnlockProduct product, PaymentChannel channel) async {
     final l10n = AppLocalizations.of(context);
 
     try {
@@ -851,21 +878,23 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         displayName: product.goodsName,
         goodsId: product.goodsId,
       );
-      final success = await handler.purchaseVip(
+      // success=true here only means "payment page was opened".
+      // The in-app WebView handles its own dismissal; we must NOT pop
+      // the calling sheet or it will dismiss the WebView too.
+      final opened = await handler.purchaseVip(
         product: subProduct,
         price: product.price.toStringAsFixed(2),
         context: context,
+        channel: channel,
       );
 
       if (!mounted) return;
       _setProcessing(product.goodsId, false);
 
-      if (success) {
-        final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
-        await coinNotifier.load();
-
-        AppSnackBar.show(context, message: l10n.vipSubscriptionSuccess);
-        Navigator.of(context).pop();
+      if (opened) {
+        // Keep the sheet open. The WebView is now on top.
+        // When the user completes payment, the WebView pops itself
+        // and we land back here — caller should refresh state then.
       } else {
         AppSnackBar.show(context, message: handler.lastError ?? l10n.vipSubscriptionFailed);
       }

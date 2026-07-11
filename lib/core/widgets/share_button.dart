@@ -19,7 +19,7 @@ class ShareContent {
   final String? imageUrl;
 
   /// 从 [VideoInfo] 构造默认分享参数。
-  /// [shareUrlBuilder] 允许业务方定制短剧页 URL（默认 `https://qahwatv.com/video/{id}`）。
+  /// [shareUrlBuilder] 允许业务方定制短剧页 URL（默认 `https://h5.qahwatv.com/`）。
   factory ShareContent.fromVideo(
     VideoInfo video, {
     String Function(VideoInfo)? shareUrlBuilder,
@@ -44,7 +44,7 @@ class ShareContent {
   }
 
   static String _defaultShareUrlBuilder(VideoInfo video) =>
-      'https://qahwatv.com/video/${video.videoId}';
+      'https://h5.qahwatv.com/';
 }
 
 /// 显示分享平台选择 sheet，命中后调用 [ShareService.share]。
@@ -235,12 +235,7 @@ class _ShareOption {
 }
 
 const List<_ShareOption> _kShareOptions = [
-  _ShareOption('facebook', 'Facebook'),
   _ShareOption('twitter', 'Twitter / X'),
-  _ShareOption('whatsapp', 'WhatsApp'),
-  _ShareOption('instagram', 'Instagram'),
-  _ShareOption('linkedin', 'LinkedIn'),
-  _ShareOption('telegram', 'Telegram'),
-  _ShareOption('line', 'Line'),
+  _ShareOption('facebook', 'Facebook'),
 ];
 

@@ -7,7 +7,7 @@
         tools:node="remove" />
 
     <application
-        android:label="Qahwa TV"
+        android:label="@string/app_name"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
@@ -56,6 +56,21 @@
                     android:host="qahwatv.com"
                     android:pathPrefix="/video"/>
             </intent-filter>
+            <!-- Twitter (X) OAuth callback：让 MobSDK WebView 在用户完成 Twitter 授权后能跳回 -->
+            <!-- OAuth2.0 mode: MobSDK 通过 twittersdk://callback 拦截回跳 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="twittersdk" android:host="callback"/>
+            </intent-filter>
+            <!-- OAuth2.0 mode: 备用 scheme，MobSDK 兜底回调 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="twitterauth" android:host="callback"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
@@ -81,6 +96,18 @@
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="https"/>
         </intent>
+        <!-- ShareSDK / MobSDK: 查询安装的社交 App -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <category android:name="android.intent.category.BROWSABLE"/>
+            <data android:scheme="twittersdk"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <category android:name="android.intent.category.BROWSABLE"/>
+            <data android:scheme="twitterauth"/>
+        </intent>
         <package android:name="com.google.android.gms"/>
+        <package android:name="com.twitter.android"/>
     </queries>
 </manifest>

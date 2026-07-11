@@ -1,48 +1,93 @@
+import 'dart:ui';
+
 import 'package:equatable/equatable.dart';
+import 'hai_pay_models.dart';
 
 /// Payment channel types supported by the app
-enum PaymentChannel {
-  /// Google Play Billing (in-app purchase)
+enum PaymentChannelKind {
   googlePlay,
-
-  /// HaiPay H5 payment (web-based payment page)
   haiPay,
 }
 
+/// Payment channel that carries the chosen sub-method for HaiPay
+class PaymentChannel extends Equatable {
+  const PaymentChannel._({required this.kind, this.haiPayMethod});
+
+  /// Google Play Billing (in-app purchase)
+  const PaymentChannel.googlePlay() : this._(kind: PaymentChannelKind.googlePlay);
+
+  /// HaiPay with a specific sub-method (Mada / STCPay / Credit Card / ...)
+  factory PaymentChannel.haiPay(HaiPayMethod method) =>
+      PaymentChannel._(kind: PaymentChannelKind.haiPay, haiPayMethod: method);
+
+  /// Convenience factory preserved for backward compatibility (no method attached)
+  factory PaymentChannel.haiPayLegacy() =>
+      const PaymentChannel._(kind: PaymentChannelKind.haiPay);
+
+  final PaymentChannelKind kind;
+  final HaiPayMethod? haiPayMethod;
+
+  bool get isGooglePlay => kind == PaymentChannelKind.googlePlay;
+  bool get isHaiPay => kind == PaymentChannelKind.haiPay;
+
+  /// Backwards-compat predicates
+  // ignore: unused_element
+  bool _matchGooglePlay() => isGooglePlay;
+  // ignore: unused_element
+  bool _matchHaiPay() => isHaiPay;
+
+  @override
+  List<Object?> get props => [kind, haiPayMethod];
+}
+
 /// Extension to provide display information for payment channels
-extension PaymentChannelExtension on PaymentChannel {
+extension PaymentChannelDisplay on PaymentChannel {
   String get id {
-    switch (this) {
-      case PaymentChannel.googlePlay:
+    switch (kind) {
+      case PaymentChannelKind.googlePlay:
         return 'google_play';
-      case PaymentChannel.haiPay:
-        return 'hai_pay';
+      case PaymentChannelKind.haiPay:
+        return 'hai_pay_${haiPayMethod?.id ?? 'unknown'}';
     }
   }
 
   String get displayName {
-    switch (this) {
-      case PaymentChannel.googlePlay:
+    switch (kind) {
+      case PaymentChannelKind.googlePlay:
         return 'Google Play';
-      case PaymentChannel.haiPay:
-        return 'HaiPay';
+      case PaymentChannelKind.haiPay:
+        final method = haiPayMethod;
+        if (method == null) return 'HaiPay';
+        return method.localizedName(_currentLocale);
+    }
+  }
+
+  Locale get _currentLocale {
+    // Best-effort: read locale from system without adding a context dependency
+    try {
+      return PlatformDispatcher.instance.locale;
+    } catch (_) {
+      return const Locale('en');
     }
   }
 
   String get description {
-    switch (this) {
-      case PaymentChannel.googlePlay:
+    switch (kind) {
+      case PaymentChannelKind.googlePlay:
         return 'Pay securely via Google Play';
-      case PaymentChannel.haiPay:
-        return 'Local payment methods (Mada, STCPay, etc.)';
+      case PaymentChannelKind.haiPay:
+        final method = haiPayMethod;
+        if (method == null) return 'Local payment methods';
+        if (method.description.isNotEmpty) return method.description;
+        return method.isExternalBrowser ? 'Opens in browser' : 'Opens in app';
     }
   }
 
   String get iconAsset {
-    switch (this) {
-      case PaymentChannel.googlePlay:
+    switch (kind) {
+      case PaymentChannelKind.googlePlay:
         return 'assets/images/payment_google_play.png';
-      case PaymentChannel.haiPay:
+      case PaymentChannelKind.haiPay:
         return 'assets/images/payment_hai_pay.png';
     }
   }

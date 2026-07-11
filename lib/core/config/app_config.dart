@@ -15,15 +15,44 @@ class AppConfig {
   // ==================== API 配置 ====================
   /// API 基础地址
   /// 正式环境
-  static const String apiBaseUrl = 'https://tvapi.qahwatv.com/';
+  // static const String apiBaseUrl = 'https://tvapi.qahwatv.com/';
 
-  // static const String apiBaseUrl = 'http://192.168.1.51:8082/';
+  static const String apiBaseUrl = 'http://192.168.1.52:8082/';
 
 
   /// 如需切回联调环境，可临时使用：
   /// https://scolding-unbaked-refrain.ngrok-free.dev/
   /// 
   /// https://tvapi.qahwatv.com/
+  /// 
+  /// 
+  /// 
+  /// 
+  /// # Google Play 版（只有 Google 支付）
+  // flutter run --flavor google -t lib/main.dart --dart-define=FLAVOR=google
+  // flutter build apk --flavor google -t lib/main.dart --dart-define=FLAVOR=google --release
+
+  // # 自主平台版（只有 HaiPay + Google 支付）
+// flutter run --flavor platform -t lib/main.dart --dart-define=FLAVOR=platform
+// flutter build apk --flavor platform -t lib/main.dart --dart-define=FLAVOR=platform --release
+
+
+
+
+
+// 用途	命令
+// Platform debug 分包（刚跑）
+// flutter build apk --flavor platform -t lib/main.dart --dart-define=FLAVOR=platform --debug --split-per-abi
+// Google debug 分包
+// flutter build apk --flavor google -t lib/main.dart --dart-define=FLAVOR=google --debug --split-per-abi
+// Platform release 分包
+// flutter build apk --flavor platform -t lib/main.dart --dart-define=FLAVOR=platform --release --split-per-abi
+// Platform release 不分包（fat apk）
+// flutter build apk --flavor platform -t lib/main.dart --dart-define=FLAVOR=platform --release
+// google release 分包
+// flutter build apk --flavor google -t lib/main.dart --dart-define=FLAVOR=google --release --split-per-abi
+// google release 不分包（fat apk）
+// flutter build apk --flavor google -t lib/main.dart --dart-define=FLAVOR=google --release
 
   /// 图片 CDN 地址
   // static const String picRootPath = 'https://image.qahwatv.com/';

@@ -7,6 +7,7 @@ import '../../../core/utils/localized_badge_assets.dart';
 import '../../../components/preload_network_image.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../core/config/build_flavor.dart';
 import '../../recommend/providers/recommend_provider.dart';
 import '../../recommend/utils/drama_navigation.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -211,10 +212,26 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       return;
     }
 
+    // Google flavor: skip HaiPay entirely — go straight to Google Play.
+    if (BuildFlavor.isGoogle) {
+      final memberNotifier = ref.read(memberStateProvider.notifier);
+      await memberNotifier.purchase(selectedProduct: product);
+      _isPurchasing = false;
+      if (mounted) setState(() {});
+      return;
+    }
+
+    final handler = ref.read(unifiedPaymentHandlerProvider);
+    final haiPayMethods = await handler.fetchHaiPayMethods(
+      price: product.price,
+      productName: product.displayName ?? product.id,
+    );
+
     final channel = await PaymentChannelSelector.show(
       context: context,
       price: product.price,
       productName: product.displayName ?? product.id,
+      haiPayMethods: haiPayMethods,
     );
 
     if (channel == null) {
@@ -225,15 +242,15 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
 
     bool success = false;
 
-    if (channel == PaymentChannel.googlePlay) {
+    if (channel.isGooglePlay) {
       final memberNotifier = ref.read(memberStateProvider.notifier);
       success = await memberNotifier.purchase(selectedProduct: product);
     } else {
-      final handler = ref.read(unifiedPaymentHandlerProvider);
       success = await handler.purchaseVip(
         product: product,
         price: product.price,
         context: context,
+        channel: channel,
       );
       if (success) {
         try {
@@ -649,7 +666,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
             return Padding(
               padding: EdgeInsets.only(bottom: index == items.length - 1 ? 0 : 8),
               child: Text(
-                '${index + 1}�?�${items[index]}',
+                '${index + 1}. ${items[index]}',
                 style: const TextStyle(
                   fontWeight: FontWeight.w400,
                   fontSize: 13,

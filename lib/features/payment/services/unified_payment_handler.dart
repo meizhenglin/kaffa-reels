@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,14 +14,19 @@ import '../models/subscription_product.dart';
 import '../services/hai_pay_service.dart';
 import '../services/payment_service.dart';
 import '../pages/hai_pay_webview_page.dart';
-import '../widgets/payment_channel_selector.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/storage/storage_service.dart';
 import '../../../core/service/pay_service.dart';
 import '../../../app/providers/app_providers.dart';
 
-/// Unified payment handler that orchestrates both Google Play and HaiPay flows
-/// Provides a clean abstraction for all payment scenarios in the app
+/// Unified payment handler that orchestrates both Google Play and HaiPay flows.
+///
+/// HaiPay flow (two-step):
+///   1. payType is the method id from getPayMethods
+///   2. POST /api/pay/userRechange  -> merchantOrderNo
+///   3. POST /api/pay/initPay        -> { payUrl, orderNo, merchantOrderNo }
+///   4. Open H5 page in WebView
+///   5. Poll /api/pay/getOrderIsPay on resume
 class UnifiedPaymentHandler {
   UnifiedPaymentHandler({
     required DioClient dioClient,
@@ -33,76 +41,59 @@ class UnifiedPaymentHandler {
   final StorageService _storage;
   final PaymentService _paymentService = PaymentService.instance;
 
-  /// Last error message
   String? lastError;
 
-  /// Purchase a VIP subscription
-  /// [product] - The subscription product to purchase
-  /// [price] - Display price (e.g., "$24.99")
-  /// Returns true if payment is successful
+  Future<List<HaiPayMethod>> fetchHaiPayMethods({
+    required String price,
+    required String productName,
+    String currency = 'USD',
+  }) {
+    return _haiPayService.getPaymentMethods(
+      currency: currency,
+      price: price.replaceAll(RegExp(r'[^\\d.]'), ''),
+      productName: productName,
+    );
+  }
+
+  /// Purchase a VIP subscription.
   Future<bool> purchaseVip({
     required SubscriptionProduct product,
     required String price,
     required BuildContext context,
+    required PaymentChannel channel,
   }) async {
     lastError = null;
 
-    // Show channel selector
-    final channel = await PaymentChannelSelector.show(
-      context: context,
+    if (channel.isGooglePlay) {
+      return _purchaseVipViaGooglePlay(product: product, context: context);
+    }
+    return _purchaseVipViaHaiPay(
+      product: product,
       price: price,
-      productName: product.displayName ?? product.id,
+      context: context,
+      channel: channel,
     );
-
-    if (channel == null) {
-      lastError = 'Payment cancelled';
-      return false;
-    }
-
-    switch (channel) {
-      case PaymentChannel.googlePlay:
-        return _purchaseVipViaGooglePlay(product: product, context: context);
-      case PaymentChannel.haiPay:
-        return _purchaseVipViaHaiPay(
-          product: product,
-          price: price,
-          context: context,
-        );
-    }
   }
 
-  /// Purchase coins (recharge)
   Future<bool> purchaseRecharge({
     required RechargeProduct product,
     required String price,
     required BuildContext context,
+    required PaymentChannel channel,
   }) async {
     lastError = null;
 
-    final channel = await PaymentChannelSelector.show(
-      context: context,
+    if (channel.isGooglePlay) {
+      return _purchaseRechargeViaGooglePlay(product: product, context: context);
+    }
+    return _purchaseRechargeViaHaiPay(
+      product: product,
       price: price,
-      productName: product.name,
+      context: context,
+      channel: channel,
     );
-
-    if (channel == null) {
-      lastError = 'Payment cancelled';
-      return false;
-    }
-
-    switch (channel) {
-      case PaymentChannel.googlePlay:
-        return _purchaseRechargeViaGooglePlay(product: product, context: context);
-      case PaymentChannel.haiPay:
-        return _purchaseRechargeViaHaiPay(
-          product: product,
-          price: price,
-          context: context,
-        );
-    }
   }
 
-  /// Unlock an episode or drama
   Future<bool> unlockEpisode({
     required UnlockProduct product,
     required String price,
@@ -110,66 +101,25 @@ class UnifiedPaymentHandler {
     String? videoId,
     String? episodeId,
     int? episodesNum,
+    required PaymentChannel channel,
   }) async {
     lastError = null;
 
-    final channel = await PaymentChannelSelector.show(
-      context: context,
+    if (channel.isGooglePlay) {
+      return _unlockViaGooglePlay(product: product, context: context);
+    }
+    return _unlockViaHaiPay(
+      product: product,
       price: price,
-      productName: product.goodsName,
+      context: context,
+      videoId: videoId,
+      episodeId: episodeId,
+      episodesNum: episodesNum,
+      channel: channel,
     );
-
-    if (channel == null) {
-      lastError = 'Payment cancelled';
-      return false;
-    }
-
-    switch (channel) {
-      case PaymentChannel.googlePlay:
-        return _unlockViaGooglePlay(product: product, context: context);
-      case PaymentChannel.haiPay:
-        return _unlockViaHaiPay(
-          product: product,
-          price: price,
-          context: context,
-          videoId: videoId,
-          episodeId: episodeId,
-          episodesNum: episodesNum,
-        );
-    }
   }
 
-  // ==================== Google Play Flows ====================
-
-  Future<bool> _purchaseVipViaGooglePlay({
-    required SubscriptionProduct product,
-    required BuildContext context,
-  }) async {
-    try {
-      final productId = product.googlePlayId;
-
-      final products = await _paymentService.getProducts(
-        productIds: [productId],
-        requireSubscriptionOnAndroid: true,
-      );
-
-      if (products.isEmpty) {
-        lastError = 'Product not available in Google Play';
-        return false;
-      }
-
-      final userId = _storage.getString('user_id');
-      final success = await _paymentService.purchase(
-        product: products.first,
-        applicationUserName: userId,
-      );
-
-      return success;
-    } catch (e) {
-      lastError = 'Purchase failed: $e';
-      return false;
-    }
-  }
+  // ============== Google Play (unchanged) ==============
 
   Future<bool> _purchaseRechargeViaGooglePlay({
     required RechargeProduct product,
@@ -179,16 +129,12 @@ class UnifiedPaymentHandler {
       final products = await _paymentService.getProducts(
         productIds: [product.googlePlayId],
       );
-
       if (products.isEmpty) {
         lastError = 'Product not available in Google Play';
         return false;
       }
-
-      final success = await _paymentService.purchaseConsumable(
-        product: products.first,
-      );
-
+      final success =
+          await _paymentService.purchaseConsumable(product: products.first);
       return success;
     } catch (e) {
       lastError = 'Purchase failed: $e';
@@ -206,16 +152,11 @@ class UnifiedPaymentHandler {
         lastError = 'Product not configured';
         return false;
       }
-
-      final products = await _paymentService.getProducts(
-        productIds: [productId],
-      );
-
+      final products = await _paymentService.getProducts(productIds: [productId]);
       if (products.isEmpty) {
         lastError = 'Product not available in Google Play';
         return false;
       }
-
       final success = await _paymentService.purchase(product: products.first);
       return success;
     } catch (e) {
@@ -224,118 +165,259 @@ class UnifiedPaymentHandler {
     }
   }
 
-  // ==================== HaiPay Flows ====================
+  Future<bool> _purchaseVipViaGooglePlay({
+    required SubscriptionProduct product,
+    required BuildContext context,
+  }) async {
+    try {
+      final products = await _paymentService.getProducts(
+        productIds: [product.googlePlayId],
+        requireSubscriptionOnAndroid: true,
+      );
+      if (products.isEmpty) {
+        lastError = 'Product not available in Google Play';
+        return false;
+      }
+      final userId = _storage.getString('user_id');
+      final success = await _paymentService.purchase(
+        product: products.first,
+        applicationUserName: userId,
+      );
+      return success;
+    } catch (e) {
+      lastError = 'Purchase failed: $e';
+      return false;
+    }
+  }
+
+  // ============== HaiPay new flow ==============
+
+  /// Resolve HaiPay method: prefer the one selected upstream, otherwise fetch
+  /// the first available (legacy behavior). Caller might choose to abort
+  /// when channel.haiPayMethod is null — see callers.
+  Future<HaiPayMethod?> _resolveHaiPayMethod({
+    required PaymentChannel channel,
+    required String price,
+    required String productName,
+  }) async {
+    if (channel.haiPayMethod != null) return channel.haiPayMethod;
+    final methods = await _haiPayService.getPaymentMethods(
+      currency: 'USD',
+      price: price.replaceAll(RegExp(r'[^\\d.]'), ''),
+      productName: productName,
+    );
+    return methods.isEmpty ? null : methods.first;
+  }
+
+  /// PayConfig id (payConfigId) used in /api/pay/userRechange.
+  /// Identifies VIP / recharge / unlock item — backend resolves the rest.
+  int? _payConfigIdForVip(SubscriptionProduct product) => product.goodsId;
+  int? _payConfigIdForRecharge(RechargeProduct product) => product.goodsId;
+  int? _payConfigIdForUnlock(UnlockProduct product) => product.goodsId;
+
+  /// Common two-step HaiPay flow shared by VIP / recharge / unlock.
+  ///
+  /// Returns true if the order was created AND the payment page was pushed
+  /// onto the navigator. This does NOT indicate that the user has paid yet —
+  /// the in-app WebView handles payment completion internally and pops itself
+  /// when the user finishes (or cancels).
+  Future<bool> _runHaiPayFlow({
+    required BuildContext context,
+    required HaiPayMethod method,
+    required int payConfigId,
+    required String productType,
+  }) async {
+    try {
+      final order = await _haiPayService.createAndInit(
+        payType: method.id,
+        payConfigId: payConfigId,
+      );
+
+      if (order == null || order.payInfo.isEmpty) {
+        lastError = 'Failed to initialize payment';
+        return false;
+      }
+
+      debugPrint(
+          '[UnifiedPayment] _runHaiPayFlow order=${order.orderNo} payUrl=${order.payInfo} isExternal=${method.isExternalBrowser} mounted=${context.mounted} jumpType=${method.jumpType}');
+      // ignore: avoid_print
+      print('[UnifiedPayment] _runHaiPayFlow order=${order.orderNo} payUrl=${order.payInfo} isExternal=${method.isExternalBrowser} mounted=${context.mounted} jumpType=${method.jumpType}');
+
+      if (method.isExternalBrowser) {
+        // External URL: dispatch and return immediately.
+        // The user pays in the external browser and we poll on resume.
+        // The caller must NOT close the bottom sheet / pop, because the
+        // WebView / external flow is responsible for its own lifecycle.
+        return _openExternal(context: context, order: order);
+      }
+
+      // In-app WebView: push the page and return.
+      // The WebView page handles its own Navigator.pop() on completion.
+      // Caller must not pop the bottom sheet.
+      return _openWebView(
+        context: context,
+        order: order,
+        productType: productType,
+      );
+    } catch (e) {
+      lastError = 'HaiPay purchase failed: $e';
+      debugPrint('[UnifiedPaymentHandler] hai pay error: $e');
+      return false;
+    }
+  }
+
+  /// Open the payment URL in the system browser.
+  /// Caller should NOT pop the calling sheet on success.
+  Future<bool> _openExternal({
+    required BuildContext context,
+    required HaiPayOrder order,
+  }) async {
+    debugPrint(
+        '[UnifiedPayment] _openExternal payInfo=${order.payInfo}');
+    // ignore: avoid_print
+    print('[UnifiedPayment] _openExternal payInfo=${order.payInfo}');
+    try {
+      final uri = Uri.parse(order.payInfo);
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+        webViewConfiguration: const WebViewConfiguration(
+          enableJavaScript: true,
+        ),
+      );
+      if (!launched) {
+        lastError = 'Failed to open payment page';
+        return false;
+      }
+      return true;
+    } catch (e) {
+      lastError = 'Failed to launch payment URL: $e';
+      debugPrint('[UnifiedPayment] launchUrl error: $e');
+      return false;
+    }
+  }
+
+  /// Push the in-app HaiPay WebView page.
+  /// The WebView page is self-managing: it pops itself when the user
+  /// completes (or cancels) the payment. Caller must NOT pop the calling
+  /// sheet on success — only on failure (and only with an error toast).
+  Future<bool> _openWebView({
+    required BuildContext context,
+    required HaiPayOrder order,
+    required String productType,
+  }) async {
+    debugPrint(
+        '[UnifiedPayment] _openWebView payInfo=${order.payInfo} orderNo=${order.orderNo}');
+    // ignore: avoid_print
+    print('[UnifiedPayment] _openWebView payInfo=${order.payInfo} orderNo=${order.orderNo}');
+    try {
+      if (!context.mounted) {
+        lastError = 'UI no longer available';
+        return false;
+      }
+      // Fire the push but DO NOT await its result: push's future resolves
+      // when the WebView pops, which happens AFTER the user pays. We want
+      // to return to the caller immediately so it doesn't try to pop its
+      // own UI on top of the WebView.
+      unawaited(HaiPayWebViewPage.show(
+        context: context,
+        paymentUrl: order.payInfo,
+        orderNo: order.orderNo,
+        productType: productType,
+      ));
+      return true;
+    } catch (e, st) {
+      lastError = 'Failed to open webview: $e';
+      debugPrint('[UnifiedPayment] show webview error: $e\n$st');
+      return false;
+    }
+  }
+
+  // Kept for backwards compatibility. The new flow prefers _openExternal /
+  // _openWebView above. Use only from contexts where the caller is fine with
+  // awaiting the WebView lifecycle.
+  Future<bool> _openPaymentPage({
+    required BuildContext context,
+    required HaiPayOrder order,
+    required String productType,
+    required bool isExternal,
+  }) async {
+    if (isExternal) {
+      return _openExternal(context: context, order: order);
+    }
+    return _openWebView(
+      context: context,
+      order: order,
+      productType: productType,
+    );
+  }
 
   Future<bool> _purchaseVipViaHaiPay({
     required SubscriptionProduct product,
     required String price,
     required BuildContext context,
+    required PaymentChannel channel,
   }) async {
-    try {
-      // Step 1: Get payment methods from backend
-      final methods = await _haiPayService.getPaymentMethods(
-        currency: 'USD',
-        price: price.replaceAll(RegExp(r'[^\d.]'), ''),
-        productName: product.displayName ?? product.id,
-      );
-
-      if (methods.isEmpty) {
-        lastError = 'No payment methods available';
-        return false;
-      }
-
-      // Step 2: User selects a payment method
-      final selectedMethod = await _showHaiPayMethodSelector(
-        context: context,
-        methods: methods,
-        price: price,
-      );
-
-      if (selectedMethod == null) {
-        lastError = 'Payment cancelled';
-        return false;
-      }
-
-      // Step 3: Create order and get H5 payment URL
-      final order = await _haiPayService.createVipOrder(
-        payMethodId: selectedMethod.id,
-        vipId: product.goodsId?.toString() ?? product.id,
-        money: price.replaceAll(RegExp(r'[^\d.]'), ''),
-        currency: 'USD',
-      );
-
-      if (order == null || order.payInfo.isEmpty) {
-        lastError = 'Failed to create order';
-        return false;
-      }
-
-      // Step 4: Open payment page
-      final success = await _openPaymentPage(
-        context: context,
-        order: order,
-        productType: '1', // VIP
-        isExternal: selectedMethod.isExternalBrowser,
-      );
-
-      return success;
-    } catch (e) {
-      lastError = 'HaiPay purchase failed: $e';
+    final selectedMethod = await _resolveHaiPayMethod(
+      channel: channel,
+      price: price,
+      productName: product.displayName ?? product.id,
+    );
+    // ignore: avoid_print
+    print('[UnifiedPayment] _purchaseVipViaHaiPay method=$selectedMethod product=${product.id} goodsId=${product.goodsId}');
+    if (selectedMethod == null) {
+      lastError = 'No payment methods available';
+      print('[UnifiedPayment] _purchaseVipViaHaiPay ABORT: selectedMethod=null');
       return false;
     }
+
+    final payConfigId = _payConfigIdForVip(product);
+    if (payConfigId == null || payConfigId == 0) {
+      lastError = 'Invalid VIP product';
+      print('[UnifiedPayment] _purchaseVipViaHaiPay ABORT: payConfigId=$payConfigId');
+      return false;
+    }
+
+    return _runHaiPayFlow(
+      context: context,
+      method: selectedMethod,
+      payConfigId: payConfigId,
+      productType: '1',
+    );
   }
 
   Future<bool> _purchaseRechargeViaHaiPay({
     required RechargeProduct product,
     required String price,
     required BuildContext context,
+    required PaymentChannel channel,
   }) async {
-    try {
-      final methods = await _haiPayService.getPaymentMethods(
-        currency: 'USD',
-        price: price.replaceAll(RegExp(r'[^\d.]'), ''),
-        productName: product.name,
-      );
-
-      if (methods.isEmpty) {
-        lastError = 'No payment methods available';
-        return false;
-      }
-
-      final selectedMethod = await _showHaiPayMethodSelector(
-        context: context,
-        methods: methods,
-        price: price,
-      );
-
-      if (selectedMethod == null) {
-        lastError = 'Payment cancelled';
-        return false;
-      }
-
-      final order = await _haiPayService.createRechargeOrder(
-        payMethodId: selectedMethod.id,
-        goodsId: product.goodsId,
-        amount: price.replaceAll(RegExp(r'[^\d.]'), ''),
-        currency: 'USD',
-      );
-
-      if (order == null || order.payInfo.isEmpty) {
-        lastError = 'Failed to create order';
-        return false;
-      }
-
-      final success = await _openPaymentPage(
-        context: context,
-        order: order,
-        productType: '2', // Recharge
-        isExternal: selectedMethod.isExternalBrowser,
-      );
-
-      return success;
-    } catch (e) {
-      lastError = 'HaiPay purchase failed: $e';
+    final selectedMethod = await _resolveHaiPayMethod(
+      channel: channel,
+      price: price,
+      productName: product.name,
+    );
+    // ignore: avoid_print
+    print('[UnifiedPayment] _purchaseRechargeViaHaiPay method=$selectedMethod goodsId=${product.goodsId}');
+    if (selectedMethod == null) {
+      lastError = 'No payment methods available';
+      print('[UnifiedPayment] _purchaseRechargeViaHaiPay ABORT: selectedMethod=null');
       return false;
     }
+
+    final payConfigId = _payConfigIdForRecharge(product);
+    if (payConfigId == null || payConfigId == 0) {
+      lastError = 'Invalid recharge product';
+      print('[UnifiedPayment] _purchaseRechargeViaHaiPay ABORT: payConfigId=$payConfigId');
+      return false;
+    }
+
+    return _runHaiPayFlow(
+      context: context,
+      method: selectedMethod,
+      payConfigId: payConfigId,
+      productType: '2',
+    );
   }
 
   Future<bool> _unlockViaHaiPay({
@@ -345,289 +427,34 @@ class UnifiedPaymentHandler {
     String? videoId,
     String? episodeId,
     int? episodesNum,
+    required PaymentChannel channel,
   }) async {
-    try {
-      final methods = await _haiPayService.getPaymentMethods(
-        currency: 'USD',
-        price: price.replaceAll(RegExp(r'[^\d.]'), ''),
-        productName: product.goodsName,
-      );
-
-      if (methods.isEmpty) {
-        lastError = 'No payment methods available';
-        return false;
-      }
-
-      final selectedMethod = await _showHaiPayMethodSelector(
-        context: context,
-        methods: methods,
-        price: price,
-      );
-
-      if (selectedMethod == null) {
-        lastError = 'Payment cancelled';
-        return false;
-      }
-
-      final order = await _haiPayService.createEpisodeUnlockOrder(
-        payMethodId: selectedMethod.id,
-        videoId: videoId ?? '',
-        episodeId: episodeId ?? '',
-        episodesNum: episodesNum ?? 1,
-        goodsId: product.goodsId,
-        amount: price.replaceAll(RegExp(r'[^\d.]'), ''),
-        currency: 'USD',
-      );
-
-      if (order == null || order.payInfo.isEmpty) {
-        lastError = 'Failed to create order';
-        return false;
-      }
-
-      final success = await _openPaymentPage(
-        context: context,
-        order: order,
-        productType: '3', // Episode unlock
-        isExternal: selectedMethod.isExternalBrowser,
-      );
-
-      return success;
-    } catch (e) {
-      lastError = 'HaiPay purchase failed: $e';
+    final selectedMethod = await _resolveHaiPayMethod(
+      channel: channel,
+      price: price,
+      productName: product.goodsName,
+    );
+    // ignore: avoid_print
+    print('[UnifiedPayment] _unlockViaHaiPay method=$selectedMethod product=${product.goodsName} goodsId=${product.goodsId}');
+    if (selectedMethod == null) {
+      lastError = 'No payment methods available';
+      print('[UnifiedPayment] _unlockViaHaiPay ABORT: selectedMethod=null');
       return false;
     }
-  }
 
-  // ==================== Helper Methods ====================
-
-  Future<HaiPayMethod?> _showHaiPayMethodSelector({
-    required BuildContext context,
-    required List<HaiPayMethod> methods,
-    required String price,
-  }) async {
-    return showModalBottomSheet<HaiPayMethod>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => _HaiPayMethodSelector(
-        methods: methods,
-        price: price,
-        onMethodSelected: (method) => Navigator.of(ctx).pop(method),
-      ),
-    );
-  }
-
-  Future<bool> _openPaymentPage({
-    required BuildContext context,
-    required HaiPayOrder order,
-    required String productType,
-    required bool isExternal,
-  }) async {
-    if (isExternal) {
-      // Open in external browser
-      final uri = Uri.parse(order.payInfo);
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!launched) {
-        lastError = 'Failed to open payment page';
-        return false;
-      }
-      // Poll in background after returning
-      return true;
-    } else {
-      // Open in WebView
-      final success = await HaiPayWebViewPage.show(
-        context: context,
-        paymentUrl: order.payInfo,
-        orderNo: order.orderNo,
-        productType: productType,
-      );
-      return success == true;
+    final payConfigId = _payConfigIdForUnlock(product);
+    if (payConfigId == null || payConfigId == 0) {
+      lastError = 'Invalid unlock product';
+      print('[UnifiedPayment] _unlockViaHaiPay ABORT: payConfigId=$payConfigId');
+      return false;
     }
-  }
-}
 
-/// Bottom sheet for selecting a HaiPay payment method
-class _HaiPayMethodSelector extends StatelessWidget {
-  const _HaiPayMethodSelector({
-    required this.methods,
-    required this.price,
-    required this.onMethodSelected,
-  });
-
-  final List<HaiPayMethod> methods;
-  final String price;
-  final void Function(HaiPayMethod method) onMethodSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF2D2440),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Select Payment Method',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    price,
-                    style: const TextStyle(
-                      color: Color(0xFFFFD700),
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: methods.map((method) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _HaiPayMethodItem(
-                      method: method,
-                      onTap: () => onMethodSelected(method),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white70,
-                    side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                  ),
-                  child: const Text('Cancel'),
-                ),
-              ),
-            ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
-          ],
-        ),
-      ),
+    return _runHaiPayFlow(
+      context: context,
+      method: selectedMethod,
+      payConfigId: payConfigId,
+      productType: '3',
     );
-  }
-}
-
-class _HaiPayMethodItem extends StatelessWidget {
-  const _HaiPayMethodItem({
-    required this.method,
-    required this.onTap,
-  });
-
-  final HaiPayMethod method;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: _getMethodColor(method.name).withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Center(
-                child: Text(
-                  _getMethodIcon(method.name),
-                  style: const TextStyle(fontSize: 20),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    method.name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    method.isExternalBrowser ? 'Opens in browser' : 'Opens in app',
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.chevron_right,
-              color: Colors.white.withValues(alpha: 0.4),
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Color _getMethodColor(String name) {
-    final lower = name.toLowerCase();
-    if (lower.contains('mada')) return const Color(0xFF00A651);
-    if (lower.contains('stc') || lower.contains('stcpay')) return const Color(0xFFFFC107);
-    if (lower.contains('credit') || lower.contains('card')) return const Color(0xFF4285F4);
-    if (lower.contains('apple')) return Colors.black;
-    return const Color(0xFF6C63FF);
-  }
-
-  String _getMethodIcon(String name) {
-    final lower = name.toLowerCase();
-    if (lower.contains('mada')) return '💳';
-    if (lower.contains('stc') || lower.contains('stcpay')) return '📱';
-    if (lower.contains('credit') || lower.contains('card')) return '💳';
-    if (lower.contains('apple')) return '🍎';
-    if (lower.contains('fawry')) return '🛒';
-    return '💰';
   }
 }
 

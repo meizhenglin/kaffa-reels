@@ -1,31 +1,86 @@
 import 'package:flutter/material.dart';
+import '../../../core/config/build_flavor.dart';
 import '../models/payment_channel.dart';
+import '../models/hai_pay_models.dart';
 
-/// Unified payment channel selector (Google Play vs HaiPay)
-/// Shown as a bottom sheet when user taps "Pay"
+/// Unified payment channel selector (Google Play + HaiPay sub-methods).
+/// Shown as a bottom sheet when user taps "Pay".
+/// If [haiPayMethods] is empty, falls back to a single "HaiPay" entry.
 class PaymentChannelSelector extends StatelessWidget {
   const PaymentChannelSelector({
     super.key,
     required this.price,
     required this.productName,
     required this.onChannelSelected,
+    this.haiPayMethods = const <HaiPayMethod>[],
   });
 
   final String price;
   final String productName;
   final void Function(PaymentChannel channel) onChannelSelected;
+  final List<HaiPayMethod> haiPayMethods;
+
+  /// Returns the effective list of payment channels for the current build.
+  ///
+  /// - google flavor    -> Google Play only.
+  /// - platform flavor  -> Google Play + HaiPay sub-methods (or legacy entry).
+  ///
+  /// Channels are returned in display order.
+  static List<PaymentChannel> effectiveChannels({
+    List<HaiPayMethod> haiPayMethods = const <HaiPayMethod>[],
+  }) {
+    final channels = <PaymentChannel>[
+      if (BuildFlavor.isGoogle || BuildFlavor.isPlatform)
+        const PaymentChannel.googlePlay(),
+      if (haiPayMethods.isNotEmpty)
+        ...haiPayMethods.map((m) => PaymentChannel.haiPay(m))
+      else if (!BuildFlavor.isGoogle)
+        PaymentChannel.haiPayLegacy(),
+    ];
+    return channels;
+  }
+
+  /// Convenience for the google flavor: when the build is the google
+  /// flavor there is no channel choice to make and no HaiPay state to
+  /// touch, so callers can invoke this helper instead of [show] to skip
+  /// the modal *and* the HaiPay methods fetch.
+  ///
+  /// Returns the single Google Play channel that will be used.
+  static PaymentChannel pickGooglePlay() {
+    assert(BuildFlavor.isGoogle,
+        'pickGooglePlay() is only valid for the google flavor');
+    return const PaymentChannel.googlePlay();
+  }
 
   static Future<PaymentChannel?> show({
     required BuildContext context,
     required String price,
     required String productName,
+    List<HaiPayMethod> haiPayMethods = const <HaiPayMethod>[],
   }) {
+    // Fast path: when only a single channel is available for this build
+    // (e.g. the Google flavor, where HaiPay is disabled), skip the modal
+    // and return that channel directly. The caller proceeds straight to
+    // the Google Play billing flow — matching the pre-flavor behaviour.
+    //
+    // For the google flavor callers should use [pickGooglePlay] directly
+    // so the HaiPay methods fetch is also skipped.
+    if (BuildFlavor.isGoogle) {
+      return Future.value(pickGooglePlay());
+    }
+
+    final channels = effectiveChannels(haiPayMethods: haiPayMethods);
+    if (channels.length == 1) {
+      return Future.value(channels.first);
+    }
+
     return showModalBottomSheet<PaymentChannel>(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => PaymentChannelSelector(
         price: price,
         productName: productName,
+        haiPayMethods: haiPayMethods,
         onChannelSelected: (channel) => Navigator.of(ctx).pop(channel),
       ),
     );
@@ -39,16 +94,18 @@ class PaymentChannelSelector extends StatelessWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildHeader(context),
-            const SizedBox(height: 8),
-            _buildChannelList(context),
-            const SizedBox(height: 16),
-            _buildCancelButton(context),
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
-          ],
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).padding.bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildHeader(context),
+              const SizedBox(height: 8),
+              _buildChannelList(context),
+            ],
+          ),
         ),
       ),
     );
@@ -114,41 +171,30 @@ class PaymentChannelSelector extends StatelessWidget {
   }
 
   Widget _buildChannelList(BuildContext context) {
+    final channels = effectiveChannels(haiPayMethods: haiPayMethods);
+
+    if (channels.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(
+          'No payment methods available for this build.',
+          style: const TextStyle(color: Colors.white60),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
-          _PaymentChannelItem(
-            channel: PaymentChannel.googlePlay,
-            onTap: () => onChannelSelected(PaymentChannel.googlePlay),
-          ),
-          const SizedBox(height: 8),
-          _PaymentChannelItem(
-            channel: PaymentChannel.haiPay,
-            onTap: () => onChannelSelected(PaymentChannel.haiPay),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCancelButton(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: SizedBox(
-        width: double.infinity,
-        height: 44,
-        child: OutlinedButton(
-          onPressed: () => Navigator.of(context).pop(),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: Colors.white70,
-            side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(22),
+          for (var i = 0; i < channels.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            _PaymentChannelItem(
+              channel: channels[i],
+              onTap: () => onChannelSelected(channels[i]),
             ),
-          ),
-          child: const Text('Cancel'),
-        ),
+          ],
+        ],
       ),
     );
   }
@@ -215,43 +261,72 @@ class _PaymentChannelItem extends StatelessWidget {
   }
 
   Widget _buildIcon() {
-    switch (channel) {
-      case PaymentChannel.googlePlay:
-        return Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
+    if (channel.isGooglePlay) {
+      return Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Center(
+          child: Icon(
+            Icons.play_circle_fill,
+            color: Color(0xFF4285F4),
+            size: 28,
           ),
-          child: const Center(
-            child: Icon(
-              Icons.play_circle_fill,
-              color: Color(0xFF4285F4),
-              size: 28,
-            ),
-          ),
-        );
-      case PaymentChannel.haiPay:
-        return Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF6C63FF), Color(0xFF4ECDC4)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Center(
-            child: Icon(
-              Icons.account_balance_wallet,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
-        );
+        ),
+      );
     }
+
+    final method = channel.haiPayMethod;
+    if (method != null) {
+      return Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Center(
+          child: Text(
+            _iconFor(method.name),
+            style: const TextStyle(fontSize: 20),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF6C63FF), Color(0xFF4ECDC4)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.account_balance_wallet,
+          color: Colors.white,
+          size: 24,
+        ),
+      ),
+    );
+  }
+
+  String _iconFor(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('mada')) return '💳';
+    if (lower.contains('stc') || lower.contains('stcpay')) return '📱';
+    if (lower.contains('credit') || lower.contains('card') ||
+        lower.contains('debit')) return '💳';
+    if (lower.contains('apple')) return '🍎';
+    if (lower.contains('fawry')) return '🛒';
+    if (lower.contains('haipay')) return '🌊';
+    return '💰';
   }
 }

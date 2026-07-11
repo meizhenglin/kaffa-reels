@@ -49,6 +49,27 @@ android {
         versionName = flutter.versionName
     }
 
+    flavorDimensions += "distribution"
+
+    productFlavors {
+        create("google") {
+            dimension = "distribution"
+            // Google Play release keeps the bare applicationId so the
+            // Play Console listing stays valid.
+            applicationIdSuffix = ""
+            versionNameSuffix = "-g"
+            resValue("string", "app_name", "Qahwa TV")
+        }
+        create("platform") {
+            dimension = "distribution"
+            // Self-hosted platform build: distinct package id so it can
+            // coexist with the Google build on the same device.
+            applicationIdSuffix = ".platform"
+            versionNameSuffix = "-p"
+            resValue("string", "app_name", "Qahwa TV")
+        }
+    }
+
     buildTypes {
         release {
             signingConfig = if (keystorePropertiesFile.exists()) {
