@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:aliplayer_widget/aliplayer_widget_lib.dart';
 import 'package:flutter/foundation.dart';
@@ -19,6 +20,7 @@ import 'app/providers/app_providers.dart';
 import 'app/router/router_config.dart';
 import 'app/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
+import 'core/config/build_flavor.dart';
 import 'core/firebase/firebase_service.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'core/storage/storage_service.dart';
@@ -161,6 +163,7 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       routerConfig: router,
+      builder: (context, child) => child ?? const SizedBox.shrink(),
     );
   }
 }

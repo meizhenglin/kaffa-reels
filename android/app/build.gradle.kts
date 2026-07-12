@@ -62,9 +62,11 @@ android {
         }
         create("platform") {
             dimension = "distribution"
-            // Self-hosted platform build: distinct package id so it can
-            // coexist with the Google build on the same device.
-            applicationIdSuffix = ".platform"
+            // Share applicationId with the Google build so the two
+            // distribution channels target the same installed package.
+            // The latest installed APK wins; users will not see both apps
+            // side by side.
+            applicationIdSuffix = ""
             versionNameSuffix = "-p"
             resValue("string", "app_name", "Qahwa TV")
         }

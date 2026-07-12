@@ -23,14 +23,14 @@ class PaymentChannelSelector extends StatelessWidget {
   /// Returns the effective list of payment channels for the current build.
   ///
   /// - google flavor    -> Google Play only.
-  /// - platform flavor  -> Google Play + HaiPay sub-methods (or legacy entry).
+  /// - platform flavor  -> HaiPay sub-methods only (or legacy entry).
   ///
   /// Channels are returned in display order.
   static List<PaymentChannel> effectiveChannels({
     List<HaiPayMethod> haiPayMethods = const <HaiPayMethod>[],
   }) {
     final channels = <PaymentChannel>[
-      if (BuildFlavor.isGoogle || BuildFlavor.isPlatform)
+      if (BuildFlavor.isGoogle)
         const PaymentChannel.googlePlay(),
       if (haiPayMethods.isNotEmpty)
         ...haiPayMethods.map((m) => PaymentChannel.haiPay(m))

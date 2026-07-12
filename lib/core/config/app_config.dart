@@ -32,7 +32,7 @@ class AppConfig {
   // flutter run --flavor google -t lib/main.dart --dart-define=FLAVOR=google
   // flutter build apk --flavor google -t lib/main.dart --dart-define=FLAVOR=google --release
 
-  // # 自主平台版（只有 HaiPay + Google 支付）
+  // # 自主平台版（只有 HaiPay）
 // flutter run --flavor platform -t lib/main.dart --dart-define=FLAVOR=platform
 // flutter build apk --flavor platform -t lib/main.dart --dart-define=FLAVOR=platform --release
 
