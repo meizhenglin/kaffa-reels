@@ -258,6 +258,7 @@ class UnifiedPaymentHandler {
         context: context,
         order: order,
         productType: productType,
+        methodName: method.localizedName(Localizations.localeOf(context)),
       );
     } catch (e) {
       lastError = 'HaiPay purchase failed: $e';
@@ -305,11 +306,12 @@ class UnifiedPaymentHandler {
     required BuildContext context,
     required HaiPayOrder order,
     required String productType,
+    required String methodName,
   }) async {
     debugPrint(
-        '[UnifiedPayment] _openWebView payInfo=${order.payInfo} orderNo=${order.orderNo}');
+        '[UnifiedPayment] _openWebView payInfo=${order.payInfo} orderNo=${order.orderNo} methodName=$methodName');
     // ignore: avoid_print
-    print('[UnifiedPayment] _openWebView payInfo=${order.payInfo} orderNo=${order.orderNo}');
+    print('[UnifiedPayment] _openWebView payInfo=${order.payInfo} orderNo=${order.orderNo} methodName=$methodName');
     try {
       if (!context.mounted) {
         lastError = 'UI no longer available';
@@ -324,6 +326,7 @@ class UnifiedPaymentHandler {
         paymentUrl: order.payInfo,
         orderNo: order.orderNo,
         productType: productType,
+        methodName: methodName,
       ));
       return true;
     } catch (e, st) {
@@ -334,24 +337,6 @@ class UnifiedPaymentHandler {
   }
 
   // Kept for backwards compatibility. The new flow prefers _openExternal /
-  // _openWebView above. Use only from contexts where the caller is fine with
-  // awaiting the WebView lifecycle.
-  Future<bool> _openPaymentPage({
-    required BuildContext context,
-    required HaiPayOrder order,
-    required String productType,
-    required bool isExternal,
-  }) async {
-    if (isExternal) {
-      return _openExternal(context: context, order: order);
-    }
-    return _openWebView(
-      context: context,
-      order: order,
-      productType: productType,
-    );
-  }
-
   Future<bool> _purchaseVipViaHaiPay({
     required SubscriptionProduct product,
     required String price,

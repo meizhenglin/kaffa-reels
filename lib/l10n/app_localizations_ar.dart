@@ -1284,4 +1284,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get noEpisodesAvailable => 'لا توجد حلقات متاحة';
+
+  @override
+  String get haiPayPayment => 'دفع HaiPay';
 }

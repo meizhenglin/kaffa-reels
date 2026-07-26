@@ -7,6 +7,7 @@ import 'package:preload_page_view/preload_page_view.dart';
 import '../../l10n/app_localizations.dart';
 import '../home/pages/main_page.dart';
 import '../home/providers/last_watched_provider.dart';
+import '../../core/ads/ad_manager.dart';
 import '../../core/network/api_service.dart';
 import '../../core/storage/storage_service.dart';
 import '../../core/widgets/app_snack_bar.dart';
@@ -1018,6 +1019,22 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     if (nextIndex >= videoInfoList.length) {
       return;
     }
+
+    // 每隔一定集数展示一次插屏广告
+    const adInterval = 2;
+    if ((_currentIndex + 1) % adInterval == 0) {
+      // 暂停当前视频
+      _pauseAtIndex(_currentIndex);
+      // 展示广告，广告关闭后切换到下一集
+      await AdManager.instance.showInterstitialAd(
+        onDismissed: () {
+          debugPrint('[_playNextEpisode] Ad dismissed, switching to episode $nextIndex');
+          _jumpToEpisode(nextIndex);
+        },
+      );
+      return;
+    }
+
     if (!mounted) return;
     await _jumpToEpisode(nextIndex);
   }

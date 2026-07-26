@@ -16,6 +16,7 @@ allprojects {
         mavenCentral()
         maven { url = uri("https://mvn.mob.com/android") }
         maven { url = uri("https://mvn.zztfly.com/android") }
+        maven { url = uri("https://jfrog.takuad.com/artifactory/china_sdk") }
     }
 }
 

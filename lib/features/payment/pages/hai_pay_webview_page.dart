@@ -5,8 +5,6 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../models/hai_pay_models.dart';
 import '../services/hai_pay_service.dart';
-import '../../../l10n/app_localizations.dart';
-import '../../../app/providers/app_providers.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/storage/storage_service.dart';
 
@@ -21,6 +19,7 @@ class HaiPayWebViewPage extends StatefulWidget {
     required this.paymentUrl,
     required this.orderNo,
     required this.productType,
+    required this.methodName,
     this.onPaymentComplete,
   });
 
@@ -33,6 +32,9 @@ class HaiPayWebViewPage extends StatefulWidget {
   /// "1" = VIP, "2" = recharge, "3" = episode unlock
   final String productType;
 
+  /// Display name of the selected payment method
+  final String methodName;
+
   /// Callback when payment is confirmed
   final void Function(bool success)? onPaymentComplete;
 
@@ -41,12 +43,13 @@ class HaiPayWebViewPage extends StatefulWidget {
     required String paymentUrl,
     required String orderNo,
     required String productType,
+    required String methodName,
     void Function(bool success)? onPaymentComplete,
   }) {
     debugPrint(
-        '[HaiPayWebView] show paymentUrl=$paymentUrl orderNo=$orderNo productType=$productType');
+        '[HaiPayWebView] show paymentUrl=$paymentUrl orderNo=$orderNo productType=$productType methodName=$methodName');
     // ignore: avoid_print
-    print('[HaiPayWebView] show paymentUrl=$paymentUrl orderNo=$orderNo productType=$productType');
+    print('[HaiPayWebView] show paymentUrl=$paymentUrl orderNo=$orderNo productType=$productType methodName=$methodName');
     return Navigator.of(context, rootNavigator: true).push<bool>(
       MaterialPageRoute(
         fullscreenDialog: true,
@@ -54,6 +57,7 @@ class HaiPayWebViewPage extends StatefulWidget {
           paymentUrl: paymentUrl,
           orderNo: orderNo,
           productType: productType,
+          methodName: methodName,
           onPaymentComplete: onPaymentComplete,
         ),
       ),
@@ -239,8 +243,6 @@ class _HaiPayWebViewPageState extends State<HaiPayWebViewPage>
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-
     return Scaffold(
       backgroundColor: const Color(0xFF2D2440),
       appBar: AppBar(
@@ -250,9 +252,11 @@ class _HaiPayWebViewPageState extends State<HaiPayWebViewPage>
           icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => _showExitConfirmation(context),
         ),
-        title: const Text(
-          'HaiPay Payment',
-          style: TextStyle(color: Colors.white, fontSize: 16),
+        title: Text(
+          widget.methodName,
+          style: const TextStyle(color: Colors.white, fontSize: 16),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         centerTitle: true,
         actions: [

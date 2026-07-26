@@ -2545,6 +2545,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No episodes available'**
   String get noEpisodesAvailable;
+
+  /// No description provided for @haiPayPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'HaiPay Payment'**
+  String get haiPayPayment;
 }
 
 class _AppLocalizationsDelegate

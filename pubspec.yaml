@@ -75,6 +75,9 @@ dependencies:
   sharesdk_plugin: ^1.3.20
   mobcommonlib: ^1.1.7
 
+  # AdMob
+  google_mobile_ads: ^5.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

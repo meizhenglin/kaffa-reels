@@ -15,9 +15,9 @@ class AppConfig {
   // ==================== API 配置 ====================
   /// API 基础地址
   /// 正式环境
-  // static const String apiBaseUrl = 'https://tvapi.qahwatv.com/';
+  static const String apiBaseUrl = 'https://tvapi.qahwatv.com/';
 
-  static const String apiBaseUrl = 'http://192.168.1.52:8082/';
+  // static const String apiBaseUrl = 'http://192.168.1.52:8082/';
 
 
   /// 如需切回联调环境，可临时使用：

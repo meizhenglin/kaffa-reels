@@ -494,5 +494,6 @@
   "unlockClarityLevel": "Unlock the clarity level",
   "shortDramaSeries": "Short drama series",
   "content": "Content",
-  "noEpisodesAvailable": "No episodes available"
+  "noEpisodesAvailable": "No episodes available",
+  "haiPayPayment": "HaiPay Payment"
 }

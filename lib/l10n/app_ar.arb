@@ -1,4 +1,4 @@
-﻿{
+{
   "@@locale": "ar",
   "appTitle": "قهوة تي في",
 
@@ -382,5 +382,6 @@
   "unlockClarityLevel": "فتح مستوى الوضوح",
   "shortDramaSeries": "مسلسل قصير",
   "content": "المحتوى",
-  "noEpisodesAvailable": "لا توجد حلقات متاحة"
+  "noEpisodesAvailable": "لا توجد حلقات متاحة",
+  "haiPayPayment": "دفع HaiPay"
 }

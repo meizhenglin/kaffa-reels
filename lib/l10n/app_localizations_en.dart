@@ -1287,4 +1287,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noEpisodesAvailable => 'No episodes available';
+
+  @override
+  String get haiPayPayment => 'HaiPay Payment';
 }
