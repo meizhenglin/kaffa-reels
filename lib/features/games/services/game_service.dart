@@ -1,26 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/widgets/app_snack_bar.dart';
 import '../../../l10n/app_localizations.dart';
+import '../pages/game_webview_page.dart';
 
 class GameService {
   /// 打开游戏
   static Future<void> openGame(
-    BuildContext context,
-    String gameType,
-    String? gameUrl,
+    BuildContext context, {
+    required String gameType,
+    required String? gameUrl,
     String? downloadUrl,
-    String gameName,
-  ) async {
+    required String gameName,
+  }) async {
     final l10n = AppLocalizations.of(context);
 
     if (gameType.toLowerCase() == 'app') {
       // APP 游戏：提示下载
       _showDownloadDialog(context, l10n, gameName, downloadUrl);
     } else {
-      // H5 游戏：直接打开
-      await _openH5Game(context, l10n, gameUrl);
+      // H5 游戏：使用 Flutter WebView 打开（支持 MobileAds.registerWebView）
+      await _openH5Game(context, gameUrl, gameName);
     }
   }
 
@@ -66,50 +65,34 @@ class GameService {
 
   /// 下载游戏
   static Future<void> _downloadGame(BuildContext context, String downloadUrl) async {
-    final uri = Uri.parse(downloadUrl);
-    
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        AppSnackBar.show(context, message: 'Failed to open download link: $e');
-      }
-    }
+    // TODO: 实现下载逻辑
+    debugPrint('[GameService] Download: $downloadUrl');
   }
 
   /// 打开 H5 游戏
+  /// 使用 Flutter WebView 加载游戏 URL，以便：
+  /// 1. 支持 MobileAds.registerWebView，让 H5 的 adBreak() 走 AdMob
+  /// 2. 通过 JavaScriptChannel 处理登录/登出/充值回调
   static Future<void> _openH5Game(
     BuildContext context,
-    AppLocalizations l10n,
     String? gameUrl,
+    String gameName,
   ) async {
+    debugPrint('[GameService] _openH5Game called');
+    debugPrint('[GameService] gameUrl: $gameUrl');
+    debugPrint('[GameService] gameName: $gameName');
+
     if (gameUrl == null || gameUrl.isEmpty) {
-      AppSnackBar.show(context, message: l10n.networkError);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Game URL is empty')),
+      );
       return;
     }
 
-    final uri = Uri.parse(gameUrl);
-    
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(
-          uri,
-          mode: LaunchMode.inAppWebView,
-          webViewConfiguration: const WebViewConfiguration(
-            enableJavaScript: true,
-            enableDomStorage: true,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        AppSnackBar.show(context, message: '${l10n.error}: $e');
-      }
-    }
+    await GameWebViewPage.show(
+      context,
+      gameUrl: gameUrl,
+      gameName: gameName,
+    );
   }
 }

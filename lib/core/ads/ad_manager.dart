@@ -15,7 +15,9 @@ class AdManager {
   static final AdManager instance = AdManager._();
 
   InterstitialAd? _interstitialAd;
+  RewardedAd? _rewardedAd;
   bool _isAdLoading = false;
+  bool _isRewardedAdLoading = false;
   DateTime? _lastAdShownTime;
 
   /// 是否使用模拟广告（用于开发调试）
@@ -43,6 +45,7 @@ class AdManager {
 
     // 预加载广告
     _loadInterstitialAd();
+    _loadRewardedAd();
   }
 
   /// 预加载插屏广告
@@ -209,5 +212,114 @@ class AdManager {
   void dispose() {
     _interstitialAd?.dispose();
     _interstitialAd = null;
+    _rewardedAd?.dispose();
+    _rewardedAd = null;
+  }
+
+  // ============================================================================
+  // 激励广告 (Rewarded Ad)
+  // 用法：用户主动选择「看广告解锁 VIP 剧集」时调用
+  // ============================================================================
+
+  /// 预加载激励广告
+  void _loadRewardedAd() {
+    if (_isRewardedAdLoading || _rewardedAd != null || _useDebugMockAd) {
+      return;
+    }
+
+    _isRewardedAdLoading = true;
+    debugPrint('[AdManager] Loading rewarded ad with unit ID: ${AdConfig.rewardedAdUnitId}');
+
+    RewardedAd.load(
+      adUnitId: AdConfig.rewardedAdUnitId,
+      request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) {
+          _rewardedAd = ad;
+          _isRewardedAdLoading = false;
+          debugPrint('[AdManager] Rewarded ad LOADED successfully');
+          _setupRewardedAdListeners();
+        },
+        onAdFailedToLoad: (error) {
+          _isRewardedAdLoading = false;
+          debugPrint('[AdManager] Rewarded ad FAILED to load: $error');
+          // 延迟重试
+          Future.delayed(const Duration(seconds: 5), _loadRewardedAd);
+        },
+      ),
+    );
+  }
+
+  /// 激励广告监听器
+  void _setupRewardedAdListeners() {
+    _rewardedAd?.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        debugPrint('[AdManager] Rewarded ad dismissed');
+        _rewardedAd = null;
+        // 广告关闭后预加载下一个
+        _loadRewardedAd();
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        debugPrint('[AdManager] Failed to show rewarded ad: $error');
+        _rewardedAd = null;
+        _loadRewardedAd();
+      },
+    );
+  }
+
+  /// 激励广告是否已准备好
+  bool isRewardedAdReady() {
+    if (!AdConfig.isAdEnabled) return false;
+    if (_useDebugMockAd) return true;
+    return _rewardedAd != null;
+  }
+
+  /// 展示激励广告
+  /// [onRewardEarned] 用户完整观看广告、获得奖励时回调
+  /// [onNotReady] 广告未就绪时回调（用于降级处理）
+  /// 返回是否成功展示
+  Future<bool> showRewardedAd({
+    required void Function() onRewardEarned,
+    void Function()? onNotReady,
+  }) async {
+    debugPrint('[AdManager] showRewardedAd called, ad=$_rewardedAd, loading=$_isRewardedAdLoading');
+
+    if (!AdConfig.isAdEnabled) {
+      debugPrint('[AdManager] Rewarded ad disabled');
+      onNotReady?.call();
+      return false;
+    }
+
+    // 调试模式：模拟广告，1 秒后自动发放奖励
+    if (_useDebugMockAd) {
+      debugPrint('[AdManager] [DEBUG MOCK] Showing simulated rewarded ad');
+      await Future.delayed(const Duration(seconds: 1));
+      onRewardEarned();
+      return true;
+    }
+
+    if (_rewardedAd == null) {
+      debugPrint('[AdManager] Rewarded ad not ready, try to load...');
+      _loadRewardedAd();
+      onNotReady?.call();
+      return false;
+    }
+
+    try {
+      debugPrint('[AdManager] Showing real rewarded ad...');
+      await _rewardedAd!.show(
+        onUserEarnedReward: (ad, reward) {
+          debugPrint('[AdManager] User earned reward: ${reward.amount} ${reward.type}');
+          onRewardEarned();
+        },
+      );
+      debugPrint('[AdManager] Real rewarded ad shown successfully');
+      return true;
+    } catch (e) {
+      debugPrint('[AdManager] Error showing rewarded ad: $e');
+      _rewardedAd = null;
+      _loadRewardedAd();
+      return false;
+    }
   }
 }

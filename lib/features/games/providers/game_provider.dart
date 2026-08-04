@@ -140,10 +140,10 @@ class GameNotifier extends StateNotifier<GameState> {
     final gameTypeValue = game.gameType == GameType.app ? 'app' : 'h5';
     await GameService.openGame(
       context,
-      gameTypeValue,
-      game.h5Url,
-      game.downloadUrl,
-      game.name,
+      gameType: gameTypeValue,
+      gameUrl: game.h5Url,
+      downloadUrl: game.downloadUrl,
+      gameName: game.name,
     );
   }
 }

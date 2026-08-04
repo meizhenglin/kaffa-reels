@@ -12,6 +12,8 @@ class WatchShortVideoItem extends StatefulWidget {
   final bool resolvePlayableUrl;
   final bool lockedPreviewMode;
   final VoidCallback? onLockedWatchNowTap;
+  // 看广告解锁按钮的回调（激励广告就绪时显示）
+  final VoidCallback? onWatchAdToUnlock;
   final Widget Function(BuildContext context, VideoInfo videoInfo)? overlayBuilder;
   final Widget Function(BuildContext context, VideoInfo videoInfo)? topOverlayBuilder;
   final bool showDebugInfo;
@@ -25,6 +27,7 @@ class WatchShortVideoItem extends StatefulWidget {
     this.resolvePlayableUrl = true,
     this.lockedPreviewMode = false,
     this.onLockedWatchNowTap,
+    this.onWatchAdToUnlock,
     this.overlayBuilder,
     this.topOverlayBuilder,
     this.showDebugInfo = false,
@@ -587,23 +590,76 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
   }
 
   Widget _buildLockedWatchNowAction() {
-    if (!widget.lockedPreviewMode || widget.onLockedWatchNowTap == null) {
+    if (!widget.lockedPreviewMode) {
+      return const SizedBox.shrink();
+    }
+
+    final hasWatchNow = widget.onLockedWatchNowTap != null;
+    final hasWatchAd = widget.onWatchAdToUnlock != null;
+
+    if (!hasWatchNow && !hasWatchAd) {
       return const SizedBox.shrink();
     }
 
     return Positioned.fill(
       child: SafeArea(
         child: Center(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: widget.onLockedWatchNowTap,
-            child: Image.asset(
-              'assets/images/watch_now.png',
-              width: 156,
-              height: 110,
-              fit: BoxFit.contain,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (hasWatchNow)
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: widget.onLockedWatchNowTap,
+                  child: Image.asset(
+                    'assets/images/watch_now.png',
+                    width: 156,
+                    height: 110,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              if (hasWatchNow && hasWatchAd) const SizedBox(height: 16),
+              if (hasWatchAd)
+                _buildWatchAdButton(),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// 「看广告解锁该集」按钮（激励广告入口）
+  Widget _buildWatchAdButton() {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onWatchAdToUnlock,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFD700),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.play_circle_outline, color: Colors.white, size: 18),
+            SizedBox(width: 6),
+            Text(
+              'Watch Ad to Unlock',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
       ),
     );

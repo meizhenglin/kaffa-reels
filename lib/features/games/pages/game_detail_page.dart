@@ -1,11 +1,10 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
-import '../../../core/providers/auth_provider.dart';
-import '../../../core/widgets/app_snack_bar.dart';
+import '../../../core/providers/auth_provider.dart' show apiServiceProviderRef;
 import '../../../l10n/app_localizations.dart';
 import '../models/game_detail.dart';
+import '../services/game_service.dart';
 
 class GameDetailPage extends ConsumerStatefulWidget {
   const GameDetailPage({
@@ -22,7 +21,6 @@ class GameDetailPage extends ConsumerStatefulWidget {
 }
 
 class _GameDetailPageState extends ConsumerState<GameDetailPage> {
-  bool _isLoading = true;
   String? _errorMessage;
   GameDetail? _gameDetail;
 
@@ -42,7 +40,6 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
 
   Future<void> _loadGameDetail() async {
     setState(() {
-      _isLoading = true;
       _errorMessage = null;
     });
 
@@ -52,66 +49,47 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
 
       if (response.isSuccess && response.data is Map<String, dynamic>) {
         final detail = GameDetail.fromJson(response.data as Map<String, dynamic>);
+        debugPrint('[GameDetailPage] Loaded game: ${detail.name}');
+        debugPrint('[GameDetailPage] gameType: ${detail.gameType} (1=H5, 2=App)');
+        debugPrint('[GameDetailPage] isH5Game: ${detail.isH5Game}');
+        debugPrint('[GameDetailPage] isAppGame: ${detail.isAppGame}');
+        debugPrint('[GameDetailPage] h5Url: ${detail.h5Url}');
+        debugPrint('[GameDetailPage] downloadUrl: ${detail.downloadUrl}');
+        debugPrint('[GameDetailPage] packageName: ${detail.packageName}');
         setState(() {
           _gameDetail = detail;
-          _isLoading = false;
         });
       } else {
         final l10n = AppLocalizations.of(context);
         setState(() {
           _errorMessage = response.error ?? l10n.failedToLoadGameDetails;
-          _isLoading = false;
         });
       }
     } catch (e) {
       final l10n = AppLocalizations.of(context);
       setState(() {
         _errorMessage = e.toString();
-        _isLoading = false;
       });
     }
   }
 
   Future<void> _handlePlayAction() async {
+    debugPrint('[GameDetailPage] _handlePlayAction called');
+
     final game = _gameDetail;
+    debugPrint('[GameDetailPage] gameDetail: $game');
+    debugPrint('[GameDetailPage] game.isH5Game: ${game?.isH5Game}');
+    debugPrint('[GameDetailPage] game.h5Url: ${game?.h5Url}');
+
     if (game == null) return;
 
-    final l10n = AppLocalizations.of(context);
-
-    if (game.isH5Game) {
-      // H5 游戏 - 使用 h5Url 在应用内打开
-      if (game.h5Url != null && game.h5Url!.isNotEmpty) {
-        final uri = Uri.parse(game.h5Url!);
-        try {
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(
-              uri,
-              mode: LaunchMode.inAppWebView,
-              webViewConfiguration: const WebViewConfiguration(
-                enableJavaScript: true,
-                enableDomStorage: true,
-              ),
-            );
-          }
-        } catch (e) {
-          if (!mounted) return;
-          AppSnackBar.show(context, message: '${l10n.error}: $e');
-        }
-      }
-    } else if (game.isAppGame) {
-      // App 游戏 - 使用 downloadUrl 外部下载
-      if (game.downloadUrl != null && game.downloadUrl!.isNotEmpty) {
-        final uri = Uri.parse(game.downloadUrl!);
-        try {
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          }
-        } catch (e) {
-          if (!mounted) return;
-          AppSnackBar.show(context, message: '${l10n.error}: $e');
-        }
-      }
-    }
+    await GameService.openGame(
+      context,
+      gameType: game.isH5Game ? 'h5' : 'app',
+      gameUrl: game.h5Url,
+      downloadUrl: game.downloadUrl,
+      gameName: game.name ?? 'Game',
+    );
   }
 
   void _toggleRewardPopup() {

@@ -84,7 +84,7 @@ class NavigationConfig {
   static List<NavigationItem> items(AppLocalizations l10n) => [
     NavigationItem(
       id: 'home',
-      titleBuilder: (l) => l.home,
+      titleBuilder: (l) => l.bottomNav_home,
       icon: Image(
         image: AssetImage('assets/images/mainPage_icon.png'),
         width: 24,

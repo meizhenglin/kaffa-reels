@@ -16,6 +16,15 @@ class AdConfig {
     }
   }
 
+  /// 激励广告单元 ID
+  static String get rewardedAdUnitId {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'ca-app-pub-3738458657290827/6345591075';
+    } else {
+      return 'ca-app-pub-3738458657290827/6345591075';
+    }
+  }
+
   /// 广告加载超时时间（秒）
   static const int adLoadTimeoutSeconds = 10;
 

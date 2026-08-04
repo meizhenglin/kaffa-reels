@@ -106,10 +106,11 @@ class _GamesPageState extends ConsumerState<GamesPage> {
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.sports_esports,
-              color: Colors.white,
-              size: 28,
+            child: Image.asset(
+              'assets/images/app_logo.png',
+              width: 28,
+              height: 28,
+              fit: BoxFit.contain,
             ),
           ),
           const SizedBox(width: 14),

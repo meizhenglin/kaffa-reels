@@ -12,7 +12,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appTitle => 'Qahwa TV';
 
   @override
-  String get bottomNav_home => 'Home';
+  String get bottomNav_home => 'Main Page';
 
   @override
   String get bottomNav_recommend => 'Recommend';

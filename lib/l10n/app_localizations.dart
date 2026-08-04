@@ -107,7 +107,7 @@ abstract class AppLocalizations {
   /// No description provided for @bottomNav_home.
   ///
   /// In en, this message translates to:
-  /// **'Home'**
+  /// **'Main Page'**
   String get bottomNav_home;
 
   /// No description provided for @bottomNav_recommend.

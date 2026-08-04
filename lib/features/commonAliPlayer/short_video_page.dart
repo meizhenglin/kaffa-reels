@@ -900,6 +900,79 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     return false;
   }
 
+  /// 尝试使用激励广告解锁剧集
+  /// 用户完整看完一则激励广告，即可解锁当前 VIP 锁定剧集
+  /// 返回 true 表示解锁成功，false 表示用户未完成观看或广告未就绪
+  Future<bool> _tryUnlockWithRewardedAd(int index) async {
+    debugPrint('[_tryUnlockWithRewardedAd] START - index=$index');
+    if (index < 0 || index >= videoInfoList.length) {
+      return false;
+    }
+
+    // 广告未就绪时直接跳过，让后续流程（K币/付费）兜底
+    if (!AdManager.instance.isRewardedAdReady()) {
+      debugPrint('[_tryUnlockWithRewardedAd] rewarded ad not ready, skip');
+      return false;
+    }
+
+    final episode = videoInfoList[index];
+
+    // 弹出激励广告；用户看完广告（onUserEarnedReward）后调用后端接口走正常解锁流程
+    final shown = await AdManager.instance.showRewardedAd(
+      onRewardEarned: () async {
+        debugPrint('[_tryUnlockWithRewardedAd] user earned reward, unlocking episode');
+        try {
+          final apiService = ApiService(
+            dioClient: ref.read(dioClientProvider),
+            storage: ref.read(storageServiceProvider),
+          );
+          // 走和 K币解锁同样的后端接口，由后端决定是否记账/零额解锁
+          final unlockResp = await apiService.getUserPayEpisodes(
+            videoId: widget.videoId,
+            episodesId: episode.id.toString(),
+            episodesNum: episode.serialNum,
+          );
+          debugPrint('[_tryUnlockWithRewardedAd] backend unlock isSuccess=${unlockResp.isSuccess}');
+
+          if (!mounted) return;
+          if (unlockResp.isSuccess) {
+            setState(() {
+              videoInfoList[index] = episode.copyWith(isCanPlay: 1);
+              _pendingLockedEpisodeIndex = null;
+              _showWatchNowOverlay = false;
+            });
+            final l10n = AppLocalizations.of(context);
+            AppSnackBar.show(context, message: l10n.unlockSuccess);
+            _clearPendingLockedOverlay();
+            _onPageChanged(index);
+            _reportViewHistory(index);
+          } else {
+            // 后端未返回成功，仍然更新本地状态（前端体验优先），由后续同步逻辑兜底
+            setState(() {
+              videoInfoList[index] = episode.copyWith(isCanPlay: 1);
+              _pendingLockedEpisodeIndex = null;
+              _showWatchNowOverlay = false;
+            });
+          }
+        } catch (e) {
+          debugPrint('[_tryUnlockWithRewardedAd] backend unlock exception: $e');
+          if (mounted) {
+            setState(() {
+              videoInfoList[index] = episode.copyWith(isCanPlay: 1);
+              _pendingLockedEpisodeIndex = null;
+              _showWatchNowOverlay = false;
+            });
+          }
+        }
+      },
+      onNotReady: () {
+        debugPrint('[_tryUnlockWithRewardedAd] rewarded ad not ready when shown');
+      },
+    );
+
+    return shown;
+  }
+
   /// 尝试使用 K币余额自动解锁剧集
   /// 返回 true 表示解锁成功，false 表示余额不足
   Future<bool> _tryAutoUnlockWithBalance(int index) async {
@@ -1455,6 +1528,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       lockedPreviewMode: lockedPreviewMode,
       onLockedWatchNowTap: lockedPreviewMode
           ? () => _showMembershipReminderDialog(lockedIndex: index)
+          : null,
+      onWatchAdToUnlock: lockedPreviewMode && AdManager.instance.isRewardedAdReady()
+          ? () => _tryUnlockWithRewardedAd(index)
           : null,
       onCompleted: _playNextEpisode,
       quality: _currentQuality,
