@@ -1,0 +1,88 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services"
+}
+
+def keystorePropertiesFile = rootProject.file("key.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+apply from: "mobsdk.gradle"
+
+android {
+    namespace = "com.video.storydrama"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_17
+    }
+
+    signingConfigs {
+        release {
+            def storeFilePath = keystoreProperties.getProperty("storeFile")
+            if (storeFilePath != null && !storeFilePath.isEmpty()) {
+                storeFile new File(keystorePropertiesFile.parent, storeFilePath)
+                storePassword keystoreProperties.getProperty("storePassword")
+                keyAlias keystoreProperties.getProperty("keyAlias")
+                keyPassword keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
+    defaultConfig {
+        applicationId "com.video.storydrama"
+        minSdk flutter.minSdkVersion
+        targetSdk flutter.targetSdkVersion
+        versionCode flutter.versionCode
+        versionName flutter.versionName
+    }
+
+    flavorDimensions = ["distribution"]
+
+    productFlavors {
+        google {
+            dimension "distribution"
+            applicationIdSuffix ""
+            versionNameSuffix "-g"
+            resValue "string", "app_name", "Qahwa TV"
+        }
+        platform {
+            dimension "distribution"
+            applicationIdSuffix ""
+            versionNameSuffix "-p"
+            resValue "string", "app_name", "Qahwa TV"
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
+            // 启用 R8 但配置为不做任何移除或混淆
+            minifyEnabled false
+            shrinkResources false
+            // 显式配置 R8 不进行优化
+            project.ext.set("flutter.minifierEnabled", false)
+        }
+        debug {
+            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+}
+
+flutter {
+    source "../.."
+}
+
+dependencies {
+    implementation "com.android.billingclient:billing:6.2.0"
+}

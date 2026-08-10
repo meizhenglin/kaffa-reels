@@ -7,13 +7,14 @@ class GameCarousel extends StatefulWidget {
   const GameCarousel({
     super.key,
     required this.items,
-    this.height = 160,
     this.onItemTap,
   });
 
   final List<GameCarouselItem> items;
-  final double height;
   final void Function(GameCarouselItem item)? onItemTap;
+
+  /// 轮播图原始尺寸比例 945*321
+  static const double imageAspectRatio = 945 / 321;
 
   @override
   State<GameCarousel> createState() => _GameCarouselState();
@@ -63,11 +64,14 @@ class _GameCarouselState extends State<GameCarousel> {
   @override
   Widget build(BuildContext context) {
     if (widget.items.isEmpty) {
-      return SizedBox(height: widget.height, child: _buildPlaceholder());
+      return AspectRatio(
+        aspectRatio: GameCarousel.imageAspectRatio,
+        child: _buildPlaceholder(),
+      );
     }
 
-    return SizedBox(
-      height: widget.height,
+    return AspectRatio(
+      aspectRatio: GameCarousel.imageAspectRatio,
       child: Stack(
         children: [
           PageView.builder(
@@ -140,7 +144,6 @@ class _CarouselItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
@@ -196,7 +199,7 @@ class _CarouselItem extends StatelessWidget {
     if (item.imageUrl != null && item.imageUrl!.isNotEmpty) {
       return Image.network(
         item.imageUrl!,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         width: double.infinity,
         height: double.infinity,
         loadingBuilder: (context, child, progress) {

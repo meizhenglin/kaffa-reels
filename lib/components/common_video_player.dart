@@ -1,10 +1,16 @@
-import 'package:aliplayer_widget/aliplayer_widget_lib.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_aliplayer/flutter_aliplayer.dart';
-import 'package:flutter_aliplayer/flutter_aliplayer_factory.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:video_player/video_player.dart';
+
+// Conditional import for aliplayer - web uses stub, native uses real implementation
+import 'aliplayer_native.dart'
+    if (dart.library.html) 'aliplayer_stub.dart';
+
+// Web fullscreen player
+import 'player_web.dart' if (dart.library.io) 'player_stub.dart';
 
 import '../core/constants/api_error_code.dart';
 import '../features/payment/widgets/vip_paywall_overlay.dart';
@@ -91,6 +97,22 @@ class _CommonVideoPlayerState extends ConsumerState<CommonVideoPlayer> {
 
   @override
   Widget build(BuildContext context) {
+    // Web 端统一使用原生 VideoPlayer
+    if (kIsWeb) {
+      return _WebFullscreenPlayer(
+        videoUrl: widget.videoUrl,
+        coverUrl: widget.coverUrl,
+        autoPlay: widget.autoPlay,
+        title: widget.title ?? '',
+        isCanPlay: widget.isCanPlay,
+        isVip: widget.isVip,
+        allEpisodes: widget.allEpisodes,
+        currentIndex: widget.currentIndex,
+        onEpisodeChanged: widget.onEpisodeChanged,
+        onBackPressed: widget.onBackPressed,
+      );
+    }
+
     if (widget.isFullscreen) {
       return _FullscreenPlayerView(
         videoUrl: widget.videoUrl,
@@ -479,15 +501,6 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // 手势层 — 点击切换控制栏显示，双击播放/暂停
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: _toggleControls,
-              onDoubleTap: _togglePlay,
-              behavior: HitTestBehavior.opaque,
-            ),
-          ),
-
           // 播放器画面
           AliPlayerView(
             onCreated: (viewId) => _onViewCreated(viewId),
@@ -496,6 +509,15 @@ class _FullscreenPlayerViewState extends ConsumerState<_FullscreenPlayerView> {
             width: MediaQuery.sizeOf(context).width,
             height: MediaQuery.sizeOf(context).height,
             aliPlayerViewType: AliPlayerViewTypeForAndroid.textureview,
+          ),
+
+          // 手势层 — 单击播放/暂停（放在播放器上面）
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: _togglePlay,
+              behavior: HitTestBehavior.opaque,
+              child: Container(color: Colors.transparent),
+            ),
           ),
 
           // 封面兜底
@@ -1153,3 +1175,7 @@ class _QualitySheet extends StatelessWidget {
     );
   }
 }
+
+// ============================================================================
+// _FullscreenPlayerView uses AliPlayer for mobile, see player_web.dart for web
+// ============================================================================

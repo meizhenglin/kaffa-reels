@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 /// ============================================================================
 /// 应用配置文件
 ///
@@ -5,7 +7,7 @@
 /// 对应小程序原版 config.js，定义 API 地址、平台标识、X-Client 信息等。
 ///
 /// 【如何修改】
-/// - 切换环境：修改 apiBaseUrl
+/// - 切换环境：修改 _apiBaseUrl
 /// - 切换平台：修改当前使用的 X-Client 字符串（Android/iOS）
 /// - 版本更新：修改 appVersion
 /// ============================================================================
@@ -13,10 +15,13 @@ class AppConfig {
   AppConfig._();
 
   // ==================== API 配置 ====================
-  /// API 基础地址
-  /// 正式环境
+  /// 正式环境 API 地址（私有常量）
   static const String apiBaseUrl = 'https://tvapi.qahwatv.com/';
 
+  // test 环境 API 地址
+  // static const String apiBaseUrl ="http://101.46.59.160:8082/";
+ 
+  // 开发环境
   // static const String apiBaseUrl = 'http://192.168.1.52:8082/';
 
 
@@ -53,6 +58,30 @@ class AppConfig {
 // flutter build apk --flavor google -t lib/main.dart --dart-define=FLAVOR=google --release --split-per-abi
 // google release 不分包（fat apk）
 // flutter build apk --flavor google -t lib/main.dart --dart-define=FLAVOR=google --release
+
+
+
+
+// flutter run --flavor platform --debug
+// flutter build apk --flavor platform --release --no-tree-shake-icons --split-per-abi
+
+// flutter run --flavor google --debug
+// flutter build apk --flavor google --release --no-tree-shake-icons --split-per-abi
+
+
+
+
+// # Google flavor
+// flutter run --flavor google --dart-define=FLAVOR=google --debug
+
+// # Platform flavor
+// flutter run --flavor platform --dart-define=FLAVOR=platform --debug
+
+// # web版本打包
+// flutter build web --base-href=/qahwa/
+
+
+// flutter build apk --flavor platform --dart-define=FLAVOR=platform --release --no-tree-shake-icons --split-per-abi
 
   /// 图片 CDN 地址
   // static const String picRootPath = 'https://image.qahwatv.com/';

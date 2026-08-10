@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -337,31 +338,33 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
     final isLoggedIn = user != null && !user.isTourist;
     final isVip = user != null && user.membershipExpiryDate != null && !user.isTourist && DateTime.now().isBefore(user.membershipExpiryDate!);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        image: const DecorationImage(
-          image: AssetImage('assets/images/vip_bg.png'),
-          // fit: BoxFit.cover,
+    return SizedBox(
+      width: double.infinity,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          image: const DecorationImage(
+            image: AssetImage('assets/images/vip_bg.png'),
+            fit: BoxFit.cover,
+          ),
         ),
-      ),
-      child: Row(
-        children: [
-          // Container(
-          //   width: 48,
-          //   height: 48,
-          //   decoration: BoxDecoration(
-          //     color: Colors.white.withValues(alpha: 0.15),
-          //     shape: BoxShape.circle,
-          //   ),
-          //   child: const Icon(
-          //     Icons.workspace_premium,
-          //     color: Color(0xFFFFB800),
-          //     size: 28,
-          //   ),
-          // ),
-          const SizedBox(width: 56),
+        child: Row(
+          children: [
+            // Container(
+            //   width: 48,
+            //   height: 48,
+            //   decoration: BoxDecoration(
+            //     color: Colors.white.withValues(alpha: 0.15),
+            //     shape: BoxShape.circle,
+            //   ),
+            //   child: const Icon(
+            //     Icons.workspace_premium,
+            //     color: Color(0xFFFFB800),
+            //     size: 28,
+            //   ),
+            // ),
+            const SizedBox(width: 56),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -443,6 +446,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
               ),
             ),
         ],
+        ),
       ),
     );
   }

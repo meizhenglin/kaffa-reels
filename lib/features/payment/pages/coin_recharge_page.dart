@@ -9,10 +9,13 @@ import '../../../features/auth/providers/auth_provider.dart';
 import '../../../features/recommend/utils/drama_navigation.dart';
 import '../../../core/widgets/app_snack_bar.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../core/config/build_flavor.dart';
 import '../../home/models/home_card_layout.dart';
 import '../models/recharge_product.dart';
 import '../providers/coin_record_provider.dart';
 import '../providers/membership_provider.dart';
+import '../services/unified_payment_handler.dart';
+import '../widgets/payment_channel_selector.dart';
 
 /// K-Coin recharge products page
 /// Shows list of K-Coin packages from /api/rechargeGoodsConfig/list, select and buy via Google Pay
@@ -87,15 +90,55 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
     setState(() => _isPurchasing = true);
 
     try {
-      final handler = ref.read(rechargePurchaseHandlerProvider);
-      final success = await handler.purchase(product);
+      // Google flavor: skip channel selection, go straight to Google Play.
+      if (BuildFlavor.isGoogle) {
+        final handler = ref.read(rechargePurchaseHandlerProvider);
+        final success = await handler.purchase(product);
+        if (!success && mounted) {
+          final reason = handler.lastError ?? l10n.purchaseFailedPleaseRetry;
+          AppSnackBar.show(context, message: reason);
+        } else if (success && mounted) {
+          AppSnackBar.show(context, message: l10n.purchaseSuccessful);
+          await ref.read(coinBalanceInfoProvider.notifier).load();
+        }
+        return;
+      }
+
+      // Platform flavor: let user select payment channel (HaiPay sub-methods).
+      final unifiedHandler = ref.read(unifiedPaymentHandlerProvider);
+      final haiPayMethods = await unifiedHandler.fetchHaiPayMethods(
+        price: product.price,
+        productName: product.name,
+      );
+
+      final channel = await PaymentChannelSelector.show(
+        context: context,
+        price: product.price,
+        productName: product.name,
+        haiPayMethods: haiPayMethods,
+      );
+
+      if (channel == null) return;
+
+      bool success = false;
+
+      if (channel.isGooglePlay) {
+        final handler = ref.read(rechargePurchaseHandlerProvider);
+        success = await handler.purchase(product);
+      } else {
+        success = await unifiedHandler.purchaseRecharge(
+          product: product,
+          price: product.price,
+          context: context,
+          channel: channel,
+        );
+      }
 
       if (!success && mounted) {
-        final reason = handler.lastError ?? l10n.purchaseFailedPleaseRetry;
+        final reason = unifiedHandler.lastError ?? l10n.purchaseFailedPleaseRetry;
         AppSnackBar.show(context, message: reason);
       } else if (success && mounted) {
         AppSnackBar.show(context, message: l10n.purchaseSuccessful);
-        // 刷新余额
         await ref.read(coinBalanceInfoProvider.notifier).load();
       }
     } finally {

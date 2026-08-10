@@ -21,7 +21,6 @@ class GameDetailPage extends ConsumerStatefulWidget {
 }
 
 class _GameDetailPageState extends ConsumerState<GameDetailPage> {
-  String? _errorMessage;
   GameDetail? _gameDetail;
 
   // Popup state
@@ -39,48 +38,21 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
   }
 
   Future<void> _loadGameDetail() async {
-    setState(() {
-      _errorMessage = null;
-    });
-
     try {
       final apiService = ref.read(apiServiceProviderRef);
       final response = await apiService.getGameDetail(id: widget.id);
 
       if (response.isSuccess && response.data is Map<String, dynamic>) {
         final detail = GameDetail.fromJson(response.data as Map<String, dynamic>);
-        debugPrint('[GameDetailPage] Loaded game: ${detail.name}');
-        debugPrint('[GameDetailPage] gameType: ${detail.gameType} (1=H5, 2=App)');
-        debugPrint('[GameDetailPage] isH5Game: ${detail.isH5Game}');
-        debugPrint('[GameDetailPage] isAppGame: ${detail.isAppGame}');
-        debugPrint('[GameDetailPage] h5Url: ${detail.h5Url}');
-        debugPrint('[GameDetailPage] downloadUrl: ${detail.downloadUrl}');
-        debugPrint('[GameDetailPage] packageName: ${detail.packageName}');
         setState(() {
           _gameDetail = detail;
         });
-      } else {
-        final l10n = AppLocalizations.of(context);
-        setState(() {
-          _errorMessage = response.error ?? l10n.failedToLoadGameDetails;
-        });
       }
-    } catch (e) {
-      final l10n = AppLocalizations.of(context);
-      setState(() {
-        _errorMessage = e.toString();
-      });
-    }
+    } catch (_) {}
   }
 
   Future<void> _handlePlayAction() async {
-    debugPrint('[GameDetailPage] _handlePlayAction called');
-
     final game = _gameDetail;
-    debugPrint('[GameDetailPage] gameDetail: $game');
-    debugPrint('[GameDetailPage] game.isH5Game: ${game?.isH5Game}');
-    debugPrint('[GameDetailPage] game.h5Url: ${game?.h5Url}');
-
     if (game == null) return;
 
     await GameService.openGame(
@@ -88,7 +60,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
       gameType: game.isH5Game ? 'h5' : 'app',
       gameUrl: game.h5Url,
       downloadUrl: game.downloadUrl,
-      gameName: game.name ?? 'Game',
+      gameName: game.name,
     );
   }
 
@@ -190,63 +162,6 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildLoadingOverlay(AppLocalizations l10n) {
-    return Container(
-      color: const Color(0xFF13131A),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.8),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(
-                width: 40,
-                height: 40,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 4,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                l10n.loadingLower,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorView(ThemeData theme, AppLocalizations l10n) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              _errorMessage!,
-              style: theme.textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: _loadGameDetail,
-              icon: const Icon(Icons.refresh),
-              label: Text(l10n.retry),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

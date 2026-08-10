@@ -48,20 +48,22 @@ class _GamesPageState extends ConsumerState<GamesPage> {
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
               if (carouselItems.isNotEmpty)
                 SliverToBoxAdapter(
-                  child: GameCarousel(
-                    items: carouselItems,
-                    height: 180,
-                    onItemTap: (item) {
-                      if (item.id.isEmpty) return;
-                      final router = ref.read(routerProvider);
-                      router.push('/games/detail/${item.id}', extra: {'id': item.id, 'gameName': item.title ?? ''});
-                    },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: GameCarousel(
+                      items: carouselItems,
+                      onItemTap: (item) {
+                        if (item.id.isEmpty) return;
+                        final router = ref.read(routerProvider);
+                        router.push('/games/detail/${item.id}', extra: {'id': item.id, 'gameName': item.title ?? ''});
+                      },
+                    ),
                   ),
                 ),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
-                  child: Text('${l10n.allGames} (${allGames.length})', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+                  child: Text(l10n.allGames, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
                 ),
               ),
               if (allGames.isEmpty)
@@ -89,28 +91,12 @@ class _GamesPageState extends ConsumerState<GamesPage> {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF028760), Color(0xFF04A87A)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF028760).withValues(alpha: 0.4),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
+          ClipOval(
             child: Image.asset(
               'assets/images/app_logo.png',
-              width: 28,
-              height: 28,
-              fit: BoxFit.contain,
+              width: 48,
+              height: 48,
+              fit: BoxFit.cover,
             ),
           ),
           const SizedBox(width: 14),

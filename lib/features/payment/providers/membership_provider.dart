@@ -487,6 +487,15 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
   }
 
   void _handlePurchaseError(String error) {
+    // Web + platform flavor: Google Play errors are expected and already
+    // surfaced (if at all) via the membership_web_purchase_unsupported
+    // copy. Don't double-broadcast through the member error channel.
+    if (kIsWeb) {
+      debugPrint('[MembershipProvider] suppressed on web: $error');
+      state = state.copyWith(isLoading: false, clearPendingOrder: true);
+      return;
+    }
+
     // Don't show error dialog for user cancellation
     if (error == 'Purchase was canceled') {
       debugPrint('[MembershipProvider] Purchase canceled by user, ignoring');

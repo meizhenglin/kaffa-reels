@@ -16,12 +16,14 @@ import 'package:preload_page_view/preload_page_view.dart';
 import 'package:qahwa_tv/l10n/app_localizations.dart';
 
 import '../../home/pages/main_page.dart';
-import '../../commonAliPlayer/short_video_item.dart';
 import '../../commonAliPlayer/short_video_preload_tuning.dart';
 import '../models/video_info.dart';
 import '../providers/recommend_provider.dart';
 import '../providers/video_action_provider.dart';
-import '../../commonAliPlayer/ali_player_preload.dart';
+import '../../commonAliPlayer/short_video_item.dart'
+    if (dart.library.html) '../../commonAliPlayer/short_video_item_web.dart';
+import '../../commonAliPlayer/ali_player_preload.dart'
+    if (dart.library.html) '../../commonAliPlayer/ali_player_preload_web.dart';
 
 const bool _showRecommendPlaybackDebug = false;
 

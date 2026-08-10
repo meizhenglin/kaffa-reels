@@ -77,6 +77,8 @@ dependencies:
 
   # AdMob
   google_mobile_ads: ^5.0.0
+  # Native browser/HTML5 video player used by the platform Web build
+  video_player: ^2.13.0
 
 dev_dependencies:
   flutter_test:

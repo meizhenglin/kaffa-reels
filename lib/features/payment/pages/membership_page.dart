@@ -56,7 +56,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       }
     });
     Future.microtask(() async {
-      // �?�?�并�?��?�?�?�?�??�?��?�??�?
+      // 并??
       await ref.read(memberStateProvider.notifier).checkAndRetryPendingPayments();
       if (mounted) {
         setState(() {
@@ -67,20 +67,13 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       ref.read(membershipDramaProvider.notifier).load();
       await ref.read(membershipProductsProvider.notifier).loadVipProducts();
 
-      // �?�?��?��?��?��?VIP�?��?�
+      // VIP
       final authState = ref.read(authProvider);
       final isVip = authState.user?.isVip ?? false;
       final vipExpireDate = authState.user?.vipExpireDate;
       final hasActive = isVip && (vipExpireDate == null || vipExpireDate.isAfter(DateTime.now()));
 
-      // �?�?�??印
-      debugPrint('[MembershipPage] ===== VIP �?��?��?�? =====');
-      debugPrint('[MembershipPage] userId: ${authState.user?.id}');
-      debugPrint('[MembershipPage] isVip: $isVip');
-      debugPrint('[MembershipPage] vipExpireDate: $vipExpireDate');
-      debugPrint('[MembershipPage] hasActiveSubscription: $hasActive');
-      debugPrint('[MembershipPage] �?�?��?��?�: ${DateTime.now()}');
-      debugPrint('[MembershipPage] =========================');
+      // ?印
 
       if (mounted) {
         setState(() {
@@ -117,20 +110,13 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       return;
     }
 
-    // �?�?��?��?��?��?VIP�?��?��?�??含�?�??�?��?��?�?��?
+    // VIP?含?
     final isVip = authState.user?.isVip ?? false;
     final vipExpireDate = authState.user?.vipExpireDate;
     final hasActiveSubscription = isVip && 
         (vipExpireDate == null || vipExpireDate.isAfter(DateTime.now()));
 
-    // �?�?�??印
-    debugPrint('[MembershipPage] ===== �?��?�购买�??�?� =====');
-    debugPrint('[MembershipPage] userId: ${authState.user?.id}');
-    debugPrint('[MembershipPage] isVip: $isVip');
-    debugPrint('[MembershipPage] vipExpireDate: $vipExpireDate');
-    debugPrint('[MembershipPage] hasActiveSubscription: $hasActiveSubscription');
-    debugPrint('[MembershipPage] �?�?��?��?�: ${DateTime.now()}');
-    debugPrint('[MembershipPage] =========================');
+    // ?印
 
     if (hasActiveSubscription) {
       if (mounted) {
@@ -153,7 +139,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       return;
     }
 
-    // �?�示购买确认对话�?
+    // 示购买确认对话
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -192,18 +178,22 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
 
     if (confirmed != true) {
-      // �?��?��?�?�?�?�?可�?��?�??�??�?�?�?订�?�?��?�
+      // 可??订
       ref.read(memberStateProvider.notifier).clearPendingOrder();
       return;
     }
 
-    // �?�示�?�载�?��?�
+    // 示载
     _isPurchasing = true;
     if (mounted) setState(() {});
 
-    // 订�??�??�?��?�许�??�? Google Play �?��?��?级/�?�级�?不�?��?��?��?��?��?�复购买
+    // 订??许? Google Play 级/级不复购买
 
-    if (kIsWeb) {
+    // Web + Google flavor: Google Play Billing API is not callable from
+    // a browser. Refuse and surface the localized "unsupported" copy.
+    // Web + platform flavor falls through to HaiPay (works in WebView /
+    // external browser) below.
+    if (kIsWeb && BuildFlavor.isGoogle) {
       _isPurchasing = false;
       if (mounted) {
         setState(() {});
@@ -288,7 +278,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         ),
       );
     } else if (!success && mounted) {
-      // �?�示�??�?�??�??误信息�?�??不�?�误导�?��?? "Google Play opened" 提示
+      // 示???误信息?不误导? "Google Play opened" 提示
       final memberState = ref.read(memberStateProvider);
       final errorMsg = memberState.errorMessage;
       if (errorMsg != null && errorMsg.isNotEmpty) {
@@ -328,7 +318,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       _selectedIndex = 0;
     }
 
-    // �?�?��?�?�?�?��?�?��??�?�载�?��?� - �?个�??要�?�屏 loading
+    // ?载 - 个?要屏 loading
     if (_isCheckingPendingPayments) {
       return GradientScaffold(
         bottomBackgroundColor: _membershipBottomColor,
@@ -351,7 +341,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       );
     }
 
-    // �?�??�?� VIP �?��?��?�?�示�?�??�?�?�?�?�
+    // ? VIP 示?
     if (isVip) {
       return _buildActiveView(
         l10n,
@@ -361,7 +351,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       );
     }
 
-    // �? VIP �?��?� - �?��??购买�?�?�
+    //  VIP  - ?购买
     return GradientScaffold(
       bottomBackgroundColor: _membershipBottomColor,
       bottomNavigationBar:
@@ -376,14 +366,14 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
               child: Column(
                 children: [
                   _buildTopImage(),
-                  // �??�?��??表�?��?? - �?��?�?�? loading �?��?�
+                  // ??表? -  loading 
                   if (isInitialProductsLoading)
                     _buildProductsLoadingState(context)
                   else
                     _buildVipOptions(l10n, products, false, hasActiveSubscription: _hasActiveSubscription),
                   _buildDramaSection(recommendState),
                   _buildBenefitsSection(l10n, products),
-                  // TODO: �?�??�?��?启 K 币�??�?��??�?�
+                  // TODO: ?启 K 币??
                   // _buildRechargeSection(context),
                   _buildBottomSpacer(context),
                 ],
@@ -403,7 +393,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
   }
 
-  /// �??�?��??表�?�载�?��?�
+  /// ??表载
   Widget _buildProductsLoadingState(BuildContext context) {
     return Container(
       color: const Color(0xFF121212),
@@ -417,7 +407,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
   }
 
-  /// 1. 顶�?��?��??
+  /// 1. 顶?
   Widget _buildTopImage() {
     return SizedBox(
       width: double.infinity,
@@ -527,12 +517,12 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     return productId;
   }
 
-  /// �??�?产�?�ID�??goodsCode�?��?�订�??产�?�
+  /// ?产ID?goodsCode订?产
   SubscriptionProduct? _findProductById(String productIdOrCode) {
     final membershipProductsState = ref.read(membershipProductsProvider);
     final products = membershipProductsState.products;
 
-    // �??尝�?精确�?��?� id�?productId�?
+    // ?尝精确 idproductId
     for (final product in products) {
       if (product.googlePlayId == productIdOrCode ||
           product.appStoreId == productIdOrCode ||
@@ -541,7 +531,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       }
     }
 
-    // �?�尝�?�?��?� goodsCode
+    // 尝 goodsCode
     for (final product in products) {
       final productId = PaymentService.instance.getProductIdForType(product.id);
       if (productId == productIdOrCode) {
@@ -586,7 +576,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
   }
 
-  /// 4. Member Benefits �?绍
+  /// 4. Member Benefits 绍
   Widget _buildBenefitsSection(AppLocalizations l10n, List<SubscriptionProduct> products) {
     final benefits = [
       l10n.membership_benefits_unlockEpisodes,
@@ -714,7 +704,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
   }
 
-  /// 5. K币�??�?��?�口
+  /// 5. K币?口
   Widget _buildRechargeSection(BuildContext context, AppLocalizations l10n) {
     return Container(
       color: const Color(0xFF121212),
@@ -775,7 +765,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
   }
 
-  /// 6. �?�?��?��?�??�?�
+  /// 6. ?
   Widget _buildBottomPayButton(
     AppLocalizations l10n,
     MemberState memberState,
@@ -842,7 +832,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     );
   }
 
-  /// 已订�??�?�?�
+  /// 已订?
   Widget _buildActiveView(
     AppLocalizations l10n,
     MemberState memberState,
@@ -902,7 +892,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   //         const Icon(Icons.workspace_premium, size: 48, color: Colors.white),
   //         const SizedBox(height: 4),
   //         Text(
-  //           'Expires: ${_formatDate(memberState.expireDate)}  �?�  ${memberState.daysRemaining ?? 0} days left',
+  //           'Expires: ${_formatDate(memberState.expireDate)}    ${memberState.daysRemaining ?? 0} days left',
   //           style: TextStyle(
   //             color: Colors.white.withAlpha(204),
   //             fontSize: 13,
@@ -919,7 +909,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   }
 }
 
-/// �?个 VIP �??项�?
+/// 个 VIP ?项
 class _VipOptionItem extends StatelessWidget {
   const _VipOptionItem({
     required this.product,
@@ -1067,7 +1057,7 @@ class _VipOptionItem extends StatelessWidget {
   }
 }
 
-/// �?�卡�??
+/// 卡?
 class _DramaCardPlaceholder extends StatelessWidget {
   const _DramaCardPlaceholder({this.showImage = true});
 

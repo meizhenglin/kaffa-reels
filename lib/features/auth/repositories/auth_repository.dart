@@ -10,6 +10,7 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'google_sign_in_client_stub.dart'
     if (dart.library.io) 'google_sign_in_client_mobile.dart';
 
+import '../../../core/config/build_flavor.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/firebase/firebase_service.dart';
 import '../../../core/network/api_service.dart';
@@ -189,6 +190,9 @@ class AuthRepository {
       return false;
     }
     if (kIsWeb) {
+      return false;
+    }
+    if (BuildFlavor.isPlatform) {
       return false;
     }
     return true;

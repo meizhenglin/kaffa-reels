@@ -124,6 +124,10 @@ class _RouterRefreshNotifier extends ChangeNotifier {
   final Ref _ref;
 }
 
+// Web: 移除 URL hash，使用 path 模式
+void _configureRouterUrlStrategy() {
+}
+
 // ==================== 路由 Provider ====================
 /// 路由配置 Provider
 ///

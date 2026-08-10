@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:aliplayer_widget/aliplayer_widget_lib.dart';
@@ -13,11 +13,14 @@ import 'package:qahwa_tv/l10n/app_localizations.dart';
 import '_aliplayer_log_stub.dart'
     if (dart.library.io) '_aliplayer_log_native.dart'
     as aliplayer_impl;
+import 'app/router/url_strategy_stub.dart'
+    if (dart.library.html) 'app/router/url_strategy_web.dart'
+    as url_strategy;
 import 'core/platform/platform_info_stub.dart'
     if (dart.library.io) 'core/platform/platform_info_io.dart';
 
 import 'app/providers/app_providers.dart';
-import 'app/router/router_config.dart';
+import 'app/router/router_config.dart' show routerProvider;
 import 'app/theme/app_theme.dart';
 import 'core/ads/ad_manager.dart';
 import 'core/constants/app_constants.dart';
@@ -74,14 +77,18 @@ Future<void> _initializeAliPlayerWidgetGlobalSettings() async {
 
     debugPrint('[MAIN] AliPlayerWidget global settings initialized');
   } catch (e) {
-    debugPrint('[MAIN] AliPlayerWidget global settings init failed: $e');
+    debugPrint('[MAIN] AliPlayerWidget global settings init failed: `$e`');
   }
 }
 
 Future<void> main() async {
   debugPrint('[MAIN] === main() started ===');
+  debugPrint('[MAIN] BuildFlavor.current = ${BuildFlavor.current}');
   WidgetsFlutterBinding.ensureInitialized();
   debugPrint('[MAIN] WidgetsFlutterBinding ready');
+
+  // Web: 配置 URL 策略，移除 hash
+  url_strategy.configureRouterUrlStrategy();
 
   final storage = StorageService();
   await storage.init();
@@ -97,7 +104,6 @@ Future<void> main() async {
     );
     Mobcommonlib.submitPolicyGrantResult(true, null);
     ShareService.init();
-    // 初始化 AdMob 广告
     await AdManager.instance.initialize();
   }
 
@@ -121,7 +127,7 @@ void _initFirebaseInBackground() {
     FirebaseService.initialize().then((_) {
       debugPrint('[MAIN] Web: Firebase initialized in background');
     }).catchError((e) {
-      debugPrint('[MAIN] Web: Firebase background init failed: $e');
+      debugPrint('[MAIN] Web: Firebase background init failed: `$e`');
     });
   });
 }
@@ -151,7 +157,7 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
     final themeMode = ref.watch(themeModeProvider);
     final locale = ref.watch(localeProvider);
 
-    return MaterialApp.router(
+    final app = MaterialApp.router(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
@@ -167,6 +173,30 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
       ],
       routerConfig: router,
       builder: (context, child) => child ?? const SizedBox.shrink(),
+    );
+
+    if (kIsWeb) {
+      return _WebFrame(child: app);
+    }
+    return app;
+  }
+}
+
+// ============================================================================
+// Web: max-width 1024px centered
+// ============================================================================
+
+class _WebFrame extends StatelessWidget {
+  const _WebFrame({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1024),
+        child: child,
+      ),
     );
   }
 }

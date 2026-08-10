@@ -1,7 +1,20 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
-import '../pages/game_webview_page.dart';
+import '../pages/game_webview_page_native.dart'
+    if (dart.library.html) '../pages/game_webview_page_web.dart' as platform;
+
+/// 统一的游戏 WebView 页面
+class GameWebViewPage {
+  static Future<void> show(
+    BuildContext context, {
+    required String gameUrl,
+    String? gameName,
+  }) {
+    return platform.showWebView(context, gameUrl: gameUrl, gameName: gameName);
+  }
+}
 
 class GameService {
   /// 打开游戏
@@ -14,13 +27,33 @@ class GameService {
   }) async {
     final l10n = AppLocalizations.of(context);
 
+    if (kIsWeb) {
+      await _openInBrowser(context, gameUrl, gameName);
+      return;
+    }
+
     if (gameType.toLowerCase() == 'app') {
-      // APP 游戏：提示下载
       _showDownloadDialog(context, l10n, gameName, downloadUrl);
     } else {
-      // H5 游戏：使用 Flutter WebView 打开（支持 MobileAds.registerWebView）
       await _openH5Game(context, gameUrl, gameName);
     }
+  }
+
+  /// Web 端：在应用内打开游戏链接
+  static Future<void> _openInBrowser(
+    BuildContext context,
+    String? gameUrl,
+    String gameName,
+  ) async {
+    if (gameUrl == null || gameUrl.isEmpty) return;
+
+    try {
+      await GameWebViewPage.show(
+        context,
+        gameUrl: gameUrl,
+        gameName: gameName,
+      );
+    } catch (_) {}
   }
 
   /// 显示下载提示对话框
@@ -66,33 +99,22 @@ class GameService {
   /// 下载游戏
   static Future<void> _downloadGame(BuildContext context, String downloadUrl) async {
     // TODO: 实现下载逻辑
-    debugPrint('[GameService] Download: $downloadUrl');
   }
 
   /// 打开 H5 游戏
-  /// 使用 Flutter WebView 加载游戏 URL，以便：
-  /// 1. 支持 MobileAds.registerWebView，让 H5 的 adBreak() 走 AdMob
-  /// 2. 通过 JavaScriptChannel 处理登录/登出/充值回调
   static Future<void> _openH5Game(
     BuildContext context,
     String? gameUrl,
     String gameName,
   ) async {
-    debugPrint('[GameService] _openH5Game called');
-    debugPrint('[GameService] gameUrl: $gameUrl');
-    debugPrint('[GameService] gameName: $gameName');
+    if (gameUrl == null || gameUrl.isEmpty) return;
 
-    if (gameUrl == null || gameUrl.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Game URL is empty')),
+    try {
+      await platform.showWebView(
+        context,
+        gameUrl: gameUrl,
+        gameName: gameName,
       );
-      return;
-    }
-
-    await GameWebViewPage.show(
-      context,
-      gameUrl: gameUrl,
-      gameName: gameName,
-    );
+    } catch (_) {}
   }
 }

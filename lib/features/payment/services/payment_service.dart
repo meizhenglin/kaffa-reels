@@ -48,6 +48,16 @@ class PaymentService {
 
     if (_isInitialized) return true;
 
+    // Web and non-Google targets: Google Play Billing is not callable.
+    // Bail out cleanly without notifying the error channel — web users
+    // still get a working HaiPay flow in the platform flavor, so this
+    // is not an error condition from the user's perspective.
+    if (kIsWeb) {
+      _lastError = 'Google Play Billing is not supported on web.';
+      _isInitialized = false;
+      return false;
+    }
+
     try {
       final isAvailable = await _inAppPurchase.isAvailable();
       if (!isAvailable) {

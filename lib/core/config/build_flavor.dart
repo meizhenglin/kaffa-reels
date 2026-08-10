@@ -7,8 +7,9 @@
 ///                   Google Play flows are enabled (currently only
 ///                   HaiPay is wired up).
 class BuildFlavor {
+  // 平台默认值改为 platform，这样当没有显式指定时也能正常工作
   static const String _value =
-      String.fromEnvironment('FLAVOR', defaultValue: 'google');
+      String.fromEnvironment('FLAVOR', defaultValue: 'platform');
 
   static const String google = 'google';
   static const String platform = 'platform';
