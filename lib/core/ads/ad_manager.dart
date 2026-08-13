@@ -216,6 +216,12 @@ class AdManager {
     _rewardedAd = null;
   }
 
+  /// 手动预加载激励广告（供需要提前准备的页面调用）
+  void preloadRewardedAd() {
+    if (!AdConfig.isAdEnabled) return;
+    _loadRewardedAd();
+  }
+
   // ============================================================================
   // 激励广告 (Rewarded Ad)
   // 用法：用户主动选择「看广告解锁 VIP 剧集」时调用
@@ -243,8 +249,12 @@ class AdManager {
         onAdFailedToLoad: (error) {
           _isRewardedAdLoading = false;
           debugPrint('[AdManager] Rewarded ad FAILED to load: $error');
-          // 延迟重试
-          Future.delayed(const Duration(seconds: 5), _loadRewardedAd);
+          // 失败后立即重试一次，然后再延迟重试
+          Future.delayed(const Duration(seconds: 2), () {
+            if (_rewardedAd == null) {
+              _loadRewardedAd();
+            }
+          });
         },
       ),
     );

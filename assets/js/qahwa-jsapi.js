@@ -184,10 +184,11 @@
     },
 
     /**
-     * 真实激励广告播放（Google Ad Placement API）
+     * 真实激励广告播放
      *
-     * 在浏览器 → AdSense 真实激励广告
-     * 在 WebView + MobileAds.registerWebView → AdMob 真实激励广告
+     * 优先级：
+     * 1. 原生桥接 (QahwaNative) - App WebView 中使用 Flutter AdManager
+     * 2. Google Ad Placement API (adBreak) - 浏览器中使用 AdSense
      *
      * @param {Object} [options]
      * @param {Function} [options.onRewardEarned] - 用户完整观看获得奖励时回调（必传）
@@ -206,10 +207,133 @@
         onError: options.onError
       };
 
+      // ========== 优先级 1：使用原生桥接（App WebView）==========
+      if (this._isNativeBridgeAvailable()) {
+        return this._showAdViaNativeBridge(callbacks);
+      }
+
+      // ========== 优先级 2：使用 Ad Placement API（浏览器）==========
+      return this._showAdViaAdPlacementApi(callbacks);
+    },
+
+    /**
+     * 通过原生桥接显示广告（App WebView 环境）
+     * @private
+     */
+    _showAdViaNativeBridge: function(callbacks) {
+      var self = this;
+      var requestId = 'ad_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
       return new Promise(function(resolve, reject) {
-        // 1. Ad Placement API script 加载失败（file:// 协议 / 假 client ID / 网络阻断）
-        //    此时调用 adBreak() 会被 push 进队列但永远不会被消费 → adBreakDone 永不触发
-        //    立刻 reject，避免 hang 死
+        // 注册回调
+        self._adCallbacks = self._adCallbacks || {};
+        self._adCallbacks[requestId] = {
+          resolve: resolve,
+          reject: reject,
+          callbacks: callbacks,
+          timeoutId: null
+        };
+
+        // 30秒超时
+        var timeoutId = setTimeout(function() {
+          delete self._adCallbacks[requestId];
+          console.warn('[QahwaJS] Ad timeout 30s');
+          if (callbacks.onNotReady) callbacks.onNotReady('timeout');
+          reject(new Error('Ad timeout: no response after 30s'));
+        }, 30000);
+        self._adCallbacks[requestId].timeoutId = timeoutId;
+
+        // 发送消息给原生
+        console.log('[QahwaJS] Native bridge available, sending ad request...');
+        window.QahwaNative.postMessage(JSON.stringify({
+          action: 'showRewardedAd',
+          requestId: requestId,
+          data: {
+            adUnitId: self._rewardedAdUnitId
+          }
+        }));
+      });
+    },
+
+    /**
+     * 处理原生广告回调（由原生端调用）
+     * @param {string} requestId
+     * @param {Object} result
+     * @private
+     */
+    _handleAdCallback: function(requestId, result) {
+      var self = this;
+      var callbacks = self._adCallbacks && self._adCallbacks[requestId];
+      if (!callbacks) return;
+
+      clearTimeout(callbacks.timeoutId);
+      delete self._adCallbacks[requestId];
+
+      if (result.success) {
+        // 广告成功显示并完成
+        self._doAdReward()
+          .then(function(reward) {
+            if (callbacks.callbacks.onRewardEarned) callbacks.callbacks.onRewardEarned(reward);
+            callbacks.resolve({
+              success: true,
+              coins: reward.coins,
+              totalCoins: reward.totalCoins
+            });
+          })
+          .catch(function(err) {
+            // 后端记账失败：仍然算用户已看完广告
+            console.warn('[QahwaJS] Reward backend error (不影响用户奖励):', err.message);
+            if (callbacks.callbacks.onRewardEarned) callbacks.callbacks.onRewardEarned({ coins: 0, totalCoins: 0 });
+            callbacks.resolve({ success: true, coins: 0, totalCoins: 0 });
+          });
+      } else if (result.dismissed) {
+        // 用户关闭广告
+        if (callbacks.callbacks.onClose) callbacks.callbacks.onClose();
+        callbacks.reject(new Error('Ad dismissed by user'));
+      } else {
+        // 广告未就绪或其他错误
+        if (callbacks.callbacks.onNotReady) callbacks.callbacks.onNotReady(result.reason || 'not_ready');
+        callbacks.reject(new Error(result.reason || 'Ad not ready'));
+      }
+    },
+
+    /**
+     * 注册原生回调接收器
+     * @private
+     */
+    _registerNativeCallback: function() {
+      var self = this;
+      // 监听来自原生端的消息
+      if (window.QahwaNative && window.QahwaNative.onMessage) {
+        window.QahwaNative.onMessage(function(message) {
+          console.log('[QahwaJS] Received native message:', message);
+          try {
+            var data = typeof message === 'string' ? JSON.parse(message) : message;
+            if (data.action === 'adCallback' && data.requestId) {
+              self._handleAdCallback(data.requestId, data.result || {});
+            }
+          } catch (e) {
+            console.error('[QahwaJS] Error parsing native message:', e);
+          }
+        });
+      }
+
+      // 也支持直接调用 _handleAdCallback（游戏 HTML 可以直接调用）
+      window.QahwaNative = window.QahwaNative || {};
+      window.QahwaNative._onAdResult = function(requestId, result) {
+        self._handleAdCallback(requestId, result);
+      };
+    },
+
+    /**
+     * 通过 Google Ad Placement API 显示广告（浏览器环境）
+     * @private
+     */
+    _showAdViaAdPlacementApi: function(callbacks) {
+      var self = this;
+
+      return new Promise(function(resolve, reject) {
+        // 1. Ad Placement API script 加载失败
         if (self._adPlacementApiLoadFailed) {
           var loadErr = new Error(
             'Ad Placement API script failed to load. ' +
@@ -220,7 +344,7 @@
           return;
         }
 
-        // 2. Ad Placement API 还在加载（脚本下载中）
+        // 2. Ad Placement API 还在加载
         if (typeof window.adBreak !== 'function') {
           var notReadyErr = new Error('Ad Placement API not loaded yet');
           if (callbacks.onNotReady) callbacks.onNotReady('initializing');
@@ -228,19 +352,10 @@
           return;
         }
 
-        // 3. （可选）登录检查 - 这里放宽以方便 demo 验证
-        //    真实业务里你可能想确保用户已登录才发奖励
-        //    if (!self._userInfo) { ... }
-
-        // 4. 调用真实 Google 激励广告
-        // beforeReward(showAdFn): 有可用广告时弹出"看广告得奖励"提示；用户点确认后调 showAdFn()
-        // adViewed: 用户完整看完 → 发放奖励
-        // adDismissed: 用户中途关闭 → 不发放奖励
-        // adBreakDone: 永远会被调用一次（含 beforeReward 没被调用时也走这）
         var timedOut = false;
         var timeoutId = setTimeout(function() {
           timedOut = true;
-          console.warn('[QahwaJS] adBreak timeout 30s — no adBreakDone received');
+          console.warn('[QahwaJS] adBreak timeout 30s');
           if (callbacks.onNotReady) callbacks.onNotReady('timeout');
           reject(new Error('Ad timeout: no adBreakDone after 30s'));
         }, 30000);
@@ -260,21 +375,15 @@
               if (timedOut) return;
               clearTimeout(timeoutId);
               console.log('[QahwaJS] User viewed rewarded ad');
-              // 用户完整看完 → 调后端记账（失败也不影响用户体验）
               self._doAdReward()
                 .then(function(reward) {
                   if (callbacks.onRewardEarned) callbacks.onRewardEarned(reward);
-                  resolve({
-                    success: true,
-                    coins: reward.coins,
-                    totalCoins: reward.totalCoins
-                  });
+                  resolve({ success: true, coins: reward.coins, totalCoins: reward.totalCoins });
                 })
                 .catch(function(err) {
-                  // 后端记账失败（404 / 网络错误等）：仍然算用户已看完广告
-                  console.warn('[QahwaJS] Reward backend error (不影响用户奖励):', err.message);
-                  if (callbacks.onRewardEarned) callbacks.onRewardEarned({ coins: 0, totalCoins: 0, _backendError: err.message });
-                  resolve({ success: true, coins: 0, totalCoins: 0, _backendError: err.message });
+                  console.warn('[QahwaJS] Reward backend error:', err.message);
+                  if (callbacks.onRewardEarned) callbacks.onRewardEarned({ coins: 0, totalCoins: 0 });
+                  resolve({ success: true, coins: 0, totalCoins: 0 });
                 });
             },
 
@@ -286,28 +395,17 @@
               reject(new Error('Ad dismissed by user'));
             },
 
-            beforeAd: function() {
-              console.log('[QahwaJS] beforeAd');
-            },
-
-            afterAd: function() {
-              console.log('[QahwaJS] afterAd');
-            },
-
             adBreakDone: function(placementInfo) {
               if (timedOut) return;
               clearTimeout(timeoutId);
               console.log('[QahwaJS] adBreakDone:', placementInfo);
-              // placementInfo.breakStatus === 'dismissed' | 'viewed' | 'frequencyCapped' | 'other'
               if (placementInfo && placementInfo.breakStatus === 'frequencyCapped') {
                 if (callbacks.onNotReady) callbacks.onNotReady('frequency_capped');
                 reject(new Error('Ad frequency capped'));
               } else if (placementInfo && placementInfo.breakStatus === 'other') {
-                // 没有可用广告 / 假 client ID / 浏览器非 in-app 环境
                 if (callbacks.onNotReady) callbacks.onNotReady('not_ready');
                 reject(new Error('Ad not ready'));
               }
-              // 'dismissed' 和 'viewed' 已经分别处理过了
             }
           });
         } catch (e) {
@@ -320,11 +418,16 @@
     },
 
     /**
-     * 激励广告是否已准备好（同步本地缓存）
-     * 注意：真实就绪状态由 Ad Placement API 管理，每次 showAd 时会自动检测
+     * 激励广告是否已准备好
+     * 同时检测：原生桥接（App WebView）或 Ad Placement API（浏览器）
      * @returns {boolean}
      */
     isRewardedAdReady: function() {
+      // 1. 原生桥接可用（App WebView - AdMob）
+      if (this._isNativeBridgeAvailable()) {
+        return true;
+      }
+      // 2. Ad Placement API 可用（浏览器 - AdSense）
       return typeof window !== 'undefined' && typeof window.adBreak === 'function';
     },
 
@@ -335,8 +438,6 @@
     checkRewardedAdReady: function() {
       var self = this;
       return new Promise(function(resolve) {
-        // Ad Placement API 没有专门的 "isReady" 方法
-        // 简化处理：只要 API 加载好了就视为"ready"，真实可用性在 adBreak 时才知道
         resolve(self.isRewardedAdReady());
       });
     },
@@ -848,31 +949,6 @@
       return typeof window !== 'undefined'
         && window.QahwaNative
         && typeof window.QahwaNative.postMessage === 'function';
-    },
-
-    /**
-     * 注册原生回调（旧版 JS Bridge 兼容代码，已废弃，仅保留 API 兼容）
-     * Ad Placement API 模式下不需要此方法
-     * @private
-     */
-    _registerNativeCallback: function() {
-      // No-op: Ad Placement API 通过 adBreak() 直接调用，无需 JS Bridge
-      // 保留方法签名以防外部代码意外调用
-    },
-
-    /**
-     * 旧版 JS Bridge 调用方法（已废弃，请直接使用 showAd）
-     * 保留仅为 API 兼容，新代码请勿使用
-     * @deprecated Use showAd() which uses Google Ad Placement API
-     * @private
-     */
-    _callNative: function(method, params) {
-      var self = this;
-      return new Promise(function(resolve, reject) {
-        // 旧版 JS Bridge 已废弃，请使用 Google Ad Placement API
-        console.warn('[QahwaJS] _callNative is deprecated. Use showAd() with Ad Placement API instead.');
-        reject(new Error('_callNative is deprecated. The SDK now uses Google Ad Placement API directly.'));
-      });
     },
 
     /**

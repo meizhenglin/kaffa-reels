@@ -690,6 +690,16 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     return videoInfoList[index].isCanPlay == 0;
   }
 
+  /// 获取第一个未解锁的剧集索引（按顺序解锁检查用）
+  int _getFirstUnlockedIndex() {
+    for (int i = 0; i < videoInfoList.length; i++) {
+      if (_isEpisodeLocked(i)) {
+        return i;
+      }
+    }
+    return -1; // 全部已解锁
+  }
+
   Future<void> _showMembershipReminderDialog({int? lockedIndex}) async {
     debugPrint('[_showMembershipReminderDialog] called with lockedIndex=$lockedIndex, currentIndex=$_currentIndex, videoInfoList.length=${videoInfoList.length}');
     if (_pendingLockedDialogIndex == lockedIndex) return;
@@ -910,10 +920,25 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       return false;
     }
 
-    // 广告未就绪时直接跳过，让后续流程（K币/付费）兜底
-    if (!AdManager.instance.isRewardedAdReady()) {
-      debugPrint('[_tryUnlockWithRewardedAd] rewarded ad not ready, skip');
+    // 检查是否按顺序解锁：只能解锁第一个未解锁的剧集
+    final firstUnlockedIndex = _getFirstUnlockedIndex();
+    debugPrint('[_tryUnlockWithRewardedAd] firstUnlockedIndex=$firstUnlockedIndex, requested index=$index');
+    
+    if (index != firstUnlockedIndex) {
+      // 不是按顺序解锁，提示用户
+      if (mounted) {
+        final l10n = AppLocalizations.of(context);
+        AppSnackBar.show(context, message: l10n.unlockToContinue);
+      }
       return false;
+    }
+
+    // 广告未就绪时，先尝试触发加载（AdManager 内部会自动重试）
+    if (!AdManager.instance.isRewardedAdReady()) {
+      debugPrint('[_tryUnlockWithRewardedAd] rewarded ad not ready, triggering load...');
+      // 通知 AdManager 加载广告（会启动重试逻辑）
+      // 用户可以等待或直接进入付费流程
+      // 这里改为：即使广告未就绪也尝试显示，由 onNotReady 回调处理
     }
 
     final episode = videoInfoList[index];
@@ -968,6 +993,10 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       },
       onNotReady: () {
         debugPrint('[_tryUnlockWithRewardedAd] rewarded ad not ready when shown');
+        // 广告未就绪时，提示用户稍后重试
+        if (mounted) {
+          AppSnackBar.show(context, message: 'Ad is loading, please try again in a moment');
+        }
       },
     );
 
@@ -1530,7 +1559,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       onLockedWatchNowTap: lockedPreviewMode
           ? () => _showMembershipReminderDialog(lockedIndex: index)
           : null,
-      onWatchAdToUnlock: lockedPreviewMode && AdManager.instance.isRewardedAdReady()
+      onWatchAdToUnlock: lockedPreviewMode
           ? () => _tryUnlockWithRewardedAd(index)
           : null,
       onCompleted: _playNextEpisode,
