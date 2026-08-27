@@ -20,6 +20,12 @@ class AdManager {
   bool _isRewardedAdLoading = false;
   DateTime? _lastAdShownTime;
 
+  /// 上次加载失败时间（用于冷却）
+  DateTime? _lastLoadFailedTime;
+
+  /// 加载冷却时间（毫秒）- 正式环境至少45秒
+  static const int _loadCooldownMs = 45000;
+
   /// 是否使用模拟广告（用于开发调试）
   static bool get _useDebugMockAd => kDebugMode && false; // 关闭调试模拟，使用真实广告
 
@@ -56,6 +62,15 @@ class AdManager {
       return;
     }
 
+    // 检查冷却时间
+    if (_lastLoadFailedTime != null) {
+      final elapsed = DateTime.now().difference(_lastLoadFailedTime!).inMilliseconds;
+      if (elapsed < _loadCooldownMs) {
+        debugPrint('[AdManager] Interstitial ad still in cooldown (${(_loadCooldownMs - elapsed) / 1000}s remaining)');
+        return;
+      }
+    }
+
     _isAdLoading = true;
     debugPrint('[AdManager] Loading interstitial ad with unit ID: ${AdConfig.interstitialAdUnitId}');
 
@@ -71,9 +86,10 @@ class AdManager {
         },
         onAdFailedToLoad: (error) {
           _isAdLoading = false;
+          _lastLoadFailedTime = DateTime.now(); // 记录失败时间
           debugPrint('[AdManager] Interstitial ad FAILED to load: $error');
-          // 延迟重试
-          Future.delayed(const Duration(seconds: 5), _loadInterstitialAd);
+          // 延迟重试（使用冷却时间）
+          Future.delayed(Duration(milliseconds: _loadCooldownMs), _loadInterstitialAd);
         },
       ),
     );
@@ -216,6 +232,18 @@ class AdManager {
     _rewardedAd = null;
   }
 
+  /// 手动预加载插屏广告（供需要提前准备的页面调用）
+  void preloadInterstitialAd() {
+    if (!AdConfig.isAdEnabled) return;
+    _loadInterstitialAd();
+  }
+
+  /// 检查插屏广告是否就绪
+  bool isInterstitialAdReady() {
+    if (!AdConfig.isAdEnabled) return false;
+    return _interstitialAd != null;
+  }
+
   /// 手动预加载激励广告（供需要提前准备的页面调用）
   void preloadRewardedAd() {
     if (!AdConfig.isAdEnabled) return;
@@ -233,11 +261,20 @@ class AdManager {
       return;
     }
 
+    // 检查冷却时间
+    if (_lastLoadFailedTime != null) {
+      final elapsed = DateTime.now().difference(_lastLoadFailedTime!).inMilliseconds;
+      if (elapsed < _loadCooldownMs) {
+        debugPrint('[AdManager] Rewarded ad still in cooldown (${(_loadCooldownMs - elapsed) / 1000}s remaining)');
+        return;
+      }
+    }
+
     _isRewardedAdLoading = true;
-    debugPrint('[AdManager] Loading rewarded ad with unit ID: ${AdConfig.rewardedAdUnitId}');
+    debugPrint('[AdManager] Loading rewarded ad with unit ID: ${AdConfig.admobRewardedAdUnitId}');
 
     RewardedAd.load(
-      adUnitId: AdConfig.rewardedAdUnitId,
+      adUnitId: AdConfig.admobRewardedAdUnitId,
       request: const AdRequest(),
       rewardedAdLoadCallback: RewardedAdLoadCallback(
         onAdLoaded: (ad) {
@@ -248,9 +285,10 @@ class AdManager {
         },
         onAdFailedToLoad: (error) {
           _isRewardedAdLoading = false;
+          _lastLoadFailedTime = DateTime.now(); // 记录失败时间
           debugPrint('[AdManager] Rewarded ad FAILED to load: $error');
-          // 失败后立即重试一次，然后再延迟重试
-          Future.delayed(const Duration(seconds: 2), () {
+          // 失败后延迟重试（使用冷却时间）
+          Future.delayed(Duration(milliseconds: _loadCooldownMs), () {
             if (_rewardedAd == null) {
               _loadRewardedAd();
             }
@@ -266,13 +304,15 @@ class AdManager {
       onAdDismissedFullScreenContent: (ad) {
         debugPrint('[AdManager] Rewarded ad dismissed');
         _rewardedAd = null;
-        // 广告关闭后预加载下一个
         _loadRewardedAd();
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
         debugPrint('[AdManager] Failed to show rewarded ad: $error');
         _rewardedAd = null;
         _loadRewardedAd();
+      },
+      onAdClicked: (ad) {
+        debugPrint('[AdManager] User clicked on ad');
       },
     );
   }
@@ -323,7 +363,7 @@ class AdManager {
           onRewardEarned();
         },
       );
-      debugPrint('[AdManager] Real rewarded ad shown successfully');
+      debugPrint('[AdManager] Real rewarded ad shown successfully, user returned to app');
       return true;
     } catch (e) {
       debugPrint('[AdManager] Error showing rewarded ad: $e');

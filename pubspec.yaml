@@ -75,7 +75,7 @@ dependencies:
   sharesdk_plugin: ^1.3.20
   mobcommonlib: ^1.1.7
 
-  # AdMob
+  # AdMob & Meta Ads
   google_mobile_ads: ^5.0.0
   # Native browser/HTML5 video player used by the platform Web build
   video_player: ^2.13.0

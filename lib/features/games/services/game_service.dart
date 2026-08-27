@@ -11,8 +11,9 @@ class GameWebViewPage {
     BuildContext context, {
     required String gameUrl,
     String? gameName,
+    int orientation = 1, // 默认竖屏，由游戏JS决定方向
   }) {
-    return platform.showWebView(context, gameUrl: gameUrl, gameName: gameName);
+    return platform.showWebView(context, gameUrl: gameUrl, gameName: gameName, orientation: orientation);
   }
 }
 
@@ -106,6 +107,7 @@ class GameService {
     BuildContext context,
     String? gameUrl,
     String gameName,
+    {int orientation = 1} // 默认竖屏，由游戏JS决定方向
   ) async {
     if (gameUrl == null || gameUrl.isEmpty) return;
 
@@ -114,6 +116,7 @@ class GameService {
         context,
         gameUrl: gameUrl,
         gameName: gameName,
+        orientation: orientation,
       );
     } catch (_) {}
   }

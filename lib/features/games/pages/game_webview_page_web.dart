@@ -69,6 +69,7 @@ Future<void> showWebView(
   BuildContext context, {
   required String gameUrl,
   String? gameName,
+  int orientation = 1, // Web平台忽略此参数，仅为接口一致性
 }) {
   return Navigator.of(context).push(
     PageRouteBuilder(

@@ -23,6 +23,7 @@ import 'app/providers/app_providers.dart';
 import 'app/router/router_config.dart' show routerProvider;
 import 'app/theme/app_theme.dart';
 import 'core/ads/ad_manager.dart';
+import 'core/ads/ad_mediator.dart';
 import 'core/constants/app_constants.dart';
 import 'core/config/build_flavor.dart';
 import 'core/firebase/firebase_service.dart';
@@ -105,6 +106,7 @@ Future<void> main() async {
     Mobcommonlib.submitPolicyGrantResult(true, null);
     ShareService.init();
     await AdManager.instance.initialize();
+    await AdMediator.instance.initialize();
   }
 
   runApp(

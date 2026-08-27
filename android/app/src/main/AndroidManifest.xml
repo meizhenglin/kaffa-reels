@@ -25,6 +25,14 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-3738458657290827~8824576458" />
 
+        <!-- Meta Audience Network App ID -->
+        <meta-data
+            android:name="com.facebook.sdk.ApplicationId"
+            android:value="@string/facebook_app_id" />
+        <meta-data
+            android:name="com.facebook.audiencenetwork.applicationid"
+            android:value="@string/facebook_application_id" />
+
         <!-- <meta-data
             android:name="com.aliyun.alivc_license.licensekey_SEA"
             android:value="hPro64fDG4w5gTPmb58e1ab9918694ce6b449351127ba5ae3"/>

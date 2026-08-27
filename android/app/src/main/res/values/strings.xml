@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Facebook / Meta Audience Network App ID -->
+    <!-- 请替换为你自己的 Meta App ID -->
+    <string name="facebook_app_id">YOUR_FACEBOOK_APP_ID</string>
+    <string name="facebook_application_id">YOUR_FACEBOOK_APPLICATION_ID</string>
+</resources>

@@ -22,7 +22,7 @@ class AppConfig {
   // static const String apiBaseUrl ="http://101.46.59.160:8082/";
  
   // 开发环境
-  // static const String apiBaseUrl = 'http://192.168.1.52:8082/';
+  // static const String apiBaseUrl = 'http://192.168.1.51:8082/';
 
 
   /// 如需切回联调环境，可临时使用：

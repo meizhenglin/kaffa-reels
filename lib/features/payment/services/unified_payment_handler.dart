@@ -61,6 +61,7 @@ class UnifiedPaymentHandler {
     required String price,
     required BuildContext context,
     required PaymentChannel channel,
+    void Function(bool success)? onPaymentComplete,
   }) async {
     lastError = null;
 
@@ -72,6 +73,7 @@ class UnifiedPaymentHandler {
       price: price,
       context: context,
       channel: channel,
+      onPaymentComplete: onPaymentComplete,
     );
   }
 
@@ -80,6 +82,7 @@ class UnifiedPaymentHandler {
     required String price,
     required BuildContext context,
     required PaymentChannel channel,
+    void Function(bool success)? onPaymentComplete,
   }) async {
     lastError = null;
 
@@ -91,6 +94,7 @@ class UnifiedPaymentHandler {
       price: price,
       context: context,
       channel: channel,
+      onPaymentComplete: onPaymentComplete,
     );
   }
 
@@ -102,6 +106,7 @@ class UnifiedPaymentHandler {
     String? episodeId,
     int? episodesNum,
     required PaymentChannel channel,
+    void Function(bool success)? onPaymentComplete,
   }) async {
     lastError = null;
 
@@ -116,6 +121,7 @@ class UnifiedPaymentHandler {
       episodeId: episodeId,
       episodesNum: episodesNum,
       channel: channel,
+      onPaymentComplete: onPaymentComplete,
     );
   }
 
@@ -218,14 +224,14 @@ class UnifiedPaymentHandler {
   /// Common two-step HaiPay flow shared by VIP / recharge / unlock.
   ///
   /// Returns true if the order was created AND the payment page was pushed
-  /// onto the navigator. This does NOT indicate that the user has paid yet —
-  /// the in-app WebView handles payment completion internally and pops itself
-  /// when the user finishes (or cancels).
+  /// onto the navigator. The onPaymentComplete callback (if provided) will be
+  /// invoked when the user completes payment in the WebView.
   Future<bool> _runHaiPayFlow({
     required BuildContext context,
     required HaiPayMethod method,
     required int payConfigId,
     required String productType,
+    void Function(bool success)? onPaymentComplete,
   }) async {
     try {
       final order = await _haiPayService.createAndInit(
@@ -259,6 +265,7 @@ class UnifiedPaymentHandler {
         order: order,
         productType: productType,
         methodName: method.localizedName(Localizations.localeOf(context)),
+        onPaymentComplete: onPaymentComplete,
       );
     } catch (e) {
       lastError = 'HaiPay purchase failed: $e';
@@ -302,11 +309,14 @@ class UnifiedPaymentHandler {
   /// The WebView page is self-managing: it pops itself when the user
   /// completes (or cancels) the payment. Caller must NOT pop the calling
   /// sheet on success — only on failure (and only with an error toast).
+  ///
+  /// The onPaymentComplete callback will be invoked when payment is confirmed.
   Future<bool> _openWebView({
     required BuildContext context,
     required HaiPayOrder order,
     required String productType,
     required String methodName,
+    void Function(bool success)? onPaymentComplete,
   }) async {
     debugPrint(
         '[UnifiedPayment] _openWebView payInfo=${order.payInfo} orderNo=${order.orderNo} methodName=$methodName');
@@ -317,18 +327,18 @@ class UnifiedPaymentHandler {
         lastError = 'UI no longer available';
         return false;
       }
-      // Fire the push but DO NOT await its result: push's future resolves
-      // when the WebView pops, which happens AFTER the user pays. We want
-      // to return to the caller immediately so it doesn't try to pop its
-      // own UI on top of the WebView.
-      unawaited(HaiPayWebViewPage.show(
+      // Push the WebView and await its result. The future resolves when the
+      // WebView pops (after user completes or cancels payment).
+      final result = await HaiPayWebViewPage.show(
         context: context,
         paymentUrl: order.payInfo,
         orderNo: order.orderNo,
         productType: productType,
         methodName: methodName,
-      ));
-      return true;
+        onPaymentComplete: onPaymentComplete,
+      );
+      // Return true if user completed payment (result == true)
+      return result == true;
     } catch (e, st) {
       lastError = 'Failed to open webview: $e';
       debugPrint('[UnifiedPayment] show webview error: $e\n$st');
@@ -342,6 +352,7 @@ class UnifiedPaymentHandler {
     required String price,
     required BuildContext context,
     required PaymentChannel channel,
+    void Function(bool success)? onPaymentComplete,
   }) async {
     final selectedMethod = await _resolveHaiPayMethod(
       channel: channel,
@@ -368,6 +379,7 @@ class UnifiedPaymentHandler {
       method: selectedMethod,
       payConfigId: payConfigId,
       productType: '1',
+      onPaymentComplete: onPaymentComplete,
     );
   }
 
@@ -376,6 +388,7 @@ class UnifiedPaymentHandler {
     required String price,
     required BuildContext context,
     required PaymentChannel channel,
+    void Function(bool success)? onPaymentComplete,
   }) async {
     final selectedMethod = await _resolveHaiPayMethod(
       channel: channel,
@@ -402,6 +415,7 @@ class UnifiedPaymentHandler {
       method: selectedMethod,
       payConfigId: payConfigId,
       productType: '2',
+      onPaymentComplete: onPaymentComplete,
     );
   }
 
@@ -413,6 +427,7 @@ class UnifiedPaymentHandler {
     String? episodeId,
     int? episodesNum,
     required PaymentChannel channel,
+    void Function(bool success)? onPaymentComplete,
   }) async {
     final selectedMethod = await _resolveHaiPayMethod(
       channel: channel,
@@ -439,6 +454,7 @@ class UnifiedPaymentHandler {
       method: selectedMethod,
       payConfigId: payConfigId,
       productType: '3',
+      onPaymentComplete: onPaymentComplete,
     );
   }
 }

@@ -8,6 +8,7 @@ import '../../l10n/app_localizations.dart';
 import '../home/pages/main_page.dart';
 import '../home/providers/last_watched_provider.dart';
 import '../../core/ads/ad_manager.dart';
+import '../../core/ads/ad_mediator.dart';
 import '../../core/network/api_service.dart';
 import '../../core/storage/storage_service.dart';
 import '../../core/widgets/app_snack_bar.dart';
@@ -260,6 +261,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     _isCurrentTabActive = _shouldFollowHomeTabVisibility
         ? ref.read(currentTabIndexProvider) == 2
         : true;
+
+    // 预加载插屏广告
+    AdMediator.instance.preloadInterstitialAd();
 
     if (_shouldFollowHomeTabVisibility) {
       _tabIndexSubscription = ref.listenManual<int>(
@@ -810,6 +814,11 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           videoInfoList[episodeIndex] = updatedInfo;
         }
       },
+      onVipPurchaseSuccess: () {
+        // VIP购买成功后刷新用户状态
+        ref.read(authProvider.notifier).refreshUserInfo();
+        ref.invalidate(isVipProvider);
+      },
     );
 
     debugPrint('[_showUnlockBottomSheet] returned from bottom sheet, result=$result, index=$index');
@@ -933,18 +942,16 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       return false;
     }
 
-    // 广告未就绪时，先尝试触发加载（AdManager 内部会自动重试）
-    if (!AdManager.instance.isRewardedAdReady()) {
-      debugPrint('[_tryUnlockWithRewardedAd] rewarded ad not ready, triggering load...');
-      // 通知 AdManager 加载广告（会启动重试逻辑）
-      // 用户可以等待或直接进入付费流程
-      // 这里改为：即使广告未就绪也尝试显示，由 onNotReady 回调处理
+    // 广告未就绪时，先尝试触发加载（AdMediator 内部会自动重试）
+    if (!AdMediator.instance.isRewardedAdReady()) {
+      debugPrint('[_tryUnlockWithRewardedAd] No ad platform ready, triggering preload...');
+      AdMediator.instance.preloadRewardedAd();
     }
 
     final episode = videoInfoList[index];
 
     // 弹出激励广告；用户看完广告（onUserEarnedReward）后调用后端接口走正常解锁流程
-    final shown = await AdManager.instance.showRewardedAd(
+    final shown = await AdMediator.instance.showRewardedAd(
       onRewardEarned: () async {
         debugPrint('[_tryUnlockWithRewardedAd] user earned reward, unlocking episode');
         try {
@@ -992,8 +999,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         }
       },
       onNotReady: () {
-        debugPrint('[_tryUnlockWithRewardedAd] rewarded ad not ready when shown');
-        // 广告未就绪时，提示用户稍后重试
+        debugPrint('[_tryUnlockWithRewardedAd] No ad ready on any platform');
+        // 所有广告平台都未就绪时，提示用户稍后重试
         if (mounted) {
           AppSnackBar.show(context, message: 'Ad is loading, please try again in a moment');
         }
@@ -1128,13 +1135,37 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     if ((_currentIndex + 1) % adInterval == 0) {
       // 暂停当前视频
       _pauseAtIndex(_currentIndex);
-      // 展示广告，广告关闭后切换到下一集
-      await AdManager.instance.showInterstitialAd(
-        onDismissed: () {
-          debugPrint('[_playNextEpisode] Ad dismissed, switching to episode $nextIndex');
-          _jumpToEpisode(nextIndex);
-        },
-      );
+
+      // 如果广告没准备好，先预加载并等待
+      if (!AdMediator.instance.isInterstitialAdReady()) {
+        debugPrint('[_playNextEpisode] Interstitial not ready, triggering preload...');
+        AdMediator.instance.preloadInterstitialAd();
+        
+        // 等待广告加载完成（最多等10秒）
+        const maxWaitSeconds = 10;
+        for (int i = 0; i < maxWaitSeconds; i++) {
+          await Future.delayed(const Duration(seconds: 1));
+          if (AdMediator.instance.isInterstitialAdReady()) {
+            debugPrint('[_playNextEpisode] Interstitial ad ready after ${i + 1}s');
+            break;
+          }
+        }
+      }
+
+      // 广告加载完成后再展示
+      if (AdMediator.instance.isInterstitialAdReady()) {
+        debugPrint('[_playNextEpisode] Showing interstitial ad...');
+        await AdMediator.instance.showInterstitialAd(
+          onDismissed: () {
+            debugPrint('[_playNextEpisode] Ad dismissed, switching to episode $nextIndex');
+            _jumpToEpisode(nextIndex);
+          },
+        );
+      } else {
+        // 广告加载失败，直接播放下一集
+        debugPrint('[_playNextEpisode] Interstitial ad failed to load, playing next episode');
+        _jumpToEpisode(nextIndex);
+      }
       return;
     }
 

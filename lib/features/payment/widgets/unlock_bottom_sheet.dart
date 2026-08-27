@@ -32,6 +32,7 @@ class UnlockBottomSheet extends ConsumerStatefulWidget {
     required this.config,
     required this.onUnlockSuccess,
     this.onDismiss,
+    this.onVipPurchaseSuccess,
   });
 
   final String videoId;
@@ -43,6 +44,7 @@ class UnlockBottomSheet extends ConsumerStatefulWidget {
   final UnlockConfig config;
   final void Function(int episodeIndex) onUnlockSuccess;
   final VoidCallback? onDismiss;
+  final VoidCallback? onVipPurchaseSuccess;
 
   static Future<UnlockResult?> show({
     required BuildContext context,
@@ -55,6 +57,7 @@ class UnlockBottomSheet extends ConsumerStatefulWidget {
     required UnlockConfig config,
     required void Function(int episodeIndex) onUnlockSuccess,
     VoidCallback? onDismiss,
+    VoidCallback? onVipPurchaseSuccess,
   }) {
     return showModalBottomSheet<UnlockResult?>(
       context: context,
@@ -72,6 +75,7 @@ class UnlockBottomSheet extends ConsumerStatefulWidget {
         config: config,
         onUnlockSuccess: onUnlockSuccess,
         onDismiss: onDismiss,
+        onVipPurchaseSuccess: onVipPurchaseSuccess,
       ),
     );
   }
@@ -745,6 +749,13 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         episodeId: widget.episodeId,
         episodesNum: widget.episodesNum,
         channel: channel,
+        onPaymentComplete: (paid) {
+          if (paid) {
+            // Refresh episode unlock status via the existing callback
+            widget.onUnlockSuccess.call(widget.episodeIndex);
+            AppSnackBar.show(context, message: l10n.purchaseSuccessful);
+          }
+        },
       );
 
       if (!mounted) return;
@@ -886,6 +897,11 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         price: product.price.toStringAsFixed(2),
         context: context,
         channel: channel,
+        onPaymentComplete: (paid) {
+          if (paid) {
+            widget.onVipPurchaseSuccess?.call();
+          }
+        },
       );
 
       if (!mounted) return;

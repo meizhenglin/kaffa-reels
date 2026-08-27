@@ -320,28 +320,7 @@ class _HaiPayWebViewPageState extends State<HaiPayWebViewPage>
                 ),
               ),
             ),
-          Positioned(
-            bottom: 16,
-            left: 16,
-            right: 16,
-            child: _buildPaymentHint(),
-          ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentHint() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Text(
-        'Complete payment on the page above. App will auto-detect when payment is confirmed.',
-        style: TextStyle(color: Colors.white70, fontSize: 12),
-        textAlign: TextAlign.center,
       ),
     );
   }

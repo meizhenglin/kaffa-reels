@@ -1,8 +1,7 @@
-﻿import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
-import '../../../core/ads/ad_manager.dart';
+import '../../../core/ads/ad_mediator.dart';
 import '../../../core/providers/auth_provider.dart' show apiServiceProviderRef;
 import '../../../l10n/app_localizations.dart';
 import '../models/game_detail.dart';
@@ -32,8 +31,7 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
   void initState() {
     super.initState();
     _loadGameDetail();
-    // 预加载激励广告，确保点击 Play 时广告已就绪
-    AdManager.instance.preloadRewardedAd();
+    AdMediator.instance.preloadRewardedAd();
   }
 
   @override
@@ -59,66 +57,13 @@ class _GameDetailPageState extends ConsumerState<GameDetailPage> {
     final game = _gameDetail;
     if (game == null) return;
 
-    // 显示加载提示
-    final loadingDialog = showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => const Center(
-        child: Card(
-          child: Padding(
-            padding: EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Loading ad...'),
-              ],
-            ),
-          ),
-        ),
-      ),
+    GameService.openGame(
+      context,
+      gameType: game.isH5Game ? 'h5' : 'app',
+      gameUrl: game.h5Url,
+      downloadUrl: game.downloadUrl,
+      gameName: game.name,
     );
-
-    // 触发广告预加载
-    AdManager.instance.preloadRewardedAd();
-
-    // 等待广告加载（最多等待 3 秒）
-    bool adReady = AdManager.instance.isRewardedAdReady();
-    int waitCount = 0;
-    while (!adReady && waitCount < 6) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      adReady = AdManager.instance.isRewardedAdReady();
-      waitCount++;
-    }
-
-    // 关闭加载提示
-    await loadingDialog;
-
-    if (adReady) {
-      // 广告已就绪，显示激励广告
-      await AdManager.instance.showRewardedAd(
-        onRewardEarned: () {
-          // 用户看完广告，打开游戏
-          GameService.openGame(
-            context,
-            gameType: game.isH5Game ? 'h5' : 'app',
-            gameUrl: game.h5Url,
-            downloadUrl: game.downloadUrl,
-            gameName: game.name,
-          );
-        },
-      );
-    } else {
-      // 广告加载超时，直接打开游戏
-      GameService.openGame(
-        context,
-        gameType: game.isH5Game ? 'h5' : 'app',
-        gameUrl: game.h5Url,
-        downloadUrl: game.downloadUrl,
-        gameName: game.name,
-      );
-    }
   }
 
   void _toggleRewardPopup() {

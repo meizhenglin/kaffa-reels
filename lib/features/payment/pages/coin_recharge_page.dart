@@ -121,25 +121,33 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
       if (channel == null) return;
 
       bool success = false;
+      String? errorMessage;
 
       if (channel.isGooglePlay) {
         final handler = ref.read(rechargePurchaseHandlerProvider);
         success = await handler.purchase(product);
+        errorMessage = handler.lastError;
       } else {
         success = await unifiedHandler.purchaseRecharge(
           product: product,
           price: product.price,
           context: context,
           channel: channel,
+          onPaymentComplete: (paid) {
+            if (paid) {
+              ref.read(coinBalanceInfoProvider.notifier).load();
+              AppSnackBar.show(context, message: l10n.purchaseSuccessful);
+            }
+          },
         );
+        errorMessage = unifiedHandler.lastError;
       }
 
       if (!success && mounted) {
-        final reason = unifiedHandler.lastError ?? l10n.purchaseFailedPleaseRetry;
+        final reason = errorMessage ?? l10n.purchaseFailedPleaseRetry;
         AppSnackBar.show(context, message: reason);
       } else if (success && mounted) {
-        AppSnackBar.show(context, message: l10n.purchaseSuccessful);
-        await ref.read(coinBalanceInfoProvider.notifier).load();
+        // Success snackbar will be shown in onPaymentComplete callback
       }
     } finally {
       if (mounted) {

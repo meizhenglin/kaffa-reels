@@ -231,22 +231,30 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     }
 
     bool success = false;
+    String? errorMessage;
 
     if (channel.isGooglePlay) {
       final memberNotifier = ref.read(memberStateProvider.notifier);
       success = await memberNotifier.purchase(selectedProduct: product);
+      if (!success) {
+        final memberState = ref.read(memberStateProvider);
+        errorMessage = memberState.errorMessage;
+      }
     } else {
       success = await handler.purchaseVip(
         product: product,
         price: product.price,
         context: context,
         channel: channel,
+        onPaymentComplete: (paid) {
+          if (paid) {
+            ref.read(authProvider.notifier).refreshUserInfo();
+            ref.invalidate(isVipProvider);
+          }
+        },
       );
-      if (success) {
-        try {
-          await ref.read(authProvider.notifier).refreshUserInfo();
-          ref.invalidate(isVipProvider);
-        } catch (_) {}
+      if (!success) {
+        errorMessage = handler.lastError;
       }
     }
 
@@ -278,13 +286,10 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         ),
       );
     } else if (!success && mounted) {
-      // 示???误信息?不误导? "Google Play opened" 提示
-      final memberState = ref.read(memberStateProvider);
-      final errorMsg = memberState.errorMessage;
-      if (errorMsg != null && errorMsg.isNotEmpty) {
+      if (errorMessage != null && errorMessage.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(errorMsg),
+            content: Text(errorMessage!),
             backgroundColor: Colors.red,
           ),
         );

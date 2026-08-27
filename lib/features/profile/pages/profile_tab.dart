@@ -338,9 +338,10 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
     final isLoggedIn = user != null && !user.isTourist;
     final isVip = user != null && user.membershipExpiryDate != null && !user.isTourist && DateTime.now().isBefore(user.membershipExpiryDate!);
 
-    return SizedBox(
-      width: double.infinity,
-      child: Container(
+    // Web 端：文字居中，按钮在最右边
+    if (kIsWeb) {
+      return Container(
+        width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
@@ -351,22 +352,58 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
         ),
         child: Row(
           children: [
-            // Container(
-            //   width: 48,
-            //   height: 48,
-            //   decoration: BoxDecoration(
-            //     color: Colors.white.withValues(alpha: 0.15),
-            //     shape: BoxShape.circle,
-            //   ),
-            //   child: const Icon(
-            //     Icons.workspace_premium,
-            //     color: Color(0xFFFFB800),
-            //     size: 28,
-            //   ),
-            // ),
-            const SizedBox(width: 56),
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      l10n.vipMember,
+                      style: const TextStyle(
+                        color: Color(0xFF3A1D00),
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isVip
+                          ? l10n.validityPeriod(_formatDate(ref.read(authProvider).user?.membershipExpiryDate))
+                          : l10n.vipSubtitle,
+                      style: const TextStyle(color: Color(0xFF3A1D00), fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (!isLoggedIn)
+              _buildLoginButton(l10n)
+            else
+              _buildActivateButton(context, l10n, isVip),
+          ],
+        ),
+      );
+    }
+
+    // 手机端：contain + 固定高度保证皇冠位置一致
+    return Container(
+      width: double.infinity,
+      height: 100,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        image: const DecorationImage(
+          image: AssetImage('assets/images/vip_bg.png'),
+          fit: BoxFit.contain,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SizedBox(width: 56),
           Expanded(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -380,7 +417,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
                 const SizedBox(height: 4),
                 Text(
                   isVip
-                      ? l10n.validityPeriod(_formatDate(user.membershipExpiryDate))
+                      ? l10n.validityPeriod(_formatDate(ref.read(authProvider).user?.membershipExpiryDate))
                       : l10n.vipSubtitle,
                   style: const TextStyle(color: Color(0xFF3A1D00), fontSize: 12),
                 ),
@@ -388,64 +425,73 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
             ),
           ),
           if (!isLoggedIn)
-            GestureDetector(
-              onTap: () {
-                final messenger = ScaffoldMessenger.of(context);
-                messenger.hideCurrentSnackBar();
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      l10n.loginSubtitle,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.black),
-                    ),
-                    backgroundColor: const Color(0xFFFFFFFF),
-                    duration: const Duration(seconds: 2),
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsetsDirectional.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(31),
-                  image: const DecorationImage(
-                    image: AssetImage('assets/images/activate_bg.png'),
-                  ),
-                ),
-                child: Text(
-                  l10n.activate,
-                  style: const TextStyle(
-                    color: Color(0xFFFFEDC6),
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            )
+            _buildLoginButton(l10n)
           else
-            GestureDetector(
-              onTap: () => openMembershipPage(context, ref),
-              child: Container(
-                padding: const EdgeInsetsDirectional.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(31),
-                  image: const DecorationImage(
-                    image: AssetImage('assets/images/activate_bg.png'),
-                  ),
-                ),
-                child: Text(
-                  isVip ? l10n.renewal : l10n.activate,
-                  style: const TextStyle(
-                    color: Color(0xFFFFEDC6),
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
+            _buildActivateButton(context, l10n, isVip),
         ],
+      ),
+    );
+  }
+
+  Widget _buildLoginButton(AppLocalizations l10n) {
+    return GestureDetector(
+      onTap: () {
+        final messenger = ScaffoldMessenger.of(context);
+        messenger.hideCurrentSnackBar();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              l10n.loginSubtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.black),
+            ),
+            backgroundColor: const Color(0xFFFFFFFF),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsetsDirectional.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(31),
+          image: const DecorationImage(
+            image: AssetImage('assets/images/activate_bg.png'),
+          ),
+        ),
+        child: Text(
+          l10n.activate,
+          style: const TextStyle(
+            color: Color(0xFFFFEDC6),
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivateButton(BuildContext context, AppLocalizations l10n, bool isVip) {
+    return GestureDetector(
+      onTap: () => openMembershipPage(context, ref),
+      child: Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsetsDirectional.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(31),
+          image: const DecorationImage(
+            image: AssetImage('assets/images/activate_bg.png'),
+          ),
+        ),
+        child: Text(
+          isVip ? l10n.renewal : l10n.activate,
+          style: const TextStyle(
+            color: Color(0xFFFFEDC6),
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );

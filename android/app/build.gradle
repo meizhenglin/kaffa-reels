@@ -85,4 +85,6 @@ flutter {
 
 dependencies {
     implementation "com.android.billingclient:billing:6.2.0"
+    // Meta Audience Network SDK
+    implementation 'com.facebook.android:audience-network-sdk:6.17.0'
 }
