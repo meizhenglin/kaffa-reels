@@ -13,6 +13,7 @@ import '../../auth/providers/auth_provider.dart'
     show AuthState, AuthStatus, authProvider;
 import '../../recommend/utils/drama_navigation.dart';
 import '../../payment/widgets/sign_and_coin_module.dart';
+import '../../payment/providers/membership_provider.dart' show isVipProvider;
 import 'chat_page.dart';
 
 class ProfileTab extends ConsumerStatefulWidget {
@@ -58,6 +59,14 @@ class _ProfileTabState extends ConsumerState<ProfileTab> with WidgetsBindingObse
         }
       },
     );
+
+    // 监听 VIP 状态变化，变化时刷新用户信息
+    ref.listenManual<bool>(isVipProvider, (previous, next) {
+      if (previous != next) {
+        debugPrint('[ProfileTab] VIP status changed: $previous -> $next, refreshing user info');
+        Future.microtask(_loadUserInfo);
+      }
+    });
   }
 
   @override

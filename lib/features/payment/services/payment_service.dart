@@ -119,6 +119,8 @@ class PaymentService {
 
     try {
       debugPrint('[PaymentService] Calling _inAppPurchase.queryProductDetails with: $sanitizedIds');
+      
+      // queryProductDetails already queries both INAPP and SUBS on Android
       final response = await _inAppPurchase.queryProductDetails(
         sanitizedIds.toSet(),
       );
@@ -250,13 +252,12 @@ class PaymentService {
 
       debugPrint('[PaymentService] Launching purchase for ${product.id}');
 
-      // 使用 buySubscription 替代 buyNonConsumable 来处理订阅商品
-      // 这在 Android 上更可靠
+      // 使用 buyNonConsumable 来处理订阅商品
       try {
         final purchaseResult = await _inAppPurchase.buyNonConsumable(
           purchaseParam: purchaseParam,
         );
-        debugPrint('[PaymentService] buyNonConsumable returned (this means Google Play opened or failed): $purchaseResult');
+        debugPrint('[PaymentService] buyNonConsumable returned: $purchaseResult');
         
         // buyNonConsumable 正常返回（不抛异常）只说明 Google Play 尝试打开了
         // 实际的购买结果需要通过 purchaseStream 返回

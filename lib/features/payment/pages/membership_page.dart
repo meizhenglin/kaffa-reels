@@ -35,7 +35,6 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   static const Color _membershipBottomColor = Color(0xFF121212);
   int _selectedIndex = 0;
   bool _isBootstrappingProducts = true;
-  bool _isCheckingPendingPayments = true;
   bool _hasActiveSubscription = false;
 
   @override
@@ -55,32 +54,37 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         AppSnackBar.show(context, message: displayMessage);
       }
     });
+
+    // 并行加载商品列表和检查待处理支付（不阻塞UI渲染）
     Future.microtask(() async {
-      // 并??
-      await ref.read(memberStateProvider.notifier).checkAndRetryPendingPayments();
+      // 立即开始加载商品列表
+      ref.read(membershipProductsProvider.notifier).loadVipProducts();
+      ref.read(membershipDramaProvider.notifier).load();
+
+      // 立即允许显示商品列表（loading状态由provider控制）
       if (mounted) {
         setState(() {
-          _isCheckingPendingPayments = false;
+          _isBootstrappingProducts = false;
         });
       }
 
-      ref.read(membershipDramaProvider.notifier).load();
-      await ref.read(membershipProductsProvider.notifier).loadVipProducts();
+      // 在后台检查待处理支付
+      await ref.read(memberStateProvider.notifier).checkAndRetryPendingPayments();
+    });
 
-      // VIP
+    // 检查VIP状态
+    Future.microtask(() async {
+      await Future.delayed(Duration(milliseconds: 100));
+      if (!mounted) return;
+
       final authState = ref.read(authProvider);
       final isVip = authState.user?.isVip ?? false;
       final vipExpireDate = authState.user?.vipExpireDate;
       final hasActive = isVip && (vipExpireDate == null || vipExpireDate.isAfter(DateTime.now()));
 
-      // ?印
-
-      if (mounted) {
-        setState(() {
-          _isBootstrappingProducts = false;
-          _hasActiveSubscription = hasActive;
-        });
-      }
+      setState(() {
+        _hasActiveSubscription = hasActive;
+      });
     });
   }
 
@@ -239,6 +243,10 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       if (!success) {
         final memberState = ref.read(memberStateProvider);
         errorMessage = memberState.errorMessage;
+      } else {
+        // Google Play 购买成功后刷新状态
+        ref.read(authProvider.notifier).refreshUserInfo();
+        ref.invalidate(isVipProvider);
       }
     } else {
       success = await handler.purchaseVip(
@@ -293,13 +301,8 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
             backgroundColor: Colors.red,
           ),
         );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.membershipPurchaseOpened),
-          ),
-        );
       }
+      // WebView 内部已有提示，关闭时不需要额外显示
     }
   }
 
@@ -323,30 +326,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       _selectedIndex = 0;
     }
 
-    // ?载 - 个?要屏 loading
-    if (_isCheckingPendingPayments) {
-      return GradientScaffold(
-        bottomBackgroundColor: _membershipBottomColor,
-        body: Container(
-          color: _membershipBottomColor,
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(color: Colors.white),
-                SizedBox(height: 16),
-                Text(
-                  l10n.checkingPaymentStatus,
-                  style: const TextStyle(color: Colors.white70),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    // ? VIP 示?
+    // VIP 已订阅用户显示
     if (isVip) {
       return _buildActiveView(
         l10n,
@@ -356,7 +336,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       );
     }
 
-    //  VIP  - ?购买
+    // 非VIP用户 - 立即显示页面内容
     return GradientScaffold(
       bottomBackgroundColor: _membershipBottomColor,
       bottomNavigationBar:
@@ -371,7 +351,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
               child: Column(
                 children: [
                   _buildTopImage(),
-                  // ??表? -  loading 
+                  // 商品列表 - 显示loading状态
                   if (isInitialProductsLoading)
                     _buildProductsLoadingState(context)
                   else

@@ -751,13 +751,17 @@ class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> 
       }
 
       final items = _parseRechargeGoods(response.data);
-      final baseProducts = SubscriptionProducts.fromRechargeGoods(items);
-      final products = await _syncStorePrices(baseProducts);
+      final products = SubscriptionProducts.fromRechargeGoods(items);
+
+      // 立即更新UI显示商品（不等待Google Play查询）
       state = state.copyWith(
         isLoading: false,
         products: products,
         clearError: true,
       );
+
+      // 在后台注册Google Play商品ID（用于购买，不影响UI）
+      _syncStorePricesInBackground(products);
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -784,11 +788,7 @@ class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> 
         .toList();
   }
 
-  Future<List<SubscriptionProduct>> _syncStorePrices(
-    List<SubscriptionProduct> baseProducts,
-  ) async {
-    if (baseProducts.isEmpty || kIsWeb) return baseProducts;
-
+  Future<void> _syncStorePricesInBackground(List<SubscriptionProduct> baseProducts) async {
     try {
       final rawIds = baseProducts
           .map((product) => product.getProductId(_paymentService.currentPlatform))
@@ -800,36 +800,28 @@ class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> 
       final storeProducts = await _paymentService.getProducts(
         productIds: sanitizedIds,
         requireSubscriptionOnAndroid: defaultTargetPlatform == TargetPlatform.android,
+      ).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => <ProductDetails>[],
       );
 
-      if (storeProducts.isEmpty) {
-        return baseProducts;
-      }
+      if (storeProducts.isEmpty) return;
 
       final storeProductMap = {
         for (final product in storeProducts) product.id: product,
       };
 
-      return baseProducts.map((product) {
+      for (final product in baseProducts) {
         final storeProduct = storeProductMap[product.getProductId(_paymentService.currentPlatform)];
-        if (storeProduct == null) {
-          return product;
-        }
-
-        // Register the mapping from subscriptionType to productId
-        if (product.id.isNotEmpty) {
+        if (storeProduct != null && product.id.isNotEmpty) {
           _paymentService.registerSubscriptionProduct(
             product.id,
             storeProduct.id,
           );
         }
-
-        // For display: keep API's price and originalPrice as-is.
-        // Store price is only used for the purchase transaction, not for UI display.
-        return product;
-      }).toList();
+      }
     } catch (e) {
-      return baseProducts;
+      debugPrint('[MembershipProductsNotifier] _syncStorePrices error: $e');
     }
   }
 }

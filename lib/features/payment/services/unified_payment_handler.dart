@@ -66,7 +66,14 @@ class UnifiedPaymentHandler {
     lastError = null;
 
     if (channel.isGooglePlay) {
-      return _purchaseVipViaGooglePlay(product: product, context: context);
+      // For Google Play, we need to pass the onPaymentComplete callback
+      // but since _purchaseVipViaGooglePlay doesn't support it directly,
+      // we handle it through the memberStateProvider in the UI layer
+      return _purchaseVipViaGooglePlay(
+        product: product,
+        context: context,
+        onPaymentComplete: onPaymentComplete,
+      );
     }
     return _purchaseVipViaHaiPay(
       product: product,
@@ -174,6 +181,7 @@ class UnifiedPaymentHandler {
   Future<bool> _purchaseVipViaGooglePlay({
     required SubscriptionProduct product,
     required BuildContext context,
+    void Function(bool success)? onPaymentComplete,
   }) async {
     try {
       final products = await _paymentService.getProducts(
@@ -189,9 +197,12 @@ class UnifiedPaymentHandler {
         product: products.first,
         applicationUserName: userId,
       );
+      // Call the callback if provided
+      onPaymentComplete?.call(success);
       return success;
     } catch (e) {
       lastError = 'Purchase failed: $e';
+      onPaymentComplete?.call(false);
       return false;
     }
   }
