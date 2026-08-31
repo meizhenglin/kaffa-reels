@@ -13,7 +13,8 @@ import '../../../core/network/api_service.dart';
 import '../../../core/widgets/app_snack_bar.dart';
 import '../providers/auth_provider.dart';
 import 'photo_setting_page.dart' show RegistrationFlowContext;
-import '../../payment/providers/membership_provider.dart' show memberStateProvider;
+import '../../payment/providers/membership_provider.dart'
+    show memberStateProvider;
 
 class RegisterPage extends ConsumerStatefulWidget {
   const RegisterPage({super.key, this.redirect});
@@ -52,27 +53,34 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
     setState(() => _isLoading = true);
 
-    final success = await ref.read(authProvider.notifier).signUpWithEmail(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-      username: _emailController.text.split('@').first,
-    );
+    final success = await ref
+        .read(authProvider.notifier)
+        .signUpWithEmail(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          username: _emailController.text.split('@').first,
+        );
 
     if (!mounted) return;
 
     setState(() => _isLoading = false);
 
     if (success) {
-      final loginSuccess = await ref.read(authProvider.notifier).signInWithEmailForRegistration(
-        _emailController.text.trim(),
-        _passwordController.text,
-      );
+      final loginSuccess = await ref
+          .read(authProvider.notifier)
+          .signInWithEmailForRegistration(
+            _emailController.text.trim(),
+            _passwordController.text,
+          );
 
       if (!mounted) return;
 
       if (!loginSuccess) {
         final errorMsg = ref.read(authProvider).errorMessage;
-        AppSnackBar.show(context, message: errorMsg ?? 'Registration succeeded, but login failed');
+        AppSnackBar.show(
+          context,
+          message: errorMsg ?? 'Registration succeeded, but login failed',
+        );
         return;
       }
 
@@ -88,7 +96,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
               'userId': currentUser!.id,
             if (userCenterData['email'] == null && currentUser?.email != null)
               'email': currentUser!.email,
-            if (userCenterData['passportType'] == null && currentUser?.passportType != null)
+            if (userCenterData['passportType'] == null &&
+                currentUser?.passportType != null)
               'passportType': currentUser!.passportType,
             'isGuest': false,
           };
@@ -104,13 +113,17 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
         email: _emailController.text.trim(),
         userId: registeredUser?.id ?? '',
       );
-      debugPrint('[RegisterPage] registration flow ready, opening photo-setting');
+      debugPrint(
+        '[RegisterPage] registration flow ready, opening photo-setting',
+      );
       ref.read(authProvider.notifier).clearGuestLoginStatus();
 
       // Refresh member status after registration/login
       ref.read(memberStateProvider.notifier).refreshStatus();
 
-      GoRouter.of(context).go('/auth/photo-setting', extra: registrationContext);
+      GoRouter.of(
+        context,
+      ).go('/auth/photo-setting', extra: registrationContext);
     } else {
       final errorMsg = ref.read(authProvider).errorMessage;
       AppSnackBar.show(context, message: errorMsg ?? 'Registration failed');
@@ -172,7 +185,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       _startCountdown();
     } else {
       setState(() => _isLoading = false);
-      AppSnackBar.show(context, message: result.message ?? 'Failed to send code');
+      AppSnackBar.show(
+        context,
+        message: result.message ?? 'Failed to send code',
+      );
     }
   }
 
@@ -200,7 +216,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       });
     } else {
       setState(() => _isLoading = false);
-      AppSnackBar.show(context, message: result.message ?? 'Verification failed');
+      AppSnackBar.show(
+        context,
+        message: result.message ?? 'Verification failed',
+      );
     }
   }
 
@@ -233,7 +252,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           ref.read(authProvider.notifier).clearError();
                           final navigator = Navigator.of(context);
                           final didPop = await navigator.maybePop();
-                          debugPrint('[RegisterPage] back pressed, didPop=$didPop currentRoute=${GoRouterState.of(context).matchedLocation}');
+                          debugPrint(
+                            '[RegisterPage] back pressed, didPop=$didPop currentRoute=${GoRouterState.of(context).matchedLocation}',
+                          );
                           if (!context.mounted) {
                             return;
                           }
@@ -242,7 +263,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                           }
                         },
                         color: Colors.white,
-                        constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                        constraints: const BoxConstraints(
+                          minWidth: 20,
+                          minHeight: 20,
+                        ),
                       ),
                       const Expanded(
                         child: Center(
@@ -261,30 +285,36 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                         child: RtlBackButton(
                           onPressed: null,
                           color: Colors.white,
-                          constraints: BoxConstraints(minWidth: 20, minHeight: 20),
+                          constraints: BoxConstraints(
+                            minWidth: 20,
+                            minHeight: 20,
+                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 67),
                   Center(
-                    child: Image.asset(
-                      'assets/images/login_logo.png',
-                      width: 92,
-                      height: 92,
-                      errorBuilder: (_, __, ___) => Container(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.asset(
+                        'assets/images/APP_LOGO_NEW_SMALL.png',
                         width: 92,
                         height: 92,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 92,
+                          height: 92,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
+                            ),
+                            borderRadius: BorderRadius.circular(18),
                           ),
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: const Icon(
-                          Icons.play_arrow_rounded,
-                          color: Colors.white,
-                          size: 36,
+                          child: const Icon(
+                            Icons.play_arrow_rounded,
+                            color: Colors.white,
+                            size: 36,
+                          ),
                         ),
                       ),
                     ),
@@ -396,7 +426,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                           width: 22,
                                           height: 22,
                                           child: Image(
-                                            image: AssetImage('assets/images/loading_icon.png'),
+                                            image: AssetImage(
+                                              'assets/images/loading_icon.png',
+                                            ),
                                           ),
                                         )
                                       : const Text(
@@ -469,7 +501,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                         width: 22,
                                         height: 22,
                                         child: Image(
-                                          image: AssetImage('assets/images/loading_icon.png'),
+                                          image: AssetImage(
+                                            'assets/images/loading_icon.png',
+                                          ),
                                         ),
                                       )
                                     : const Text(
@@ -491,8 +525,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                   _PolicyCheckbox(
                     key: _policyShakeKey,
                     value: _agreePolicy,
-                    onChanged: (v) =>
-                        setState(() => _agreePolicy = v ?? false),
+                    onChanged: (v) => setState(() => _agreePolicy = v ?? false),
                   ),
                   const Spacer(),
                   const SizedBox(height: 60),
@@ -540,17 +573,17 @@ class _EmailInput extends StatelessWidget {
             'assets/images/login_email_icon.png',
             width: 20,
             height: 20,
-            errorBuilder: (_, __, ___) => const Icon(
-              Icons.email_outlined,
-              size: 20,
-            ),
+            errorBuilder: (_, __, ___) =>
+                const Icon(Icons.email_outlined, size: 20),
           ),
         ),
         prefixIconConstraints: const BoxConstraints(minWidth: 46),
         filled: true,
         fillColor: const Color(0xFF3B3C45),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
           borderSide: BorderSide.none,
@@ -606,10 +639,7 @@ class _CodeInput extends StatelessWidget {
         ),
         prefixIcon: const Padding(
           padding: EdgeInsetsDirectional.only(start: 20, end: 12),
-          child: Icon(
-            Icons.verified_user_outlined,
-            size: 20,
-          ),
+          child: Icon(Icons.verified_user_outlined, size: 20),
         ),
         prefixIconConstraints: const BoxConstraints(minWidth: 46),
         suffixIcon: (countdown > 0 || isLoading)
@@ -630,7 +660,9 @@ class _CodeInput extends StatelessWidget {
                             width: 20,
                             height: 20,
                             child: Image(
-                              image: AssetImage('assets/images/loading_icon.png'),
+                              image: AssetImage(
+                                'assets/images/loading_icon.png',
+                              ),
                             ),
                           )
                         : Text(
@@ -648,8 +680,10 @@ class _CodeInput extends StatelessWidget {
         suffixIconConstraints: const BoxConstraints(minWidth: 80),
         filled: true,
         fillColor: const Color(0xFF3B3C45),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
           borderSide: BorderSide.none,
@@ -700,16 +734,15 @@ class _PasswordInput extends StatelessWidget {
         ),
         prefixIcon: const Padding(
           padding: EdgeInsetsDirectional.only(start: 20, end: 12),
-          child: Icon(
-            Icons.lock_outline,
-            size: 20,
-          ),
+          child: Icon(Icons.lock_outline, size: 20),
         ),
         prefixIconConstraints: const BoxConstraints(minWidth: 46),
         filled: true,
         fillColor: const Color(0xFF3B3C45),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
           borderSide: BorderSide.none,
@@ -733,11 +766,7 @@ class _PasswordInput extends StatelessWidget {
 }
 
 class _PolicyCheckbox extends StatefulWidget {
-  _PolicyCheckbox({
-    super.key,
-    required this.value,
-    required this.onChanged,
-  });
+  _PolicyCheckbox({super.key, required this.value, required this.onChanged});
 
   final bool value;
   final ValueChanged<bool?> onChanged;
@@ -775,10 +804,7 @@ class _PolicyCheckboxState extends State<_PolicyCheckbox>
       animation: _controller,
       builder: (context, child) {
         final dx = sin(_controller.value * pi * 3) * 5;
-        return Transform.translate(
-          offset: Offset(dx, 0),
-          child: child,
-        );
+        return Transform.translate(offset: Offset(dx, 0), child: child);
       },
       child: GestureDetector(
         onTap: () => widget.onChanged(!widget.value),

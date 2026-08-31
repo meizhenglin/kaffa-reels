@@ -10,9 +10,9 @@ class ShareService {
     try {
       final register = ShareSDKRegister();
       register.setupFacebook(
-        '1869879543763549',
-        '0140b1faea8a36984552693d00b5592a',
-        'https://qahwatv.com',
+        '1153560107115108',
+        'df2865bc78128762e7ed0e65ab08d179',
+        'Kaffa Reels',
       );
       register.setupTwitter(
         'ZUV2bEZaNWtVYmFPUTljeDZhUzc6MTpjaQ',
@@ -54,8 +54,15 @@ class ShareService {
         SSDKContentTypes.auto,
       );
 
-      SharesdkPlugin.share(platform, params, (state, userData, contentEntity, error) {
-        print('[ShareService] share $platformName state=$state err=${error.code}');
+      SharesdkPlugin.share(platform, params, (
+        state,
+        userData,
+        contentEntity,
+        error,
+      ) {
+        print(
+          '[ShareService] share $platformName state=$state err=${error.code}',
+        );
       });
     } catch (e) {
       print('[ShareService] share failed: $e');

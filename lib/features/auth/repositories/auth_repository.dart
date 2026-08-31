@@ -6,12 +6,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:logger/logger.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-
 import 'google_sign_in_client_stub.dart'
     if (dart.library.io) 'google_sign_in_client_mobile.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/firebase/firebase_service.dart';
+import '../../../core/model/api_endpoints.dart' show PassportType;
 import '../../../core/network/api_service.dart';
 import '../../../core/storage/storage_service.dart';
 import '../models/user_model.dart';
@@ -55,9 +55,7 @@ class AuthRepository {
     final json = _storage.getString(AppConstants.userCacheKey);
     if (json == null) return null;
     try {
-      return UserModel.fromJson(
-        jsonDecode(json) as Map<String, dynamic>,
-      );
+      return UserModel.fromJson(jsonDecode(json) as Map<String, dynamic>);
     } catch (e) {
       _logger.w('Failed to parse cached user: $e');
       return null;
@@ -95,7 +93,10 @@ class AuthRepository {
     return _userModelFromFirebaseUser(user, refreshFirebaseIdToken: false);
   }
 
-  Future<UserModel> _userModelFromFirebaseUser(User user, {bool refreshFirebaseIdToken = true}) async {
+  Future<UserModel> _userModelFromFirebaseUser(
+    User user, {
+    bool refreshFirebaseIdToken = true,
+  }) async {
     if (refreshFirebaseIdToken) {
       await refreshIdToken();
     }
@@ -123,20 +124,30 @@ class AuthRepository {
         final isVip = userCenterData['isVip'] as int? ?? 0;
         final vipEndTime = userCenterData['vipEndTime'] as String?;
         return model.copyWith(
-          membershipType: isVip == 1 ? MembershipType.premium : MembershipType.regular,
-          membershipExpiryDate: vipEndTime != null ? DateTime.tryParse(vipEndTime) : null,
+          membershipType: isVip == 1
+              ? MembershipType.premium
+              : MembershipType.regular,
+          membershipExpiryDate: vipEndTime != null
+              ? DateTime.tryParse(vipEndTime)
+              : null,
         );
       }
     } catch (e, stackTrace) {
       debugPrint('[AuthRepo] Failed to refresh VIP status from backend: $e');
-      _logger.e('[AuthRepo] Failed to refresh VIP status from backend', error: e, stackTrace: stackTrace);
+      _logger.e(
+        '[AuthRepo] Failed to refresh VIP status from backend',
+        error: e,
+        stackTrace: stackTrace,
+      );
     }
     return model;
   }
 
   Future<void> warmUpGoogleSignIn() async {
     if (!isGoogleSignInSupported) {
-      _logger.i('[AuthRepo] Google sign-in warm-up skipped: unsupported on current platform/config');
+      _logger.i(
+        '[AuthRepo] Google sign-in warm-up skipped: unsupported on current platform/config',
+      );
       return;
     }
 
@@ -145,7 +156,9 @@ class AuthRepository {
     debugPrint(
       '[GoogleLoginFlow] googleSignIn config scopes=$_googleScopes serverClientId=$_googleServerClientId',
     );
-    _logger.i('[AuthRepo] Google sign-in warm-up skipped on Android to avoid chooser startup delay');
+    _logger.i(
+      '[AuthRepo] Google sign-in warm-up skipped on Android to avoid chooser startup delay',
+    );
   }
 
   /// 调用后端登录接口，同步 Firebase Token 到后端
@@ -169,7 +182,9 @@ class AuthRepository {
 
   Future<void> _ensureFirebaseAuthReady() async {
     if (!FirebaseService.isInitialized) {
-      throw StateError('Firebase Auth is unavailable because Firebase is not initialized.');
+      throw StateError(
+        'Firebase Auth is unavailable because Firebase is not initialized.',
+      );
     }
   }
 
@@ -220,20 +235,28 @@ class AuthRepository {
 
     if (error is PlatformException) {
       final code = error.code.toLowerCase();
-      final message = (error.message ?? error.details?.toString() ?? error.toString()).toLowerCase();
+      final message =
+          (error.message ?? error.details?.toString() ?? error.toString())
+              .toLowerCase();
 
-      if (code.contains('sign_in_canceled') || code.contains('canceled') || code.contains('cancelled')) {
+      if (code.contains('sign_in_canceled') ||
+          code.contains('canceled') ||
+          code.contains('cancelled')) {
         return AuthCancelledException();
       }
 
-      if (code.contains('network_error') || message.contains('apiexception: 7') || message.contains('network error')) {
+      if (code.contains('network_error') ||
+          message.contains('apiexception: 7') ||
+          message.contains('network error')) {
         return GoogleSignInException(
           'google-network-error',
           'Google services network request failed.',
         );
       }
 
-      if (code.contains('sign_in_failed') || message.contains('12500') || message.contains('10:')) {
+      if (code.contains('sign_in_failed') ||
+          message.contains('12500') ||
+          message.contains('10:')) {
         return GoogleSignInException(
           'google-sign-in-config-error',
           'Google Sign-In configuration is invalid on this device/build.',
@@ -244,7 +267,8 @@ class AuthRepository {
         return AuthCancelledException();
       }
 
-      if (message.contains('play services') || message.contains('developer_error')) {
+      if (message.contains('play services') ||
+          message.contains('developer_error')) {
         return GoogleSignInException(
           'google-play-services-unavailable',
           'Google Play services is unavailable or outdated.',
@@ -256,10 +280,12 @@ class AuthRepository {
       if (error.code == 'network-request-failed') {
         return GoogleSignInException(
           'google-network-error',
-          error.message ?? 'Firebase network request failed during Google sign-in.',
+          error.message ??
+              'Firebase network request failed during Google sign-in.',
         );
       }
-      if (error.code == 'invalid-credential' || error.code == 'invalid-verification-code') {
+      if (error.code == 'invalid-credential' ||
+          error.code == 'invalid-verification-code') {
         return GoogleSignInException(
           'google-sign-in-config-error',
           error.message ?? 'Google credential verification failed.',
@@ -268,7 +294,8 @@ class AuthRepository {
     }
 
     final errorString = error.toString().toLowerCase();
-    if (errorString.contains('apiexception: 7') || errorString.contains('network_error')) {
+    if (errorString.contains('apiexception: 7') ||
+        errorString.contains('network_error')) {
       return GoogleSignInException(
         'google-network-error',
         'Google services network request failed.',
@@ -298,7 +325,8 @@ class AuthRepository {
     }
     await _storage.saveToken(token);
 
-    final userId = data?['userId']?.toString() ?? data?['id']?.toString() ?? email;
+    final userId =
+        data?['userId']?.toString() ?? data?['id']?.toString() ?? email;
     return UserModel.fromJson({
       ...?data,
       'userId': userId,
@@ -329,10 +357,13 @@ class AuthRepository {
     if (token != null && token.isNotEmpty) {
       await _storage.saveToken(token);
     } else {
-      _logger.d('[AuthRepo] registration succeeded without token, will sign in next');
+      _logger.d(
+        '[AuthRepo] registration succeeded without token, will sign in next',
+      );
     }
 
-    final userId = data?['userId']?.toString() ?? data?['id']?.toString() ?? email;
+    final userId =
+        data?['userId']?.toString() ?? data?['id']?.toString() ?? email;
     return UserModel.fromJson({
       ...?data,
       'userId': userId,
@@ -356,8 +387,12 @@ class AuthRepository {
     final stopwatch = Stopwatch()..start();
     debugPrint('[GoogleLoginFlow] start');
     _logger.i('[AuthRepo] Google sign-in started');
-    debugPrint('[GoogleLoginFlow] launching account chooser (force sign-out first to show picker)');
-    _logger.i('[AuthRepo] Force sign-out then launching Google account chooser');
+    debugPrint(
+      '[GoogleLoginFlow] launching account chooser (force sign-out first to show picker)',
+    );
+    _logger.i(
+      '[AuthRepo] Force sign-out then launching Google account chooser',
+    );
 
     GoogleSignInAccountClient? googleUser;
     final chooserStopwatch = Stopwatch()..start();
@@ -387,8 +422,12 @@ class AuthRepository {
       debugPrint('[GoogleLoginFlow] chooser returned null user');
       throw AuthCancelledException();
     }
-    debugPrint('[GoogleLoginFlow] selected email=${googleUser.email} displayName=${googleUser.displayName}');
-    _logger.i('[AuthRepo] Google user selected email=${googleUser.email} displayName=${googleUser.displayName}');
+    debugPrint(
+      '[GoogleLoginFlow] selected email=${googleUser.email} displayName=${googleUser.displayName}',
+    );
+    _logger.i(
+      '[AuthRepo] Google user selected email=${googleUser.email} displayName=${googleUser.displayName}',
+    );
 
     final authStopwatch = Stopwatch()..start();
     debugPrint('[GoogleLoginFlow] fetching google tokens');
@@ -397,7 +436,9 @@ class AuthRepository {
       googleAuth = await googleUser.authentication.timeout(
         const Duration(seconds: 30),
         onTimeout: () {
-          throw TimeoutException('Fetching Google authentication tokens timed out after 30 seconds.');
+          throw TimeoutException(
+            'Fetching Google authentication tokens timed out after 30 seconds.',
+          );
         },
       );
     } catch (e, stackTrace) {
@@ -436,12 +477,16 @@ class AuthRepository {
     debugPrint('[GoogleLoginFlow] signing into firebase');
     UserCredential userCredential;
     try {
-      userCredential = await _auth.signInWithCredential(credential).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          throw TimeoutException('Firebase credential sign-in timed out after 30 seconds.');
-        },
-      );
+      userCredential = await _auth
+          .signInWithCredential(credential)
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              throw TimeoutException(
+                'Firebase credential sign-in timed out after 30 seconds.',
+              );
+            },
+          );
     } catch (e, stackTrace) {
       debugPrint(
         '[GoogleLoginFlow] firebase sign-in failed after ${firebaseStopwatch.elapsedMilliseconds}ms error=$e',
@@ -453,8 +498,12 @@ class AuthRepository {
       );
       throw _normalizeGoogleSignInError(e);
     }
-    debugPrint('[GoogleLoginFlow] firebase sign-in completed in ${firebaseStopwatch.elapsedMilliseconds}ms');
-    _logger.i('[AuthRepo] Firebase credential sign-in completed in ${firebaseStopwatch.elapsedMilliseconds}ms');
+    debugPrint(
+      '[GoogleLoginFlow] firebase sign-in completed in ${firebaseStopwatch.elapsedMilliseconds}ms',
+    );
+    _logger.i(
+      '[AuthRepo] Firebase credential sign-in completed in ${firebaseStopwatch.elapsedMilliseconds}ms',
+    );
     final user = userCredential.user;
     if (user == null) {
       debugPrint('[GoogleLoginFlow] firebase returned null user');
@@ -467,35 +516,142 @@ class AuthRepository {
       'code': 0,
       'message': 'Sign in successful',
     });
-    debugPrint('[GoogleLoginFlow] syncing backend token passportName=idTokenCodeMessageWrapped');
-    final backendSynced = await _syncBackendToken(() => apiServiceProvider.googleLogin(
-      passportName: googlePassportPayload,
-      idToken: googleAuth.idToken!,
-      accessToken: googleAuth.accessToken,
-      email: googleUser!.email,
-      displayName: googleUser.displayName ?? user.displayName,
-      avatar: googleUser.photoUrl ?? user.photoURL,
-    ));
+    debugPrint(
+      '[GoogleLoginFlow] syncing backend token passportName=idTokenCodeMessageWrapped',
+    );
+    final backendSynced = await _syncBackendToken(
+      () => apiServiceProvider.googleLogin(
+        passportName: googlePassportPayload,
+        idToken: googleAuth.idToken!,
+        accessToken: googleAuth.accessToken,
+        email: googleUser!.email,
+        displayName: googleUser.displayName ?? user.displayName,
+        avatar: googleUser.photoUrl ?? user.photoURL,
+      ),
+    );
     debugPrint(
       '[GoogleLoginFlow] backend sync completed in ${backendStopwatch.elapsedMilliseconds}ms success=$backendSynced',
     );
-    _logger.i('[AuthRepo] Backend Google token sync completed in ${backendStopwatch.elapsedMilliseconds}ms success=$backendSynced passportName=idTokenCodeMessageWrapped');
+    _logger.i(
+      '[AuthRepo] Backend Google token sync completed in ${backendStopwatch.elapsedMilliseconds}ms success=$backendSynced passportName=idTokenCodeMessageWrapped',
+    );
     if (!backendSynced) {
-      throw StateError('Google sign-in succeeded, but backend token sync failed.');
+      throw StateError(
+        'Google sign-in succeeded, but backend token sync failed.',
+      );
     }
 
     final refreshStopwatch = Stopwatch()..start();
     debugPrint('[GoogleLoginFlow] refreshing firebase id token');
     await refreshIdToken();
-    debugPrint('[GoogleLoginFlow] refresh id token completed in ${refreshStopwatch.elapsedMilliseconds}ms');
-    _logger.i('[AuthRepo] Firebase ID token refresh completed in ${refreshStopwatch.elapsedMilliseconds}ms');
+    debugPrint(
+      '[GoogleLoginFlow] refresh id token completed in ${refreshStopwatch.elapsedMilliseconds}ms',
+    );
+    _logger.i(
+      '[AuthRepo] Firebase ID token refresh completed in ${refreshStopwatch.elapsedMilliseconds}ms',
+    );
 
-    final model = await _userModelFromFirebaseUser(user, refreshFirebaseIdToken: false);
+    final model = await _userModelFromFirebaseUser(
+      user,
+      refreshFirebaseIdToken: false,
+    );
     final updatedModel = await _refreshVipStatusFromBackend(model);
     await cacheUser(updatedModel);
-    debugPrint('[GoogleLoginFlow] finished total=${stopwatch.elapsedMilliseconds}ms');
-    _logger.i('[AuthRepo] Google sign-in finished in ${stopwatch.elapsedMilliseconds}ms');
+    debugPrint(
+      '[GoogleLoginFlow] finished total=${stopwatch.elapsedMilliseconds}ms',
+    );
+    _logger.i(
+      '[AuthRepo] Google sign-in finished in ${stopwatch.elapsedMilliseconds}ms',
+    );
     return updatedModel;
+  }
+
+  Future<UserModel> signInWithFacebook() async {
+    if (kIsWeb) {
+      throw StateError(
+        'Facebook sign-in is only available on mobile platforms.',
+      );
+    }
+
+    try {
+      final result = await const MethodChannel(
+        'com.video.storydrama/facebook_login',
+      ).invokeMethod<Map<dynamic, dynamic>>('login');
+      if (result == null) {
+        throw AuthCancelledException();
+      }
+
+      final userData = Map<String, dynamic>.from(result);
+      final accessToken = _firstString(userData, const [
+        'access_token',
+        'accessToken',
+        'token',
+      ]);
+      final facebookId = _firstString(userData, const [
+        'id',
+        'userID',
+        'userId',
+      ]);
+      if (accessToken == null ||
+          accessToken.isEmpty ||
+          facebookId == null ||
+          facebookId.isEmpty) {
+        throw StateError(
+          'Facebook sign-in did not return a user ID and access token.',
+        );
+      }
+
+      final email = _firstString(userData, const ['email']);
+      final displayName = _firstString(userData, const ['name', 'nickname']);
+      final avatar = _firstString(userData, const [
+        'icon',
+        'picture',
+        'avatar',
+      ]);
+      final backendSynced = await _syncBackendToken(
+        () => apiServiceProvider.facebookLogin(
+          passportName: accessToken,
+          accessToken: accessToken,
+          email: email,
+          displayName: displayName,
+          avatar: avatar,
+        ),
+      );
+      if (!backendSynced) {
+        throw StateError(
+          'Facebook sign-in succeeded, but backend token sync failed.',
+        );
+      }
+
+      final model = UserModel.fromJson({
+        ...userData,
+        'userId': facebookId,
+        if (email != null) 'email': email,
+        if (displayName != null) 'nickName': displayName,
+        if (avatar != null) 'userAvatar': avatar,
+        'passportType': PassportType.facebook,
+        'isGuest': false,
+      });
+      final updatedModel = await _refreshVipStatusFromBackend(model);
+      await cacheUser(updatedModel);
+      return updatedModel;
+    } on PlatformException catch (e) {
+      if (e.code == 'CANCELLED') {
+        throw AuthCancelledException();
+      }
+      throw StateError('Facebook sign-in failed: ${e.message ?? e.code}');
+    } catch (e) {
+      if (e is AuthCancelledException || e is StateError) rethrow;
+      throw StateError('Facebook sign-in failed: $e');
+    }
+  }
+
+  static String? _firstString(Map<String, dynamic> data, List<String> keys) {
+    for (final key in keys) {
+      final value = data[key]?.toString();
+      if (value != null && value.isNotEmpty && value != 'null') return value;
+    }
+    return null;
   }
 
   Future<UserModel> signInWithApple() async {
@@ -527,28 +683,34 @@ class AuthRepository {
     }
 
     // 同步 Apple Token 到后端
-    final backendSynced = await _syncBackendToken(() => apiServiceProvider.appleLogin(
-      identityToken: appleCredential.identityToken ?? '',
-      authorizationCode: appleCredential.authorizationCode,
-      fullName: [
-        appleCredential.givenName,
-        if (appleCredential.familyName != null) appleCredential.familyName,
-      ].join(' ').trim().isEmpty ? null : [
-        appleCredential.givenName,
-        if (appleCredential.familyName != null) appleCredential.familyName,
-      ].join(' '),
-    ));
+    final backendSynced = await _syncBackendToken(
+      () => apiServiceProvider.appleLogin(
+        identityToken: appleCredential.identityToken ?? '',
+        authorizationCode: appleCredential.authorizationCode,
+        fullName:
+            [
+              appleCredential.givenName,
+              if (appleCredential.familyName != null)
+                appleCredential.familyName,
+            ].join(' ').trim().isEmpty
+            ? null
+            : [
+                appleCredential.givenName,
+                if (appleCredential.familyName != null)
+                  appleCredential.familyName,
+              ].join(' '),
+      ),
+    );
     if (!backendSynced) {
-      throw StateError('Apple sign-in succeeded, but backend token sync failed.');
+      throw StateError(
+        'Apple sign-in succeeded, but backend token sync failed.',
+      );
     }
 
     final givenName = appleCredential.givenName;
     final familyName = appleCredential.familyName;
     if (givenName != null && user.displayName == null) {
-      final fullName = [
-        givenName,
-        familyName,
-      ].whereType<String>().join(' ');
+      final fullName = [givenName, familyName].whereType<String>().join(' ');
       await user.updateDisplayName(fullName);
       user = await _reloadUser(user);
     }
@@ -639,10 +801,7 @@ class AuthRepository {
 
   Future<void> saveUserData(Map<String, dynamic> userData) async {
     await _storage.saveUserData(userData);
-    await _storage.setString(
-      AppConstants.userCacheKey,
-      jsonEncode(userData),
-    );
+    await _storage.setString(AppConstants.userCacheKey, jsonEncode(userData));
   }
 
   Future<void> clearAutoLoginCredentials() async {
@@ -654,12 +813,18 @@ class AuthRepository {
     final enabled = await _storage.getAutoLogin();
     final email = await _storage.getAutoLoginEmail();
     final password = await _storage.getAutoLoginPassword();
-    if (!enabled || email == null || email.isEmpty || password == null || password.isEmpty) {
+    if (!enabled ||
+        email == null ||
+        email.isEmpty ||
+        password == null ||
+        password.isEmpty) {
       return false;
     }
     // 检查30天有效期，过期则清除并返回 false
     if (!_storage.isAutoLoginValid()) {
-      debugPrint('[AuthRepository] auto-login expired (30 days), clearing credentials');
+      debugPrint(
+        '[AuthRepository] auto-login expired (30 days), clearing credentials',
+      );
       await clearAutoLoginCredentials();
       return false;
     }

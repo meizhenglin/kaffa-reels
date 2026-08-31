@@ -1,5 +1,5 @@
 name: qahwa_tv
-description: "QahwaTV App - A short drama streaming application for Arabic region."
+description: "Kaffa Reels App - A short drama streaming application for Arabic region."
 publish_to: 'none'
 
 version: 1.0.6+15
@@ -92,9 +92,9 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/app_logo.png"
+  image_path: "assets/images/APP_LOGO_NEW.png"
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/app_logo.png"
+  adaptive_icon_foreground: "assets/images/APP_LOGO_NEW.png"
 
 flutter:
   uses-material-design: true

@@ -538,6 +538,17 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       return;
     }
 
+    // Direct episode purchases use the cash price from the API and must not
+    // be compared with the user's K-Coin balance.
+    if (product.type == UnlockProductType.episode ||
+        product.type == UnlockProductType.season) {
+      await _confirmAndUnlockByPurchase(
+        product,
+        showBalanceDialog: false,
+      );
+      return;
+    }
+
     if (balance >= product.price) {
       await _confirmAndUnlockByBalance(product);
     } else {
@@ -602,7 +613,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       if (channel.isGooglePlay) {
         final rechargeHandler = ref.read(rechargePurchaseHandlerProvider);
         final success = await rechargeHandler.purchase(rechargeProduct);
-        if (!success && mounted) {
+        if (success) {
+          await _unlockCurrentEpisodeAfterRecharge(product.goodsId);
+        } else if (mounted) {
           AppSnackBar.show(
             context,
             message: rechargeHandler.lastError ?? l10n.purchaseFailed,
@@ -616,7 +629,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           channel: channel,
           onPaymentComplete: (paid) {
             if (paid) {
-              ref.read(coinBalanceInfoProvider.notifier).load();
+              _unlockCurrentEpisodeAfterRecharge(product.goodsId);
             }
           },
         );
@@ -625,6 +638,54 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       if (mounted) {
         _setProcessing(product.goodsId, false);
       }
+    }
+  }
+
+  /// After a recharge, immediately spend the new balance on the episode that
+  /// opened this sheet.
+  Future<void> _unlockCurrentEpisodeAfterRecharge(int rechargeGoodsId) async {
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context);
+    final balanceNotifier = ref.read(coinBalanceInfoProvider.notifier);
+    final episodePrice = widget.config.episodeUnlockPrice;
+    var balance = 0;
+    for (var attempt = 0; attempt < 5; attempt++) {
+      await balanceNotifier.load();
+      if (!mounted) return;
+      balance = ref.read(coinBalanceInfoProvider).balance;
+      if (balance >= episodePrice || attempt == 4) break;
+      await Future<void>.delayed(const Duration(seconds: 2));
+    }
+
+    if (!mounted) return;
+    if (balance < episodePrice) {
+      _setProcessing(rechargeGoodsId, false);
+      AppSnackBar.show(context, message: l10n.insufficientBalance);
+      return;
+    }
+
+    final apiService = ApiService(
+      dioClient: ref.read(dioClientProvider),
+      storage: ref.read(storageServiceProvider),
+    );
+    final response = await apiService.getUserPayEpisodes(
+      videoId: widget.videoId,
+      episodesId: widget.episodeId,
+      episodesNum: widget.episodesNum,
+    );
+    if (!mounted) return;
+
+    _setProcessing(rechargeGoodsId, false);
+    if (response.isSuccess) {
+      await balanceNotifier.load();
+      if (!mounted) return;
+      widget.onUnlockSuccess.call(widget.episodeIndex);
+      AppSnackBar.show(context, message: l10n.unlockSuccess);
+      Navigator.of(
+        context,
+      ).pop(UnlockResult.success(episodeIndex: widget.episodeIndex));
+    } else {
+      AppSnackBar.show(context, message: response.error ?? l10n.unlockFailed);
     }
   }
 
@@ -659,31 +720,36 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     await _performUnlockByBalance(product);
   }
 
-  /// 余额不足，弹出渠道选择（Google Play 或 HaiPay）
-  Future<void> _confirmAndUnlockByPurchase(UnlockProduct product) async {
+  /// 余额不足时可先提示，再弹出支付渠道。
+  Future<void> _confirmAndUnlockByPurchase(
+    UnlockProduct product, {
+    bool showBalanceDialog = true,
+  }) async {
     final l10n = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.insufficientBalance),
-        content: Text(l10n.insufficientBalanceMessage(product.goodsName)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(l10n.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              l10n.buy,
-              style: const TextStyle(color: Color(0xFF5D4391)),
+    if (showBalanceDialog) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(l10n.insufficientBalance),
+          content: Text(l10n.insufficientBalanceMessage(product.goodsName)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(l10n.cancel),
             ),
-          ),
-        ],
-      ),
-    );
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(
+                l10n.buy,
+                style: const TextStyle(color: Color(0xFF5D4391)),
+              ),
+            ),
+          ],
+        ),
+      );
 
-    if (confirmed != true) return;
+      if (confirmed != true) return;
+    }
 
     // Google flavor: skip HaiPay entirely — there is only one channel
     // and we go straight to the Google Play billing flow.
@@ -845,7 +911,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
     try {
       final handler = ref.read(unifiedPaymentHandlerProvider);
-      // opened=true means "payment page was launched" — do NOT pop sheet.
+      var paymentCompleted = false;
       final opened = await handler.unlockEpisode(
         product: product,
         price: product.price.toStringAsFixed(2),
@@ -856,7 +922,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         channel: channel,
         onPaymentComplete: (paid) {
           if (paid) {
-            // Refresh episode unlock status via the existing callback
+            paymentCompleted = true;
             widget.onUnlockSuccess.call(widget.episodeIndex);
             AppSnackBar.show(context, message: l10n.purchaseSuccessful);
           }
@@ -866,13 +932,15 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       if (!mounted) return;
       _setProcessing(product.goodsId, false);
 
-      if (opened) {
-        // WebView pushed. Do nothing — wait for WebView to pop itself.
-      } else {
+      if (!opened) {
         AppSnackBar.show(
           context,
           message: handler.lastError ?? l10n.purchaseFailed,
         );
+      } else if (paymentCompleted && mounted) {
+        Navigator.of(
+          context,
+        ).pop(UnlockResult.success(episodeIndex: widget.episodeIndex));
       }
     } catch (e) {
       if (mounted) {

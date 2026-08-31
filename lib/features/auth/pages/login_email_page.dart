@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/providers/app_providers.dart';
+import '../../../core/config/build_flavor.dart';
 import '../../../core/providers/auth_provider.dart' show apiServiceProviderRef;
 import '../../../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
@@ -13,7 +14,11 @@ import '../providers/auth_provider.dart' show AuthState;
 import '../../../components/rtl_back_button.dart';
 
 class LoginEmailPage extends ConsumerStatefulWidget {
-  const LoginEmailPage({super.key, this.redirect, this.backTarget = '/auth/login'});
+  const LoginEmailPage({
+    super.key,
+    this.redirect,
+    this.backTarget = '/auth/login',
+  });
 
   final String? redirect;
   final String backTarget;
@@ -100,7 +105,9 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
     ref.read(authProvider.notifier).clearError();
 
     await Future<void>.delayed(Duration.zero);
-    final success = await ref.read(authProvider.notifier).signInWithEmail(
+    final success = await ref
+        .read(authProvider.notifier)
+        .signInWithEmail(
           _emailController.text.trim(),
           _passwordController.text,
         );
@@ -156,19 +163,12 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                   color: Color(0xFF4CAF50),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.check,
-                  color: Colors.white,
-                  size: 20,
-                ),
+                child: const Icon(Icons.check, color: Colors.white, size: 20),
               ),
               const SizedBox(height: 10),
               const Text(
                 'Login Successful!',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -176,20 +176,27 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
       );
       // Auto close and navigate after 1 second
       Future.delayed(const Duration(seconds: 1), () {
-        debugPrint('[LoginEmailPage] success handler: redirect=${widget.redirect}, mounted=$mounted');
+        debugPrint(
+          '[LoginEmailPage] success handler: redirect=${widget.redirect}, mounted=$mounted',
+        );
         if (!mounted) return;
 
         // 关闭成功弹窗
         Navigator.of(context).pop();
 
         // 触发 loginReturnProvider，ShortVideoPage 会处理滚动到正确的集
-        debugPrint('[LoginEmailPage] checking redirect condition: redirect=${widget.redirect}');
-        if (widget.redirect != null && widget.redirect!.contains('/short-video')) {
+        debugPrint(
+          '[LoginEmailPage] checking redirect condition: redirect=${widget.redirect}',
+        );
+        if (widget.redirect != null &&
+            widget.redirect!.contains('/short-video')) {
           debugPrint('[LoginEmailPage] will trigger loginReturnProvider');
           ref.read(loginReturnProvider.notifier).state++;
           debugPrint('[LoginEmailPage] triggered loginReturnProvider');
         } else {
-          debugPrint('[LoginEmailPage] redirect condition not met, skip loginReturnProvider');
+          debugPrint(
+            '[LoginEmailPage] redirect condition not met, skip loginReturnProvider',
+          );
         }
 
         // 获取 root navigator 并连续 pop 两个页面回到 ShortVideoPage
@@ -211,14 +218,14 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
     }
 
     // Show error dialog - auto close after 2 seconds
-    final errorMsg = ref.read(authProvider).errorMessage ?? 'Login failed. Please try again.';
+    final errorMsg =
+        ref.read(authProvider).errorMessage ??
+        'Login failed. Please try again.';
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -229,11 +236,7 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                 color: Color(0xFFE53935),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.close,
-                color: Colors.white,
-                size: 20,
-              ),
+              child: const Icon(Icons.close, color: Colors.white, size: 20),
             ),
             const SizedBox(height: 10),
             Text(
@@ -290,12 +293,15 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                           }
                         },
                         color: Colors.white,
-                        constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                        constraints: const BoxConstraints(
+                          minWidth: 20,
+                          minHeight: 20,
+                        ),
                       ),
                       const Expanded(
                         child: Center(
                           child: Text(
-                            'Log in to Qahwa Tv',
+                            '${BuildFlavor.isPlatform ? 'Log in to Kaffa Reels' : 'Log in to Qahwa Tv'}',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 18,
@@ -304,35 +310,41 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                           ),
                         ),
                       ),
-                  const Opacity(
-                    opacity: 0,
-                    child: RtlBackButton(
-                      onPressed: null,
-                      color: Colors.white,
-                      constraints: BoxConstraints(minWidth: 20, minHeight: 20),
-                    ),
-                  ),
+                      const Opacity(
+                        opacity: 0,
+                        child: RtlBackButton(
+                          onPressed: null,
+                          color: Colors.white,
+                          constraints: BoxConstraints(
+                            minWidth: 20,
+                            minHeight: 20,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 67),
                   Center(
-                    child: Image.asset(
-                      'assets/images/login_logo.png',
-                      width: 92,
-                      height: 92,
-                      errorBuilder: (_, __, ___) => Container(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.asset(
+                        'assets/images/APP_LOGO_NEW_SMALL.png',
                         width: 92,
                         height: 92,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 92,
+                          height: 92,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
+                            ),
+                            borderRadius: BorderRadius.circular(18),
                           ),
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        child: const Icon(
-                          Icons.play_arrow_rounded,
-                          color: Colors.white,
-                          size: 36,
+                          child: const Icon(
+                            Icons.play_arrow_rounded,
+                            color: Colors.white,
+                            size: 36,
+                          ),
                         ),
                       ),
                     ),
@@ -358,8 +370,9 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                         _PasswordInput(
                           controller: _passwordController,
                           obscureText: _obscurePassword,
-                          onToggle: () =>
-                              setState(() => _obscurePassword = !_obscurePassword),
+                          onToggle: () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
                           validator: (v) {
                             if (v == null || v.isEmpty) {
                               return l10n.requiredField;
@@ -390,10 +403,7 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                             height: 50,
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF8F4EFF),
-                                  Color(0xFFA237FF),
-                                ],
+                                colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
                               ),
                               borderRadius: BorderRadius.circular(30),
                             ),
@@ -420,8 +430,7 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                         ),
                         const SizedBox(height: 30),
                         GestureDetector(
-                          onTap: () =>
-                              setState(() => _autoLogin = !_autoLogin),
+                          onTap: () => setState(() => _autoLogin = !_autoLogin),
                           child: Row(
                             textDirection: Directionality.of(context),
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -458,11 +467,15 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                   ),
                   const Spacer(),
                   GestureDetector(
-                        onTap: () {
-                          ref.read(authProvider.notifier).clearError();
-                          final registerBackTarget = Uri.encodeComponent('/auth/login/email?back=${Uri.encodeComponent(widget.backTarget)}');
-                          context.push('/auth/register/email?back=$registerBackTarget');
-                        },
+                    onTap: () {
+                      ref.read(authProvider.notifier).clearError();
+                      final registerBackTarget = Uri.encodeComponent(
+                        '/auth/login/email?back=${Uri.encodeComponent(widget.backTarget)}',
+                      );
+                      context.push(
+                        '/auth/register/email?back=$registerBackTarget',
+                      );
+                    },
                     child: RichText(
                       text: const TextSpan(
                         text: 'Do not have StoryDrama account? ',
@@ -496,10 +509,7 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
 }
 
 class _EmailInput extends StatelessWidget {
-  const _EmailInput({
-    required this.controller,
-    required this.validator,
-  });
+  const _EmailInput({required this.controller, required this.validator});
 
   final TextEditingController controller;
   final FormFieldValidator<String> validator;
@@ -526,17 +536,17 @@ class _EmailInput extends StatelessWidget {
             'assets/images/login_email_icon.png',
             width: 20,
             height: 20,
-            errorBuilder: (_, __, ___) => const Icon(
-              Icons.email_outlined,
-              size: 20,
-            ),
+            errorBuilder: (_, __, ___) =>
+                const Icon(Icons.email_outlined, size: 20),
           ),
         ),
         prefixIconConstraints: const BoxConstraints(minWidth: 46),
         filled: true,
         fillColor: const Color(0xFF3B3C45),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
           borderSide: BorderSide.none,
@@ -590,10 +600,7 @@ class _PasswordInput extends StatelessWidget {
         ),
         prefixIcon: const Padding(
           padding: EdgeInsets.only(left: 20, right: 12),
-          child: Icon(
-            Icons.lock_outline,
-            size: 20,
-          ),
+          child: Icon(Icons.lock_outline, size: 20),
         ),
         prefixIconConstraints: const BoxConstraints(minWidth: 46),
         suffixIcon: GestureDetector(
@@ -612,8 +619,10 @@ class _PasswordInput extends StatelessWidget {
         suffixIconConstraints: const BoxConstraints(minWidth: 40),
         filled: true,
         fillColor: const Color(0xFF3B3C45),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(30),
           borderSide: BorderSide.none,

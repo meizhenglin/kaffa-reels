@@ -60,7 +60,7 @@ android {
             dimension "distribution"
             applicationIdSuffix ""
             versionNameSuffix "-p"
-            resValue "string", "app_name", "Qahwa TV"
+            resValue "string", "app_name", "Kaffa Reels"
         }
     }
 
@@ -85,6 +85,7 @@ flutter {
 
 dependencies {
     implementation "com.android.billingclient:billing:6.2.0"
-    // Meta Audience Network SDK
+    // Meta Facebook Login SDK
+    implementation 'com.facebook.android:facebook-login:17.0.2'
     implementation 'com.facebook.android:audience-network-sdk:6.17.0'
 }

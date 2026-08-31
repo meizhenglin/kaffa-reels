@@ -47,9 +47,12 @@ class HaiPayWebViewPage extends StatefulWidget {
     void Function(bool success)? onPaymentComplete,
   }) {
     debugPrint(
-        '[HaiPayWebView] show paymentUrl=$paymentUrl orderNo=$orderNo productType=$productType methodName=$methodName');
+      '[HaiPayWebView] show paymentUrl=$paymentUrl orderNo=$orderNo productType=$productType methodName=$methodName',
+    );
     // ignore: avoid_print
-    print('[HaiPayWebView] show paymentUrl=$paymentUrl orderNo=$orderNo productType=$productType methodName=$methodName');
+    print(
+      '[HaiPayWebView] show paymentUrl=$paymentUrl orderNo=$orderNo productType=$productType methodName=$methodName',
+    );
     return Navigator.of(context, rootNavigator: true).push<bool>(
       MaterialPageRoute(
         fullscreenDialog: true,
@@ -78,6 +81,7 @@ class _HaiPayWebViewPageState extends State<HaiPayWebViewPage>
 
   bool _isLoading = true;
   bool _hasPaymentCompleted = false;
+  bool _isCheckingClose = false;
   bool _isPolling = false;
   int _pollCount = 0;
   StreamSubscription<HaiPayStatus>? _pollSubscription;
@@ -96,6 +100,10 @@ class _HaiPayWebViewPageState extends State<HaiPayWebViewPage>
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..addJavaScriptChannel(
+        'CloseWebView',
+        onMessageReceived: _handleCloseWebView,
+      )
       ..setBackgroundColor(const Color(0xFF2D2440))
       ..setNavigationDelegate(
         NavigationDelegate(
@@ -109,14 +117,66 @@ class _HaiPayWebViewPageState extends State<HaiPayWebViewPage>
           },
           onPageFinished: (String url) {
             setState(() => _isLoading = false);
+            _installCloseWebViewBridge();
           },
           onWebResourceError: (WebResourceError error) {
-            debugPrint('[HaiPayWebView] WebResourceError: ${error.description}');
+            debugPrint(
+              '[HaiPayWebView] WebResourceError: ${error.description}',
+            );
           },
           onNavigationRequest: _handleNavigation,
         ),
       )
       ..loadRequest(Uri.parse(widget.paymentUrl));
+  }
+
+  Future<void> _installCloseWebViewBridge() async {
+    // The payment H5 was originally written for flutter_inappwebview. Map its
+    // close handler to webview_flutter's registered JavaScript channel.
+    await _controller.runJavaScript('''
+      (function() {
+        function closeFlutterWebView() {
+          if (window.CloseWebView && window.CloseWebView.postMessage) {
+            window.CloseWebView.postMessage('closeWebView');
+          }
+        }
+
+        window.flutter_inappwebview = window.flutter_inappwebview || {};
+        window.flutter_inappwebview.callHandler = function(name) {
+          if (name === 'closeWebView') {
+            closeFlutterWebView();
+          }
+        };
+
+        // Also catch the payment page's inline Close link directly. This
+        // keeps the close action working if the page replaces callHandler.
+        if (!document.documentElement.dataset.flutterCloseBridgeInstalled) {
+          document.documentElement.dataset.flutterCloseBridgeInstalled = 'true';
+          document.addEventListener('click', function(event) {
+            var target = event.target;
+            var link = target && target.closest
+                ? target.closest('a[onclick*="closeWebView"]')
+                : null;
+            if (link) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+              closeFlutterWebView();
+            }
+          }, true);
+        }
+      })();
+    ''');
+  }
+
+  Future<void> _handleCloseWebView(JavaScriptMessage message) async {
+    if (message.message != 'closeWebView' || !mounted || _isCheckingClose) {
+      return;
+    }
+
+    _isCheckingClose = true;
+    // A Close control in the payment H5 is an explicit request to dismiss the
+    // Flutter route. Do not wait for payment-status polling before closing.
+    Navigator.of(context).pop(false);
   }
 
   @override
@@ -158,7 +218,9 @@ class _HaiPayWebViewPageState extends State<HaiPayWebViewPage>
         .listen(
           (status) {
             _pollCount++;
-            debugPrint('[HaiPayWebView] Poll #$_pollCount: isPay=${status.isPay}');
+            debugPrint(
+              '[HaiPayWebView] Poll #$_pollCount: isPay=${status.isPay}',
+            );
 
             if (status.isPaid) {
               _onPaymentConfirmed();
@@ -201,7 +263,7 @@ class _HaiPayWebViewPageState extends State<HaiPayWebViewPage>
     try {
       final storage = StorageService();
       final token = await storage.getToken();
-      final _dio = DioClient().dio;
+      final dio = DioClient().dio;
 
       final time = DateTime.now().millisecondsSinceEpoch;
       final params = {
@@ -210,13 +272,11 @@ class _HaiPayWebViewPageState extends State<HaiPayWebViewPage>
         'status': isPay,
       };
 
-      await _dio.post(
+      await dio.post(
         '/pay/paymentResult',
         data: params,
         options: Options(
-          headers: {
-            if (token != null && token.isNotEmpty) 'token': token,
-          },
+          headers: {if (token != null && token.isNotEmpty) 'token': token},
         ),
       );
 
@@ -236,7 +296,8 @@ class _HaiPayWebViewPageState extends State<HaiPayWebViewPage>
       _onPaymentConfirmed();
     } else {
       setState(() {
-        _lastErrorMessage = 'Payment not completed yet. Please complete payment first.';
+        _lastErrorMessage =
+            'Payment not completed yet. Please complete payment first.';
       });
     }
   }
@@ -348,7 +409,7 @@ class _HaiPayWebViewPageState extends State<HaiPayWebViewPage>
     );
 
     if (confirmed == true && mounted) {
-      Navigator.of(context).pop(false);
+      Navigator.of(this.context).pop(false);
     }
   }
 }

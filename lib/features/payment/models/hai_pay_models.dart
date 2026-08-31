@@ -187,7 +187,8 @@ class HaiPayStatus extends Equatable {
   bool get isUnpaid => isPay == '1';
 
   factory HaiPayStatus.fromJson(Map<String, dynamic> json) {
-    return HaiPayStatus(isPay: json['isPay'] as String? ?? '1');
+    final rawIsPay = json['isPay'];
+    return HaiPayStatus(isPay: rawIsPay?.toString() ?? '1');
   }
 
   @override

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <DevInfor>
-<Facebook Id="8" SortId="8" ShareByAppClient="true" Enable="true" ConsumerKey="1602047324111532" ConsumerSecret="e77eb31c1d2881c8148c81768075df68" RedirectUrl="https://mob.com" />
+<Facebook Id="8" SortId="8" ShareByAppClient="false" Enable="true" ConsumerKey="1153560107115108" ConsumerSecret="df2865bc78128762e7ed0e65ab08d179" RedirectUrl="https://mob.com" />
 <Twitter Id="9" SortId="9" ShareByAppClient="false" Enable="true" BypassApproval="true" IsUseV2="true" ConsumerKey="ZUV2bEZaNWtVYmFPUTljeDZhUzc6MTpjaQ" ConsumerSecret="TcZfOscMGrfbvMwt84ceA7goYGYtZ173mKFHlumgxkc0ymOu3z" CallbackUrl="twittersdk://callback" />
 </DevInfor>

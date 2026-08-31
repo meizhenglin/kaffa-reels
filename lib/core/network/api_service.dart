@@ -201,6 +201,28 @@ class ApiService {
     );
   }
 
+  /// Facebook 登录（统一 userAuthorization 接口）
+  Future<ApiResponse> facebookLogin({
+    required String passportName,
+    required String accessToken,
+    String? email,
+    String? displayName,
+    String? avatar,
+  }) {
+    return request(
+      ApiEndpoints.googleLogin,
+      data: {
+        'passportType': PassportType.facebook,
+        'passportName': passportName,
+        'accessToken': accessToken,
+        if (email != null && email.isNotEmpty) 'email': email,
+        if (displayName != null && displayName.isNotEmpty)
+          'nickName': displayName,
+        if (avatar != null && avatar.isNotEmpty) 'userAvatar': avatar,
+      },
+    );
+  }
+
   /// Apple 登录
   Future<ApiResponse> appleLogin({
     required String identityToken,

@@ -6,8 +6,10 @@ import 'package:go_router/go_router.dart';
 import '../providers/auth_provider.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../home/pages/main_page.dart' show currentTabIndexProvider;
-import '../../payment/providers/membership_provider.dart' show memberStateProvider;
+import '../../payment/providers/membership_provider.dart'
+    show memberStateProvider;
 import '../../../app/providers/app_providers.dart';
+import '../../../core/config/build_flavor.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key, this.redirect, this.backTarget = '/'});
@@ -19,7 +21,8 @@ class LoginPage extends ConsumerStatefulWidget {
   ConsumerState<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserver {
+class _LoginPageState extends ConsumerState<LoginPage>
+    with WidgetsBindingObserver {
   bool _appIsInForeground = true;
   bool _googleSignInInProgress = false;
 
@@ -80,7 +83,8 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                       RtlBackButton(
                         onPressed: () async {
                           // 如果目标是 short-video 页面，发送登录返回通知
-                          final effectiveTarget = (widget.redirect != null &&
+                          final effectiveTarget =
+                              (widget.redirect != null &&
                                   widget.redirect!.isNotEmpty &&
                                   widget.redirect != '/profile')
                               ? widget.redirect
@@ -97,12 +101,15 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                           }
                         },
                         color: Colors.white,
-                        constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                        constraints: const BoxConstraints(
+                          minWidth: 20,
+                          minHeight: 20,
+                        ),
                       ),
                       const Expanded(
                         child: Center(
                           child: Text(
-                            'Log in to Qahwa Tv',
+                            '${BuildFlavor.isPlatform ? 'Log in to Kaffa Reels' : 'Log in to Qahwa Tv'}',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 18,
@@ -116,25 +123,31 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                         child: RtlBackButton(
                           onPressed: null,
                           color: Colors.white,
-                          constraints: BoxConstraints(minWidth: 20, minHeight: 20),
+                          constraints: BoxConstraints(
+                            minWidth: 20,
+                            minHeight: 20,
+                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 67),
                   Center(
-                    child: Image.asset(
-                      'assets/images/login_logo.png',
-                      width: 92,
-                      height: 92,
-                      errorBuilder: (_, __, ___) => Container(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.asset(
+                        'assets/images/APP_LOGO_NEW_SMALL.png',
                         width: 92,
                         height: 92,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 92,
+                          height: 92,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
+                            ),
+                            borderRadius: BorderRadius.circular(18),
                           ),
-                          borderRadius: BorderRadius.circular(18),
                         ),
                       ),
                     ),
@@ -152,11 +165,15 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                             iconPath: 'assets/images/email_icon.png',
                             isLoading: false,
                             onTap: () {
-                              final backTarget = Uri.encodeComponent('/auth/login?back=${Uri.encodeComponent(widget.backTarget)}');
+                              final backTarget = Uri.encodeComponent(
+                                '/auth/login?back=${Uri.encodeComponent(widget.backTarget)}',
+                              );
                               final redirect = widget.redirect == null
                                   ? null
                                   : Uri.encodeComponent(widget.redirect!);
-                              final route = StringBuffer('/auth/login/email?back=$backTarget');
+                              final route = StringBuffer(
+                                '/auth/login/email?back=$backTarget',
+                              );
                               if (redirect != null) {
                                 route.write('&redirect=$redirect');
                               }
@@ -166,19 +183,26 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                           const SizedBox(height: 15),
                           Consumer(
                             builder: (_, ref, __) {
-                              final repository = ref.watch(authRepositoryProvider);
+                              final repository = ref.watch(
+                                authRepositoryProvider,
+                              );
                               if (!repository.isGoogleSignInSupported) {
                                 return const SizedBox.shrink();
                               }
 
-                              final isLoading =
-                                  ref.watch(authProvider).isLoading;
+                              final isLoading = ref
+                                  .watch(authProvider)
+                                  .isLoading;
                               return _GoogleSignInButton(
                                 label: 'Continue with Google',
                                 isLoading: isLoading,
                                 onTap: () async {
-                                  if (!_appIsInForeground || _googleSignInInProgress) return;
-                                  debugPrint('[LoginPage] Google button tapped');
+                                  if (!_appIsInForeground ||
+                                      _googleSignInInProgress)
+                                    return;
+                                  debugPrint(
+                                    '[LoginPage] Google button tapped',
+                                  );
                                   _googleSignInInProgress = true;
 
                                   // Show loading dialog
@@ -199,10 +223,13 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                           child: Container(
                                             height: 100,
                                             alignment: Alignment.center,
-                                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 24,
+                                            ),
                                             decoration: BoxDecoration(
                                               color: Colors.white,
-                                              borderRadius: BorderRadius.circular(12),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
                                             ),
                                             child: Column(
                                               mainAxisSize: MainAxisSize.min,
@@ -210,7 +237,10 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                                 const SizedBox(
                                                   width: 28,
                                                   height: 28,
-                                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                      ),
                                                 ),
                                                 const SizedBox(height: 8),
                                                 const Text(
@@ -235,20 +265,27 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                       .signInWithGoogle();
                                   _googleSignInInProgress = false;
 
-                                  debugPrint('[LoginPage] Google sign-in returned success=$success error=${ref.read(authProvider).errorMessage}');
+                                  debugPrint(
+                                    '[LoginPage] Google sign-in returned success=$success error=${ref.read(authProvider).errorMessage}',
+                                  );
 
                                   if (!mounted) return;
 
                                   if (success) {
                                     // Close loading dialog
-                                    Navigator.of(context, rootNavigator: true).pop();
+                                    Navigator.of(
+                                      context,
+                                      rootNavigator: true,
+                                    ).pop();
                                     // Show success dialog - auto close and navigate after 1 second
                                     showDialog(
                                       context: context,
                                       barrierDismissible: false,
                                       builder: (dialogContext) => AlertDialog(
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                         ),
                                         content: Column(
                                           mainAxisSize: MainAxisSize.min,
@@ -286,22 +323,41 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                       Navigator.of(context).pop();
 
                                       // 触发 loginReturnProvider，刷新 ShortVideoPage 的视频列表
-                                      if (widget.redirect != null && widget.redirect!.contains('/short-video')) {
+                                      if (widget.redirect != null &&
+                                          widget.redirect!.contains(
+                                            '/short-video',
+                                          )) {
                                         Future.delayed(Duration.zero, () {
-                                          ref.read(loginReturnProvider.notifier).state++;
-                                          debugPrint('[LoginPage] Google triggered loginReturnProvider');
+                                          ref
+                                              .read(
+                                                loginReturnProvider.notifier,
+                                              )
+                                              .state++;
+                                          debugPrint(
+                                            '[LoginPage] Google triggered loginReturnProvider',
+                                          );
                                         });
                                       }
 
                                       // 获取 root navigator 并连续 pop 两个页面回到 ShortVideoPage
-                                      final rootNav = Navigator.of(context, rootNavigator: true);
+                                      final rootNav = Navigator.of(
+                                        context,
+                                        rootNavigator: true,
+                                      );
 
-                                      Future.delayed(const Duration(milliseconds: 100), () {
-                                        debugPrint('[LoginPage] Google step 1: pop LoginPage');
-                                        rootNav.pop();
-                                      }).then((_) {
+                                      Future.delayed(
+                                        const Duration(milliseconds: 100),
+                                        () {
+                                          debugPrint(
+                                            '[LoginPage] Google step 1: pop LoginPage',
+                                          );
+                                          rootNav.pop();
+                                        },
+                                      ).then((_) {
                                         return Future.delayed(Duration.zero, () {
-                                          debugPrint('[LoginPage] Google step 2: pop LoginEmailPage if exists');
+                                          debugPrint(
+                                            '[LoginPage] Google step 2: pop LoginEmailPage if exists',
+                                          );
                                           if (Navigator.canPop(context)) {
                                             rootNav.pop();
                                           }
@@ -312,10 +368,15 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                   }
 
                                   // Close loading dialog
-                                  Navigator.of(context, rootNavigator: true).pop();
+                                  Navigator.of(
+                                    context,
+                                    rootNavigator: true,
+                                  ).pop();
 
                                   // Show error dialog - auto close after 2 seconds
-                                  final errorMsg = ref.read(authProvider).errorMessage ?? 'Login failed. Please try again.';
+                                  final errorMsg =
+                                      ref.read(authProvider).errorMessage ??
+                                      'Login failed. Please try again.';
                                   showDialog(
                                     context: context,
                                     barrierDismissible: false,
@@ -343,28 +404,78 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                           Text(
                                             errorMsg,
                                             textAlign: TextAlign.center,
-                                            style: const TextStyle(fontSize: 13),
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                            ),
                                           ),
                                         ],
                                       ),
                                     ),
                                   );
                                   // Auto close after 2 seconds
-                                  Future.delayed(const Duration(seconds: 2), () {
-                                    if (mounted && Navigator.canPop(context)) {
-                                      Navigator.of(context, rootNavigator: true).pop();
-                                    }
-                                  });
+                                  Future.delayed(
+                                    const Duration(seconds: 2),
+                                    () {
+                                      if (mounted &&
+                                          Navigator.canPop(context)) {
+                                        Navigator.of(
+                                          context,
+                                          rootNavigator: true,
+                                        ).pop();
+                                      }
+                                    },
+                                  );
                                 },
                               );
                             },
                           ),
-                          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) ...[
+                          const SizedBox(height: 16),
+                          Consumer(
+                            builder: (_, ref, __) {
+                              final isLoading = ref
+                                  .watch(authProvider)
+                                  .isLoading;
+                              return _PlatformButton(
+                                label: 'Continue with Facebook',
+                                icon: Icons.facebook,
+                                iconPath: 'assets/images/facebook_icon.png',
+                                isLoading: isLoading,
+                                onTap: () async {
+                                  if (!_appIsInForeground) return;
+                                  ref.read(authProvider.notifier).clearError();
+                                  final success = await ref
+                                      .read(authProvider.notifier)
+                                      .signInWithFacebook();
+                                  if (!mounted) return;
+                                  if (success) {
+                                    if (Navigator.canPop(context)) {
+                                      Navigator.of(
+                                        context,
+                                        rootNavigator: true,
+                                      ).pop();
+                                    }
+                                    if (widget.redirect != null &&
+                                        widget.redirect!.contains(
+                                          '/short-video',
+                                        )) {
+                                      ref
+                                          .read(loginReturnProvider.notifier)
+                                          .state++;
+                                    }
+                                    context.go(widget.backTarget);
+                                  }
+                                },
+                              );
+                            },
+                          ),
+                          if (!kIsWeb &&
+                              defaultTargetPlatform == TargetPlatform.iOS) ...[
                             const SizedBox(height: 16),
                             Consumer(
                               builder: (_, ref, __) {
-                                final isLoading =
-                                    ref.watch(authProvider).isLoading;
+                                final isLoading = ref
+                                    .watch(authProvider)
+                                    .isLoading;
                                 return _PlatformButton(
                                   label: 'Continue with Apple',
                                   icon: Icons.apple,
@@ -390,10 +501,14 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                             child: Container(
                                               height: 100,
                                               alignment: Alignment.center,
-                                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 24,
+                                                  ),
                                               decoration: BoxDecoration(
                                                 color: Colors.white,
-                                                borderRadius: BorderRadius.circular(12),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
                                               ),
                                               child: Column(
                                                 mainAxisSize: MainAxisSize.min,
@@ -401,14 +516,18 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                                   const SizedBox(
                                                     width: 28,
                                                     height: 28,
-                                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                        ),
                                                   ),
                                                   const SizedBox(height: 8),
                                                   const Text(
                                                     'Signing in...',
                                                     style: TextStyle(
                                                       fontSize: 13,
-                                                      fontWeight: FontWeight.w500,
+                                                      fontWeight:
+                                                          FontWeight.w500,
                                                     ),
                                                   ),
                                                 ],
@@ -431,14 +550,19 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
 
                                     if (success) {
                                       // Close loading dialog
-                                      Navigator.of(context, rootNavigator: true).pop();
+                                      Navigator.of(
+                                        context,
+                                        rootNavigator: true,
+                                      ).pop();
                                       // Show success dialog - auto close and navigate after 1 second
                                       showDialog(
                                         context: context,
                                         barrierDismissible: false,
                                         builder: (dialogContext) => AlertDialog(
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
                                           ),
                                           content: Column(
                                             mainAxisSize: MainAxisSize.min,
@@ -476,42 +600,71 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                         Navigator.of(context).pop();
 
                                         // 触发 loginReturnProvider，刷新 ShortVideoPage 的视频列表
-                                        if (widget.redirect != null && widget.redirect!.contains('/short-video')) {
+                                        if (widget.redirect != null &&
+                                            widget.redirect!.contains(
+                                              '/short-video',
+                                            )) {
                                           Future.delayed(Duration.zero, () {
-                                            ref.read(loginReturnProvider.notifier).state++;
-                                            debugPrint('[LoginPage] Apple triggered loginReturnProvider');
+                                            ref
+                                                .read(
+                                                  loginReturnProvider.notifier,
+                                                )
+                                                .state++;
+                                            debugPrint(
+                                              '[LoginPage] Apple triggered loginReturnProvider',
+                                            );
                                           });
                                         }
 
                                         // 获取 root navigator 并连续 pop 两个页面回到 ShortVideoPage
-                                        final rootNav = Navigator.of(context, rootNavigator: true);
+                                        final rootNav = Navigator.of(
+                                          context,
+                                          rootNavigator: true,
+                                        );
 
-                                        Future.delayed(const Duration(milliseconds: 100), () {
-                                          debugPrint('[LoginPage] Apple step 1: pop LoginPage');
-                                          rootNav.pop();
-                                        }).then((_) {
-                                          return Future.delayed(Duration.zero, () {
-                                            debugPrint('[LoginPage] Apple step 2: pop LoginEmailPage if exists');
-                                            if (Navigator.canPop(context)) {
-                                              rootNav.pop();
-                                            }
-                                          });
+                                        Future.delayed(
+                                          const Duration(milliseconds: 100),
+                                          () {
+                                            debugPrint(
+                                              '[LoginPage] Apple step 1: pop LoginPage',
+                                            );
+                                            rootNav.pop();
+                                          },
+                                        ).then((_) {
+                                          return Future.delayed(
+                                            Duration.zero,
+                                            () {
+                                              debugPrint(
+                                                '[LoginPage] Apple step 2: pop LoginEmailPage if exists',
+                                              );
+                                              if (Navigator.canPop(context)) {
+                                                rootNav.pop();
+                                              }
+                                            },
+                                          );
                                         });
                                       });
                                       return;
                                     }
 
                                     // Close loading dialog
-                                    Navigator.of(context, rootNavigator: true).pop();
+                                    Navigator.of(
+                                      context,
+                                      rootNavigator: true,
+                                    ).pop();
 
                                     // Show error dialog - auto close after 2 seconds
-                                    final errorMsg = ref.read(authProvider).errorMessage ?? 'Login failed. Please try again.';
+                                    final errorMsg =
+                                        ref.read(authProvider).errorMessage ??
+                                        'Login failed. Please try again.';
                                     showDialog(
                                       context: context,
                                       barrierDismissible: false,
                                       builder: (dialogContext) => AlertDialog(
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                         ),
                                         content: Column(
                                           mainAxisSize: MainAxisSize.min,
@@ -533,18 +686,27 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                                             Text(
                                               errorMsg,
                                               textAlign: TextAlign.center,
-                                              style: const TextStyle(fontSize: 13),
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                              ),
                                             ),
                                           ],
                                         ),
                                       ),
                                     );
                                     // Auto close after 2 seconds
-                                    Future.delayed(const Duration(seconds: 2), () {
-                                      if (mounted && Navigator.canPop(context)) {
-                                        Navigator.of(context, rootNavigator: true).pop();
-                                      }
-                                    });
+                                    Future.delayed(
+                                      const Duration(seconds: 2),
+                                      () {
+                                        if (mounted &&
+                                            Navigator.canPop(context)) {
+                                          Navigator.of(
+                                            context,
+                                            rootNavigator: true,
+                                          ).pop();
+                                        }
+                                      },
+                                    );
                                   },
                                 );
                               },
@@ -557,13 +719,18 @@ class _LoginPageState extends ConsumerState<LoginPage> with WidgetsBindingObserv
                   const Spacer(),
                   GestureDetector(
                     onTap: () {
-                      final registerBackTarget = Uri.encodeComponent('/auth/login?back=${Uri.encodeComponent(widget.backTarget)}');
-                      context.push('/auth/register/email?back=$registerBackTarget');
+                      final registerBackTarget = Uri.encodeComponent(
+                        '/auth/login?back=${Uri.encodeComponent(widget.backTarget)}',
+                      );
+                      context.push(
+                        '/auth/register/email?back=$registerBackTarget',
+                      );
                     },
                     child: Center(
                       child: RichText(
                         text: TextSpan(
-                          text: 'Do not have StoryDrama account? ',
+                          text:
+                              '${BuildFlavor.isPlatform ? 'Do not have Kaffa Reels account? ' : 'Do not have Qahwa Tv account? '}',
                           style: const TextStyle(
                             color: Color(0xFF999999),
                             fontSize: 13,
@@ -751,7 +918,9 @@ class _GoogleSignInButton extends StatelessWidget {
                     label,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: isLoading ? const Color(0xFFAAAAAA) : const Color(0xFF1F1F1F),
+                      color: isLoading
+                          ? const Color(0xFFAAAAAA)
+                          : const Color(0xFF1F1F1F),
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
                       letterSpacing: 0.1,

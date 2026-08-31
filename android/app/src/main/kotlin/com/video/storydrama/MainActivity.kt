@@ -1,5 +1,6 @@
 package com.video.storydrama
 
+import android.os.Bundle
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Intent
@@ -8,6 +9,12 @@ import android.util.Log
 import android.view.View
 import android.widget.FrameLayout
 import com.facebook.ads.*
+import com.facebook.GraphRequest
+import com.facebook.login.LoginManager
+import com.facebook.login.LoginResult
+import com.facebook.FacebookCallback
+import com.facebook.FacebookException
+import com.facebook.CallbackManager
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -18,6 +25,9 @@ class MainActivity : FlutterFragmentActivity() {
     private val META_AD_EVENT_CHANNEL = "com.video.storydrama/meta_ads_events"
     private val TAG = "AppRestart"
     private val META_AD_TAG = "MetaAdManager"
+    private val FACEBOOK_LOGIN_CHANNEL = "com.video.storydrama/facebook_login"
+    private lateinit var facebookCallbackManager: CallbackManager
+    private var facebookLoginResult: MethodChannel.Result? = null
 
     private var methodChannel: MethodChannel? = null
 
@@ -41,8 +51,75 @@ class MainActivity : FlutterFragmentActivity() {
     private var onInterstitialAdFailedListener: ((String) -> Unit)? = null
     private var onInterstitialAdClosedListener: (() -> Unit)? = null
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        facebookCallbackManager = CallbackManager.Factory.create()
+        LoginManager.getInstance().registerCallback(
+            facebookCallbackManager,
+            object : FacebookCallback<LoginResult> {
+                override fun onSuccess(result: LoginResult) {
+                    val request = GraphRequest.newMeRequest(result.accessToken) { user, response ->
+                        val error = response?.error
+                        if (error != null || user == null) {
+                            facebookLoginResult?.error("PROFILE_ERROR", error?.errorMessage ?: "Unable to load Facebook profile", null)
+                            facebookLoginResult = null
+                            return@newMeRequest
+                        }
+                        val data = HashMap<String, Any>()
+                        data["id"] = user.optString("id")
+                        data["name"] = user.optString("name")
+                        data["email"] = user.optString("email")
+                        data["access_token"] = result.accessToken.token
+                        data["picture"] = "https://graph.facebook.com/${user.optString("id")}/picture?type=large"
+                        facebookLoginResult?.success(data)
+                        facebookLoginResult = null
+                    }
+                    request.parameters = Bundle().apply { putString("fields", "id,name,email") }
+                    request.executeAsync()
+                }
+
+                override fun onCancel() {
+                    facebookLoginResult?.error("CANCELLED", "Facebook login was cancelled", null)
+                    facebookLoginResult = null
+                }
+
+                override fun onError(error: FacebookException) {
+                    facebookLoginResult?.error("LOGIN_ERROR", error.message, null)
+                    facebookLoginResult = null
+                }
+            },
+        )
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        facebookCallbackManager.onActivityResult(requestCode, resultCode, data)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FACEBOOK_LOGIN_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "login" -> {
+                        if (facebookLoginResult != null) {
+                            result.error("IN_PROGRESS", "Facebook login is already in progress", null)
+                        } else {
+                            facebookLoginResult = result
+                            LoginManager.getInstance().logInWithReadPermissions(
+                                this,
+                                listOf("email", "public_profile"),
+                            )
+                        }
+                    }
+                    "logout" -> {
+                        LoginManager.getInstance().logOut()
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
 
         // Existing app restart channel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)

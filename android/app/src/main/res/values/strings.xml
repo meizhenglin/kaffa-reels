@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">Kaffa Reels</string>
     <!-- Facebook / Meta Audience Network App ID -->
     <!-- 请替换为你自己的 Meta App ID -->
-    <string name="facebook_app_id">YOUR_FACEBOOK_APP_ID</string>
-    <string name="facebook_application_id">YOUR_FACEBOOK_APPLICATION_ID</string>
+    <string name="facebook_app_id">1153560107115108</string>
+    <!-- Replace with the Client Token from Meta App Settings > Basic. -->
+    <string name="facebook_client_token">c8fbb86b18d593cb0c68a13680d700eb</string>
+    <string name="facebook_application_id">1153560107115108</string>
 </resources>

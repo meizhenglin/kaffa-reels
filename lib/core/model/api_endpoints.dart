@@ -123,6 +123,9 @@ class PassportType {
   /// 抖音登录
   static const int douyin = 3;
 
+  /// Facebook 登录
+  static const int facebook = 2;
+
   /// Google 登录
   static const int google = 5;
 

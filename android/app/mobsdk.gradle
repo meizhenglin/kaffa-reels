@@ -9,10 +9,11 @@ MobSDK {
             Facebook {
                 id 8
                 sortId 8
-                appKey "1602047324111532"
-                appSecret "e77eb31c1d2881c8148c81768075df68"
+                appKey "1153560107115108"
+                appSecret "df2865bc78128762e7ed0e65ab08d179"
                 callbackUri "https://mob.com"
-                shareByAppClient true
+                // 使用 ShareSDK OAuth 网页授权，避免依赖 Facebook 客户端的本地登录配置。
+                shareByAppClient false
                 enable true
             }
             Twitter {
