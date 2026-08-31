@@ -28,8 +28,8 @@ import 'dio_client.dart';
 /// ============================================================================
 class ApiService {
   ApiService({DioClient? dioClient, StorageService? storage})
-      : _dioClient = dioClient ?? DioClient(),
-        _storage = storage ?? StorageService();
+    : _dioClient = dioClient ?? DioClient(),
+      _storage = storage ?? StorageService();
 
   final DioClient _dioClient;
   final StorageService _storage;
@@ -124,8 +124,10 @@ class ApiService {
           return ApiResponse.error(msg ?? 'Request failed', code: code);
         }
       } else {
-        return ApiResponse.error('HTTP ${response.statusCode}',
-            code: response.statusCode);
+        return ApiResponse.error(
+          'HTTP ${response.statusCode}',
+          code: response.statusCode,
+        );
       }
     } on DioException catch (e) {
       debugPrint('[ApiService] DioException => ${e.message}');
@@ -163,14 +165,12 @@ class ApiService {
   /// 游客登录
   /// 游客登录（对应 /api/user/userAuthorization）
   /// [passportName] 使用持久化的设备 UUID
-  Future<ApiResponse> guestLogin({
-    required String deviceId,
-  }) {
+  Future<ApiResponse> guestLogin({required String deviceId}) {
     debugPrint('[ApiService] guestLogin called, deviceId=$deviceId');
     return request(
       ApiEndpoints.guestLogin,
       data: {
-        'passportType': 0,     // 0=游客，1=邮箱，5=Google，6=Apple
+        'passportType': 0, // 0=游客，1=邮箱，5=Google，6=Apple
         'passportName': deviceId,
       },
     );
@@ -191,9 +191,11 @@ class ApiService {
         'passportType': PassportType.google,
         'passportName': passportName,
         'idToken': idToken,
-        if (accessToken != null && accessToken.isNotEmpty) 'accessToken': accessToken,
+        if (accessToken != null && accessToken.isNotEmpty)
+          'accessToken': accessToken,
         if (email != null && email.isNotEmpty) 'email': email,
-        if (displayName != null && displayName.isNotEmpty) 'nickName': displayName,
+        if (displayName != null && displayName.isNotEmpty)
+          'nickName': displayName,
         if (avatar != null && avatar.isNotEmpty) 'userAvatar': avatar,
       },
     );
@@ -220,10 +222,7 @@ class ApiService {
   Future<ApiResponse> wechatLogin({required String code}) {
     return request(
       ApiEndpoints.weixinLogin,
-      data: {
-        'passportType': PassportType.wechat,
-        'code': code,
-      },
+      data: {'passportType': PassportType.wechat, 'code': code},
     );
   }
 
@@ -231,10 +230,7 @@ class ApiService {
   Future<ApiResponse> douyinLogin({required String code}) {
     return request(
       ApiEndpoints.douyinLogin,
-      data: {
-        'passportType': PassportType.douyin,
-        'code': code,
-      },
+      data: {'passportType': PassportType.douyin, 'code': code},
     );
   }
 
@@ -274,20 +270,14 @@ class ApiService {
   }) {
     return request(
       ApiEndpoints.register,
-      data: {
-        'email': email,
-        'passportPassword': passportPassword,
-      },
+      data: {'email': email, 'passportPassword': passportPassword},
       isForm: false,
     );
   }
 
   /// 修改昵称
   Future<ApiResponse> updateNickname({required String nickname}) {
-    return request(
-      ApiEndpoints.updateNickname,
-      data: {'nickname': nickname},
-    );
+    return request(ApiEndpoints.updateNickname, data: {'nickname': nickname});
   }
 
   /// 用户设置（统一接口：修改昵称/头像/语言）
@@ -315,12 +305,18 @@ class ApiService {
       final returnedLanguage = data is Map<String, dynamic>
           ? data['language'] as String?
           : data is Map
-              ? data['language']?.toString()
-              : null;
+          ? data['language']?.toString()
+          : null;
       if (returnedLanguage != null && returnedLanguage.trim().isNotEmpty) {
         final normalizedLanguage = _normalizeLang(returnedLanguage);
-        await _storage.setString(AppConstants.deviceLangKey, normalizedLanguage);
-        await _storage.setString(AppConstants.localeKey, normalizedLanguage.startsWith('ar') ? 'ar' : 'en');
+        await _storage.setString(
+          AppConstants.deviceLangKey,
+          normalizedLanguage,
+        );
+        await _storage.setString(
+          AppConstants.localeKey,
+          normalizedLanguage.startsWith('ar') ? 'ar' : 'en',
+        );
       }
     }
 
@@ -402,10 +398,7 @@ class ApiService {
 
   /// 搜索结果
   Future<ApiResponse> getSearchList({required String searchName}) {
-    return request(
-      ApiEndpoints.searchVideo,
-      data: {'searchName': searchName},
-    );
+    return request(ApiEndpoints.searchVideo, data: {'searchName': searchName});
   }
 
   /// 全部剧集 - 标签列表
@@ -457,10 +450,7 @@ class ApiService {
 
   /// 根据视频 ID 获取剧集目录（集数列表）
   Future<ApiResponse> getEpisodesDirectoryByVideoId({required String videoId}) {
-    return request(
-      ApiEndpoints.episodesDirectory,
-      data: {'videoId': videoId},
-    );
+    return request(ApiEndpoints.episodesDirectory, data: {'videoId': videoId});
   }
 
   /// 视频点赞/取消点赞
@@ -474,7 +464,8 @@ class ApiService {
       ApiEndpoints.videoLike,
       data: {
         'videoId': videoId,
-        if (episodesId != null && episodesId.isNotEmpty) 'episodesId': episodesId,
+        if (episodesId != null && episodesId.isNotEmpty)
+          'episodesId': episodesId,
         'type': type,
       },
     );
@@ -491,7 +482,8 @@ class ApiService {
       ApiEndpoints.videoCollect,
       data: {
         'videoId': videoId,
-        if (episodesId != null && episodesId.isNotEmpty) 'episodesId': episodesId,
+        if (episodesId != null && episodesId.isNotEmpty)
+          'episodesId': episodesId,
         'type': type,
       },
     );
@@ -499,10 +491,7 @@ class ApiService {
 
   /// 视频内获取商品列表（快充）
   Future<ApiResponse> getQuickRechargeList({required String videoId}) {
-    return request(
-      ApiEndpoints.quickRechargeList,
-      data: {'videoId': videoId},
-    );
+    return request(ApiEndpoints.quickRechargeList, data: {'videoId': videoId});
   }
 
   /// 用户购买剧集（解锁）
@@ -519,6 +508,22 @@ class ApiService {
         'episodesId': episodesId,
         'episodesNum': episodesNum,
         if (goodsId != null && goodsId > 0) 'goodsId': goodsId,
+      },
+    );
+  }
+
+  /// 用户通过 AdMob 激励广告解锁剧集
+  Future<ApiResponse> admobUnlockEpisodes({
+    required String videoId,
+    required int episodesNum,
+    required String adUnitId,
+  }) {
+    return request(
+      ApiEndpoints.admobUnlockEpisodes,
+      data: {
+        'videoId': videoId,
+        'episodesNum': episodesNum,
+        'adUnitId': adUnitId,
       },
     );
   }
@@ -542,10 +547,7 @@ class ApiService {
     required String videoId,
     required String episodesId,
   }) {
-    return request(
-      ApiEndpoints.episodesDirectory,
-      data: {'videoId': videoId},
-    );
+    return request(ApiEndpoints.episodesDirectory, data: {'videoId': videoId});
   }
 
   // ==================== UserCenterModel 个人中心 ====================
@@ -572,7 +574,10 @@ class ApiService {
   }
 
   /// 用户观看历史列表
-  Future<ApiResponse> getUserViewHistoryList({int page = 1, int pageSize = 20}) {
+  Future<ApiResponse> getUserViewHistoryList({
+    int page = 1,
+    int pageSize = 20,
+  }) {
     return request(
       ApiEndpoints.userViewHistoryList,
       data: {'page': page, 'pageSize': pageSize},
@@ -648,15 +653,8 @@ class ApiService {
   }
 
   /// Google 支付回调通知
-  Future<ApiResponse> googleCallBack({
-    required String params,
-  }) {
-    return request(
-      ApiEndpoints.googleCallBack,
-      data: {
-        'params': params,
-      },
-    );
+  Future<ApiResponse> googleCallBack({required String params}) {
+    return request(ApiEndpoints.googleCallBack, data: {'params': params});
   }
 
   /// 获取签到配置
@@ -673,9 +671,7 @@ class ApiService {
   Future<ApiResponse> setUserSign({int? signGoodsId}) {
     return request(
       ApiEndpoints.userSign,
-      data: {
-        if (signGoodsId != null) 'signGoodsId': signGoodsId,
-      },
+      data: {if (signGoodsId != null) 'signGoodsId': signGoodsId},
       method: 'POST',
     );
   }

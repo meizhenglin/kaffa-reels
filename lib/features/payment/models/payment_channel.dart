@@ -4,17 +4,15 @@ import 'package:equatable/equatable.dart';
 import 'hai_pay_models.dart';
 
 /// Payment channel types supported by the app
-enum PaymentChannelKind {
-  googlePlay,
-  haiPay,
-}
+enum PaymentChannelKind { googlePlay, haiPay }
 
 /// Payment channel that carries the chosen sub-method for HaiPay
 class PaymentChannel extends Equatable {
   const PaymentChannel._({required this.kind, this.haiPayMethod});
 
   /// Google Play Billing (in-app purchase)
-  const PaymentChannel.googlePlay() : this._(kind: PaymentChannelKind.googlePlay);
+  const PaymentChannel.googlePlay()
+    : this._(kind: PaymentChannelKind.googlePlay);
 
   /// HaiPay with a specific sub-method (Mada / STCPay / Credit Card / ...)
   factory PaymentChannel.haiPay(HaiPayMethod method) =>
@@ -23,6 +21,12 @@ class PaymentChannel extends Equatable {
   /// Convenience factory preserved for backward compatibility (no method attached)
   factory PaymentChannel.haiPayLegacy() =>
       const PaymentChannel._(kind: PaymentChannelKind.haiPay);
+
+  /// Creates the native or WebView channel represented by a backend method.
+  factory PaymentChannel.fromHaiPayMethod(HaiPayMethod method) {
+    if (method.isGooglePlay) return const PaymentChannel.googlePlay();
+    return PaymentChannel.haiPay(method);
+  }
 
   final PaymentChannelKind kind;
   final HaiPayMethod? haiPayMethod;
@@ -140,17 +144,17 @@ class UnifiedPaymentRequest extends Equatable {
 
   @override
   List<Object?> get props => [
-        channel,
-        orderId,
-        amount,
-        currency,
-        productName,
-        productId,
-        goodsId,
-        videoId,
-        episodeId,
-        episodesNum,
-      ];
+    channel,
+    orderId,
+    amount,
+    currency,
+    productName,
+    productId,
+    goodsId,
+    videoId,
+    episodeId,
+    episodesNum,
+  ];
 }
 
 /// Unified payment result
@@ -196,5 +200,11 @@ class UnifiedPaymentResult extends Equatable {
   }
 
   @override
-  List<Object?> get props => [success, channel, orderId, errorMessage, transactionId];
+  List<Object?> get props => [
+    success,
+    channel,
+    orderId,
+    errorMessage,
+    transactionId,
+  ];
 }

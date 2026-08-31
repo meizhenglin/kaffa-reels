@@ -22,22 +22,22 @@ class PaymentChannelSelector extends StatelessWidget {
 
   /// Returns the effective list of payment channels for the current build.
   ///
-  /// - google flavor    -> Google Play only.
-  /// - platform flavor  -> Google Play + HaiPay sub-methods.
-  ///
-  /// Channels are returned in display order.
+  /// - google flavor -> Google Play only.
+  /// - platform flavor -> exactly the backend methods, in backend order.
   static List<PaymentChannel> effectiveChannels({
     List<HaiPayMethod> haiPayMethods = const <HaiPayMethod>[],
   }) {
-    final channels = <PaymentChannel>[
-      // Google Play 在 Google flavor 和 Platform flavor 都可用
-      const PaymentChannel.googlePlay(),
-      if (haiPayMethods.isNotEmpty)
-        ...haiPayMethods.map((m) => PaymentChannel.haiPay(m))
-      else if (!BuildFlavor.isGoogle)
-        PaymentChannel.haiPayLegacy(),
-    ];
-    return channels;
+    if (BuildFlavor.isGoogle) {
+      return const [PaymentChannel.googlePlay()];
+    }
+
+    if (haiPayMethods.isEmpty) {
+      return [PaymentChannel.haiPayLegacy()];
+    }
+
+    return haiPayMethods
+        .map(PaymentChannel.fromHaiPayMethod)
+        .toList(growable: false);
   }
 
   /// Convenience for the google flavor: when the build is the google
@@ -47,8 +47,10 @@ class PaymentChannelSelector extends StatelessWidget {
   ///
   /// Returns the single Google Play channel that will be used.
   static PaymentChannel pickGooglePlay() {
-    assert(BuildFlavor.isGoogle,
-        'pickGooglePlay() is only valid for the google flavor');
+    assert(
+      BuildFlavor.isGoogle,
+      'pickGooglePlay() is only valid for the google flavor',
+    );
     return const PaymentChannel.googlePlay();
   }
 
@@ -143,7 +145,11 @@ class PaymentChannelSelector extends StatelessWidget {
                 onTap: () => Navigator.of(context).pop(),
                 child: Container(
                   padding: const EdgeInsets.all(4),
-                  child: const Icon(Icons.close, color: Colors.white70, size: 20),
+                  child: const Icon(
+                    Icons.close,
+                    color: Colors.white70,
+                    size: 20,
+                  ),
                 ),
               ),
             ],
@@ -201,10 +207,7 @@ class PaymentChannelSelector extends StatelessWidget {
 }
 
 class _PaymentChannelItem extends StatelessWidget {
-  const _PaymentChannelItem({
-    required this.channel,
-    required this.onTap,
-  });
+  const _PaymentChannelItem({required this.channel, required this.onTap});
 
   final PaymentChannel channel;
   final VoidCallback onTap;
@@ -218,9 +221,7 @@ class _PaymentChannelItem extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.15),
-          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
         ),
         child: Row(
           children: [
@@ -241,10 +242,7 @@ class _PaymentChannelItem extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     channel.description,
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 12,
-                    ),
+                    style: const TextStyle(color: Colors.white60, fontSize: 12),
                   ),
                 ],
               ),
@@ -322,8 +320,11 @@ class _PaymentChannelItem extends StatelessWidget {
     final lower = name.toLowerCase();
     if (lower.contains('mada')) return '💳';
     if (lower.contains('stc') || lower.contains('stcpay')) return '📱';
-    if (lower.contains('credit') || lower.contains('card') ||
-        lower.contains('debit')) return '💳';
+    if (lower.contains('credit') ||
+        lower.contains('card') ||
+        lower.contains('debit')) {
+      return '💳';
+    }
     if (lower.contains('apple')) return '🍎';
     if (lower.contains('fawry')) return '🛒';
     if (lower.contains('haipay')) return '🌊';

@@ -14,6 +14,7 @@ import '../../payment/providers/membership_provider.dart';
 import '../../recommend/models/drama.dart';
 import '../../recommend/utils/drama_navigation.dart';
 import '../providers/favorites_provider.dart';
+import '../../recommend/providers/video_action_provider.dart';
 
 class FavoritesPage extends ConsumerStatefulWidget {
   const FavoritesPage({super.key});
@@ -58,9 +59,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
         child: Column(
           children: [
             _buildHeader(context, l10n),
-            Expanded(
-              child: _buildBody(context, favorites, l10n),
-            ),
+            Expanded(child: _buildBody(context, favorites, l10n)),
           ],
         ),
       ),
@@ -75,10 +74,7 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
       ),
       child: Row(
         children: [
-          RtlBackButton(
-            color: Colors.white,
-            onPressed: () => context.pop(),
-          ),
+          RtlBackButton(color: Colors.white, onPressed: () => context.pop()),
           Expanded(
             child: Text(
               l10n.favorites,
@@ -160,7 +156,9 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(HomeCardLayout.smallCardRadius(context)),
+            borderRadius: BorderRadius.circular(
+              HomeCardLayout.smallCardRadius(context),
+            ),
             child: Image.asset(
               'assets/images/small_preload_bg.png',
               width: cardWidth,
@@ -198,16 +196,29 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           GestureDetector(
-            onTap: () => openDramaPlayerWithVipCheck(
-              context: context,
-              drama: drama,
-              authState: authState,
-              memberState: memberState,
-            ),
+            onTap: () {
+              // An item returned by My Favorites is necessarily collected by
+              // the current account, even when the player APIs omit isCollect.
+              ref
+                  .read(videoActionProvider.notifier)
+                  .syncInitialState(
+                    videoId: drama.id,
+                    isCollected: true,
+                    overwrite: true,
+                  );
+              openDramaPlayerWithVipCheck(
+                context: context,
+                drama: drama,
+                authState: authState,
+                memberState: memberState,
+              );
+            },
             child: Stack(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(HomeCardLayout.smallCardRadius(context)),
+                  borderRadius: BorderRadius.circular(
+                    HomeCardLayout.smallCardRadius(context),
+                  ),
                   child: PreloadNetworkImage(
                     imageUrl: coverUrl,
                     preloadAsset: 'assets/images/small_preload_bg.png',
@@ -233,9 +244,9 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
           Text(
             drama.title.split(' / ').first,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white,
-                  fontSize: HomeCardLayout.scaled(context, 13),
-                ),
+              color: Colors.white,
+              fontSize: HomeCardLayout.scaled(context, 13),
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),

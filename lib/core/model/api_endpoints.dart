@@ -25,14 +25,16 @@ class ApiEndpoints {
   // ==================== 剧场 Tab ====================
   static const String theaterBanner = '/api/banner/list';
   static const String rankingList = '/api/videoCharts/list';
-  static const String videoHotPicks = '/api/videoHotPicks/list'; 
-  static const String lastUserViewHistoryOne = '/api/video/lastUserViewHistoryOne';
+  static const String videoHotPicks = '/api/videoHotPicks/list';
+  static const String lastUserViewHistoryOne =
+      '/api/video/lastUserViewHistoryOne';
   static const String userViewHistoryByVideoId = '/api/video/userViewHistory';
 
   // 搜索
   static const String searchHistory = '/api/videoHotPicks/selectSearch';
   static const String deleteSearchHistory = '/api/videoHotPicks/deleteSearch';
-  static const String recommondSearchList = '/api/videoHotPicks/recommondSearchList';
+  static const String recommondSearchList =
+      '/api/videoHotPicks/recommondSearchList';
   static const String searchVideo = '/api/videoHotPicks/searchVideo';
 
   // 全部剧集
@@ -45,12 +47,14 @@ class ApiEndpoints {
   static const String videoLike = '/api/userVideoLike/like';
   static const String videoCollect = '/api/userVideoChasing/chasing';
   static const String episodesDirectory = '/api/episodes/directory';
-  static const String quickRechargeList = '/api/rechargeGoodsConfig/quickRechargeList';
+  static const String quickRechargeList =
+      '/api/rechargeGoodsConfig/quickRechargeList';
   static const String userPayEpisodes = '/api/userPayEpisodes/userPayEpisodes';
+  static const String admobUnlockEpisodes =
+      '/api/userPayEpisodes/admobUnlockEpisodes';
   static const String userViewAddHistory = '/api/video/userViewAddHistory';
   // static const String episodeInfo = '/api/episodes/getEpisodeInfo';
   static const String directory = '/api/episodes/directory';
-
 
   // ==================== 个人中心 ====================
   static const String userPersonalCenter = '/api/user/userPersonalCenter';
@@ -79,21 +83,28 @@ class ApiEndpoints {
   static const String gameDetail = '/api/game/detail/{id}';
 
   // ==================== App 更新 ====================
-  static const String queryVersionInfo = '/farmerApi/commons/v1/appVersion/queryVersionInfo';
+  static const String queryVersionInfo =
+      '/farmerApi/commons/v1/appVersion/queryVersionInfo';
 
   // ==================== 设备登录（Flutter 特有） ====================
   /// Flutter 匿名设备登录
   static const String flutterGuestLogin = '/login/getUuid';
+
   /// 发送邮箱验证码
   static const String sendEmailCode = '/api/user/sendCode';
+
   /// 校验邮箱验证码
   static const String checkEmailCode = '/api/user/verifyCode';
+
   /// 注册账号
   static const String register = '/api/user/mailRegister';
+
   /// 修改昵称
   static const String updateNickname = '/api/user/updateNickname';
+
   /// 用户设置（修改昵称/头像/语言）
   static const String userSettings = '/api/user/settings';
+
   /// 系统配置查询（头像列表/协议内容等）
   static const String systemConfigSelect = '/api/systemConfig/selectConfigNew';
 }
@@ -105,12 +116,16 @@ class PassportType {
 
   /// 游客登录
   static const int guest = 0;
+
   /// 微信登录
   static const int wechat = 2;
+
   /// 抖音登录
   static const int douyin = 3;
+
   /// Google 登录
   static const int google = 5;
+
   /// Apple 登录
   static const int apple = 6;
 }

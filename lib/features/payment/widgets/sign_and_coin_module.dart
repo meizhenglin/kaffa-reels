@@ -33,16 +33,10 @@ class _SignAndCoinModuleState extends ConsumerState<SignAndCoinModule> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // K-Coin Module (Left)
-        const Expanded(
-          child: _KCoinModule(),
-        ),
+        const Expanded(child: _KCoinModule()),
         const SizedBox(width: 12),
         // Sign-in Module (Right)
-        Expanded(
-          child: _SignInModule(
-            signState: ref.watch(signStateProvider),
-          ),
-        ),
+        Expanded(child: _SignInModule(signState: ref.watch(signStateProvider))),
       ],
     );
   }
@@ -52,13 +46,26 @@ class _SignAndCoinModuleState extends ConsumerState<SignAndCoinModule> {
 class _KCoinModule extends ConsumerWidget {
   const _KCoinModule();
 
+  Future<void> _refreshBalanceAfterRecharge(WidgetRef ref) async {
+    final balanceNotifier = ref.read(coinBalanceInfoProvider.notifier);
+    for (var attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
+      await balanceNotifier.load();
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final coinBalance = ref.watch(coinBalanceInfoProvider);
 
     return GestureDetector(
-      onTap: () => context.push('/coin-recharge'),
+      onTap: () async {
+        await context.push('/coin-recharge');
+        await _refreshBalanceAfterRecharge(ref);
+      },
       child: Container(
         constraints: const BoxConstraints(minHeight: 130),
         padding: const EdgeInsets.all(12),
@@ -66,10 +73,7 @@ class _KCoinModule extends ConsumerWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF5D4391),
-              Color(0xFF3A266A),
-            ],
+            colors: [Color(0xFF5D4391), Color(0xFF3A266A)],
           ),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -134,10 +138,7 @@ class _KCoinModule extends ConsumerWidget {
             const SizedBox(height: 4),
             Text(
               l10n.balance,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 11,
-              ),
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
             ),
           ],
         ),
@@ -148,9 +149,7 @@ class _KCoinModule extends ConsumerWidget {
 
 /// Sign-in Module - Click to navigate to sign-in page
 class _SignInModule extends ConsumerWidget {
-  const _SignInModule({
-    required this.signState,
-  });
+  const _SignInModule({required this.signState});
 
   final SignState signState;
 
@@ -170,10 +169,7 @@ class _SignInModule extends ConsumerWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF5D4391),
-              Color(0xFF3A266A),
-            ],
+            colors: [Color(0xFF5D4391), Color(0xFF3A266A)],
           ),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -255,10 +251,7 @@ class _SignInModule extends ConsumerWidget {
             const SizedBox(height: 4),
             Text(
               l10n.tapToSign,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 11,
-              ),
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
             ),
           ],
         ),

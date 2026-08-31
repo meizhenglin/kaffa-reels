@@ -2,19 +2,10 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 
 /// Subscription period type
-enum SubscriptionPeriod {
-  monthly,
-  quarterly,
-  yearly,
-}
+enum SubscriptionPeriod { monthly, quarterly, yearly }
 
 /// Subscription tier/level
-enum SubscriptionTier {
-  none,
-  monthly,
-  quarterly,
-  yearly,
-}
+enum SubscriptionTier { none, monthly, quarterly, yearly }
 
 extension SubscriptionPeriodExt on SubscriptionPeriod {
   String get displayName {
@@ -177,21 +168,21 @@ class SubscriptionProduct extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        type,
-        googlePlayId,
-        appStoreId,
-        price,
-        priceCn,
-        originalPrice,
-        originalPriceCn,
-        benefits,
-        displayName,
-        isPopular,
-        isBestValue,
-        goodsId,
-        sort,
-      ];
+    id,
+    type,
+    googlePlayId,
+    appStoreId,
+    price,
+    priceCn,
+    originalPrice,
+    originalPriceCn,
+    benefits,
+    displayName,
+    isPopular,
+    isBestValue,
+    goodsId,
+    sort,
+  ];
 }
 
 class RechargeGoodsConfigItem extends Equatable {
@@ -205,6 +196,7 @@ class RechargeGoodsConfigItem extends Equatable {
     required this.originalPrice,
     required this.sort,
     required this.isEnable,
+    this.rechargeGoodsGive = 0,
     this.description,
     this.goodsCode,
   });
@@ -218,6 +210,7 @@ class RechargeGoodsConfigItem extends Equatable {
   final String originalPrice;
   final int sort;
   final bool isEnable;
+  final int rechargeGoodsGive;
   final String? description;
   final String? goodsCode;
 
@@ -261,11 +254,7 @@ class RechargeGoodsConfigItem extends Equatable {
         'googleProductId',
         'productId',
       ]),
-      goodsIosId: readString([
-        'goodsIosId',
-        'appStoreId',
-        'iosProductId',
-      ]),
+      goodsIosId: readString(['goodsIosId', 'appStoreId', 'iosProductId']),
       price: readString([
         'rechargeGoodsPrice',
         'price',
@@ -280,14 +269,18 @@ class RechargeGoodsConfigItem extends Equatable {
       ]),
       sort: parseInt(json['rechargeGoodsSort'] ?? json['sort'], 999),
       isEnable: parseBool(
-        json['isEnable'] ?? json['status'] ?? ((json['isDelete'] ?? 0) == 0 ? 1 : 0),
+        json['isEnable'] ??
+            json['status'] ??
+            ((json['isDelete'] ?? 0) == 0 ? 1 : 0),
       ),
-      description: readString([
-        'rechargeGoodsSubname2',
-        'description',
-        'desc',
-        'remark',
-      ]).isEmpty
+      rechargeGoodsGive: parseInt(json['rechargeGoodsGive']),
+      description:
+          readString([
+            'rechargeGoodsSubname2',
+            'description',
+            'desc',
+            'remark',
+          ]).isEmpty
           ? null
           : readString([
               'rechargeGoodsSubname2',
@@ -303,18 +296,19 @@ class RechargeGoodsConfigItem extends Equatable {
 
   @override
   List<Object?> get props => [
-        goodsId,
-        rechargeGoodsType,
-        goodsName,
-        goodsGoogleId,
-        goodsIosId,
-        price,
-        originalPrice,
-        sort,
-        isEnable,
-        description,
-        goodsCode,
-      ];
+    goodsId,
+    rechargeGoodsType,
+    goodsName,
+    goodsGoogleId,
+    goodsIosId,
+    price,
+    originalPrice,
+    sort,
+    isEnable,
+    rechargeGoodsGive,
+    description,
+    goodsCode,
+  ];
 }
 
 /// Member benefits configuration
@@ -336,12 +330,7 @@ class MemberBenefits {
     'Priority customer support',
   ];
 
-  static const freeTierCn = [
-    '观看广告内容',
-    '标准画质 (480p)',
-    '有限剧库',
-    '不支持下载',
-  ];
+  static const freeTierCn = ['观看广告内容', '标准画质 (480p)', '有限剧库', '不支持下载'];
 
   static const vipTierCn = [
     '无广告观看体验',
@@ -366,7 +355,7 @@ class SubscriptionProducts {
     SubscriptionProduct(
       id: 'vip1',
       type: SubscriptionPeriod.monthly,
-      googlePlayId: '$_googlePlayBase.1',  // com.qahwa.vip.1
+      googlePlayId: '$_googlePlayBase.1', // com.qahwa.vip.1
       appStoreId: '$_appStoreBase.1',
       price: r'$24.99',
       priceCn: '¥30',
@@ -383,7 +372,7 @@ class SubscriptionProducts {
     SubscriptionProduct(
       id: 'vip2',
       type: SubscriptionPeriod.quarterly,
-      googlePlayId: '$_googlePlayBase.2',  // com.qahwa.vip.2
+      googlePlayId: '$_googlePlayBase.2', // com.qahwa.vip.2
       appStoreId: '$_appStoreBase.2',
       price: r'$32.99',
       priceCn: '¥78',
@@ -401,7 +390,7 @@ class SubscriptionProducts {
     SubscriptionProduct(
       id: 'vip3',
       type: SubscriptionPeriod.yearly,
-      googlePlayId: '$_googlePlayBase.3',  // com.qahwa.vip.3
+      googlePlayId: '$_googlePlayBase.3', // com.qahwa.vip.3
       appStoreId: '$_appStoreBase.3',
       price: r'$99.99',
       priceCn: '¥258',
@@ -431,10 +420,14 @@ class SubscriptionProducts {
       final item = enabledItems[index];
       final type = _inferPeriod(item);
       return SubscriptionProduct(
-        id: item.goodsCode?.isNotEmpty == true ? item.goodsCode! : _buildId(item, type, index),
+        id: item.goodsCode?.isNotEmpty == true
+            ? item.goodsCode!
+            : _buildId(item, type, index),
         type: type,
         googlePlayId: item.goodsGoogleId,
-        appStoreId: item.goodsIosId.isNotEmpty ? item.goodsIosId : item.goodsGoogleId,
+        appStoreId: item.goodsIosId.isNotEmpty
+            ? item.goodsIosId
+            : item.goodsGoogleId,
         price: _formatPrice(item.price),
         priceCn: _formatPrice(item.price),
         originalPrice: item.originalPrice.isNotEmpty
@@ -462,10 +455,14 @@ class SubscriptionProducts {
       item.description ?? '',
     ].join(' ').toLowerCase();
 
-    if (source.contains('year') || source.contains('annual') || source.contains('12')) {
+    if (source.contains('year') ||
+        source.contains('annual') ||
+        source.contains('12')) {
       return SubscriptionPeriod.yearly;
     }
-    if (source.contains('quarter') || source.contains('season') || source.contains('3 month')) {
+    if (source.contains('quarter') ||
+        source.contains('season') ||
+        source.contains('3 month')) {
       return SubscriptionPeriod.quarterly;
     }
     return SubscriptionPeriod.monthly;
@@ -488,10 +485,16 @@ class SubscriptionProducts {
   }
 
   static String _formatPrice(String value) {
-    final cleaned = value.replaceAll(RegExp(r'[\u0000-\u001F\u007F\u200E\u200F\u202A-\u202E]'), '');
+    final cleaned = value.replaceAll(
+      RegExp(r'[\u0000-\u001F\u007F\u200E\u200F\u202A-\u202E]'),
+      '',
+    );
     final trimmed = cleaned.trim();
     if (trimmed.isEmpty) return '';
-    if (trimmed.startsWith(r'$') || trimmed.startsWith('¥') || trimmed.startsWith('€') || trimmed.startsWith('£')) {
+    if (trimmed.startsWith(r'$') ||
+        trimmed.startsWith('¥') ||
+        trimmed.startsWith('€') ||
+        trimmed.startsWith('£')) {
       return trimmed;
     }
     return r'$' + trimmed;

@@ -50,9 +50,29 @@ class HaiPayMethod extends Equatable {
   /// Whether this opens in in-app WebView
   bool get isInAppWebView => jumpType == 1;
 
+  /// True when this backend method represents Google Play Billing.
+  ///
+  /// The backend may identify it through any of the payment method fields.
+  /// Matching is intentionally limited to Google/Play/Billing tokens so a
+  /// normal HaiPay method cannot be routed into native billing by accident.
+  bool get isGooglePlay {
+    final values = [name, payType, inBankCode].map(
+      (value) => value.trim().toLowerCase().replaceAll(RegExp(r'[\s-]+'), '_'),
+    );
+    return values.any(
+      (value) =>
+          value.contains('google_play') ||
+          value.contains('googleplay') ||
+          value == 'google' ||
+          value == 'play_billing' ||
+          value == 'billing',
+    );
+  }
+
   /// True if this method is routed through HaiPay (`HAIPAY_*` ids in our backend)
   bool get isHaiPayRouted =>
-      name.startsWith('HAIPAY_') || inBankCode.startsWith('HAIPAY_');
+      !isGooglePlay &&
+      (name.startsWith('HAIPAY_') || inBankCode.startsWith('HAIPAY_'));
 
   /// Resolve the best display name for the given locale.
   /// Falls back to English, then backend raw name.
@@ -116,8 +136,15 @@ class HaiPayMethod extends Equatable {
   }
 
   @override
-  List<Object?> get props =>
-      [id, name, icon, payType, inBankCode, countryCode, description];
+  List<Object?> get props => [
+    id,
+    name,
+    icon,
+    payType,
+    inBankCode,
+    countryCode,
+    description,
+  ];
 }
 
 /// HaiPay order response (returned by POST /api/pay/userRechange and /api/pay/initPay)
@@ -151,9 +178,7 @@ class HaiPayOrder extends Equatable {
 
 /// HaiPay payment status poll result (equivalent to Android's PayReaBean)
 class HaiPayStatus extends Equatable {
-  const HaiPayStatus({
-    required this.isPay,
-  });
+  const HaiPayStatus({required this.isPay});
 
   /// "1" = unpaid, "0" = paid
   final String isPay;
@@ -162,9 +187,7 @@ class HaiPayStatus extends Equatable {
   bool get isUnpaid => isPay == '1';
 
   factory HaiPayStatus.fromJson(Map<String, dynamic> json) {
-    return HaiPayStatus(
-      isPay: json['isPay'] as String? ?? '1',
-    );
+    return HaiPayStatus(isPay: json['isPay'] as String? ?? '1');
   }
 
   @override
@@ -173,9 +196,7 @@ class HaiPayStatus extends Equatable {
 
 /// Backend payment method list response
 class HaiPayMethodsResponse extends Equatable {
-  const HaiPayMethodsResponse({
-    required this.methods,
-  });
+  const HaiPayMethodsResponse({required this.methods});
 
   final List<HaiPayMethod> methods;
 
@@ -206,7 +227,9 @@ class HaiPayMethodsResponse extends Equatable {
   factory HaiPayMethodsResponse.fromJson(dynamic data) {
     List<HaiPayMethod> methods = [];
     if (data is List) {
-      methods = data.map((e) => HaiPayMethod.fromJson(e as Map<String, dynamic>)).toList();
+      methods = data
+          .map((e) => HaiPayMethod.fromJson(e as Map<String, dynamic>))
+          .toList();
     }
     return HaiPayMethodsResponse(methods: methods);
   }

@@ -7,6 +7,7 @@ import '../models/unlock_product.dart';
 import '../models/payment_channel.dart';
 import '../models/subscription_product.dart';
 import '../providers/coin_record_provider.dart';
+import '../providers/recharge_provider.dart';
 import '../services/payment_service.dart';
 import '../services/unified_payment_handler.dart';
 import '../widgets/payment_channel_selector.dart';
@@ -88,7 +89,8 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   /// 正在处理的商品ID集合，支持同时处理多个商品
   final Set<int> _processingProductIds = {};
 
-  bool _isProcessingProduct(int goodsId) => _processingProductIds.contains(goodsId);
+  bool _isProcessingProduct(int goodsId) =>
+      _processingProductIds.contains(goodsId);
 
   void _setProcessing(int goodsId, bool processing) {
     setState(() {
@@ -117,23 +119,28 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     final bottomPadding = mediaQuery.viewInsets.bottom > 0
         ? mediaQuery.viewInsets.bottom
         : mediaQuery.padding.bottom + 16;
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF2D2440),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.only(bottom: bottomPadding),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildTopDecoration(),
-              _buildTitleSection(l10n),
-              _buildPriceInfoRow(l10n),
-              _buildProductsGrid(l10n),
-              _buildAgreementText(),
-            ],
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        constraints: BoxConstraints(maxHeight: mediaQuery.size.height * 0.88),
+        decoration: const BoxDecoration(
+          color: Color(0xFF2D2440),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: bottomPadding),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildTopDecoration(),
+                _buildTitleSection(l10n),
+                _buildPriceInfoRow(l10n),
+                _buildProductsGrid(l10n),
+                _buildAgreementText(),
+              ],
+            ),
           ),
         ),
       ),
@@ -152,8 +159,8 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
             borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
         ),
-        Positioned(
-          left: 20,
+        PositionedDirectional(
+          start: 20,
           top: -10,
           child: Container(
             width: 50,
@@ -174,8 +181,8 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
             ),
           ),
         ),
-        Positioned(
-          right: 12,
+        PositionedDirectional(
+          end: 12,
           top: 0,
           child: GestureDetector(
             onTap: () {
@@ -191,11 +198,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
                 color: Colors.grey.withValues(alpha: 0.3),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.close,
-                color: Colors.white,
-                size: 20,
-              ),
+              child: const Icon(Icons.close, color: Colors.white, size: 20),
             ),
           ),
         ),
@@ -204,13 +207,23 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   }
 
   Widget _buildTitleSection(AppLocalizations l10n) {
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 50, 8),
+      padding: EdgeInsetsDirectional.fromSTEB(
+        isRtl ? 50 : 16,
+        8,
+        isRtl ? 16 : 50,
+        8,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(left: 60, top: 4),
+            padding: EdgeInsetsDirectional.only(
+              start: isRtl ? 0 : 60,
+              end: isRtl ? 60 : 0,
+              top: 4,
+            ),
             child: ShaderMask(
               shaderCallback: (bounds) => const LinearGradient(
                 colors: [Color(0xFF8B4513), Color(0xFFD2691E)],
@@ -229,13 +242,13 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           ),
           const SizedBox(height: 2),
           Padding(
-            padding: const EdgeInsets.only(left: 60),
+            padding: EdgeInsetsDirectional.only(
+              start: isRtl ? 0 : 60,
+              end: isRtl ? 60 : 0,
+            ),
             child: Text(
               '${l10n.episode} ${widget.episodeIndex + 1} - ${widget.dramaTitle}',
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 11,
-              ),
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -252,38 +265,40 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      width: double.infinity,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 4,
         children: [
-          Text(
-            '${l10n.episodePrice}: ',
-            style: const TextStyle(
-              color: Color(0xFF333333),
-              fontSize: 12,
-            ),
+          _buildPriceDetail(
+            label: l10n.episodePrice,
+            value: '${episodePrice.toInt()} ${l10n.kCoin}',
           ),
-          Text(
-            '${episodePrice.toInt()} ${l10n.kCoin}',
-            style: const TextStyle(
-              color: Colors.red,
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-            ),
+          _buildPriceDetail(
+            label: l10n.accountBalance,
+            value: '$balance ${l10n.kCoin}',
           ),
-          const SizedBox(width: 12),
-          Text(
-            '${l10n.accountBalance}: ',
-            style: const TextStyle(
-              color: Color(0xFF333333),
-              fontSize: 12,
-            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceDetail({required String label, required String value}) {
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: '$label: ',
+            style: const TextStyle(color: Color(0xFF333333), fontSize: 12),
           ),
-          Text(
-            '$balance ${l10n.kCoin}',
+          TextSpan(
+            text: value,
             style: const TextStyle(
               color: Colors.red,
               fontSize: 13,
@@ -292,6 +307,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           ),
         ],
       ),
+      textAlign: TextAlign.center,
     );
   }
 
@@ -310,12 +326,10 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       );
     }
 
-    final crossAxisCount = allProducts.length == 1
-        ? 1
-        : (allProducts.length <= 4 ? 2 : 3);
-    final childAspectRatio = crossAxisCount == 1
-        ? 3.2
-        : (crossAxisCount == 2 ? 1.6 : 1.4);
+    // Keep every product card wide enough for localized names, prices, and tags.
+    // Three columns leave too little usable width on compact phones.
+    final crossAxisCount = allProducts.length == 1 ? 1 : 2;
+    final childAspectRatio = crossAxisCount == 1 ? 3.2 : 1.75;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -344,7 +358,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     final hasDiscount = originalPrice != null && originalPrice > price;
 
     final priceInt = price.toInt();
-    final mainLabel = price - priceInt == 0 ? '¥$priceInt' : '¥${price.toStringAsFixed(2)}';
+    final mainLabel = price - priceInt == 0
+        ? '¥$priceInt'
+        : '¥${price.toStringAsFixed(2)}';
     final subLabel = product.goodsName.isNotEmpty ? product.goodsName : '';
 
     String? tagLabel;
@@ -357,7 +373,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     }
 
     return GestureDetector(
-      onTap: _isProcessingProduct(product.goodsId) ? null : () => _handleProductTap(product),
+      onTap: _isProcessingProduct(product.goodsId)
+          ? null
+          : () => _handleProductTap(product),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -424,7 +442,10 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
                 top: 0,
                 right: 0,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
@@ -478,32 +499,20 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         children: [
           Text(
             l10n.chargingAgreement,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 11,
-            ),
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
           ),
           const SizedBox(height: 2),
           Text(
             l10n.chargingRule1,
-            style: const TextStyle(
-              color: Colors.white60,
-              fontSize: 10,
-            ),
+            style: const TextStyle(color: Colors.white60, fontSize: 10),
           ),
           Text(
             l10n.chargingRule2,
-            style: const TextStyle(
-              color: Colors.white60,
-              fontSize: 10,
-            ),
+            style: const TextStyle(color: Colors.white60, fontSize: 10),
           ),
           Text(
             l10n.chargingRule3,
-            style: const TextStyle(
-              color: Colors.white60,
-              fontSize: 10,
-            ),
+            style: const TextStyle(color: Colors.white60, fontSize: 10),
           ),
         ],
       ),
@@ -524,10 +533,98 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       return;
     }
 
+    if (product.type == UnlockProductType.coinRecharge) {
+      await _confirmCoinRecharge(product);
+      return;
+    }
+
     if (balance >= product.price) {
       await _confirmAndUnlockByBalance(product);
     } else {
       await _confirmAndUnlockByPurchase(product);
+    }
+  }
+
+  /// Confirm and start payment for a K-coin recharge package.
+  Future<void> _confirmCoinRecharge(UnlockProduct product) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.confirmPurchase),
+        content: Text(product.goodsName),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(l10n.purchase),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    _setProcessing(product.goodsId, true);
+    try {
+      final rechargeProduct = product.toRechargeProduct();
+      if (BuildFlavor.isGoogle) {
+        final handler = ref.read(rechargePurchaseHandlerProvider);
+        final success = await handler.purchase(rechargeProduct);
+        if (!success && mounted) {
+          AppSnackBar.show(
+            context,
+            message: handler.lastError ?? l10n.purchaseFailed,
+          );
+        }
+        return;
+      }
+
+      final handler = ref.read(unifiedPaymentHandlerProvider);
+      final price = product.price.toStringAsFixed(2);
+      final haiPayMethods = await handler.fetchHaiPayMethods(
+        price: price,
+        productName: product.goodsName,
+      );
+      if (!mounted) return;
+
+      final channel = await PaymentChannelSelector.show(
+        context: context,
+        price: price,
+        productName: product.goodsName,
+        haiPayMethods: haiPayMethods,
+      );
+      if (channel == null || !mounted) return;
+
+      if (channel.isGooglePlay) {
+        final rechargeHandler = ref.read(rechargePurchaseHandlerProvider);
+        final success = await rechargeHandler.purchase(rechargeProduct);
+        if (!success && mounted) {
+          AppSnackBar.show(
+            context,
+            message: rechargeHandler.lastError ?? l10n.purchaseFailed,
+          );
+        }
+      } else {
+        await handler.purchaseRecharge(
+          product: rechargeProduct,
+          price: price,
+          context: context,
+          channel: channel,
+          onPaymentComplete: (paid) {
+            if (paid) {
+              ref.read(coinBalanceInfoProvider.notifier).load();
+            }
+          },
+        );
+      }
+    } finally {
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+      }
     }
   }
 
@@ -538,7 +635,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.confirmUnlock),
-        content: Text(l10n.confirmUnlockMessage(product.price.toInt(), product.goodsName)),
+        content: Text(
+          l10n.confirmUnlockMessage(product.price.toInt(), product.goodsName),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -656,9 +755,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         await coinNotifier.load();
 
         AppSnackBar.show(context, message: l10n.unlockSuccess);
-        Navigator.of(context).pop(UnlockResult.success(
-          episodeIndex: widget.episodeIndex,
-        ));
+        Navigator.of(
+          context,
+        ).pop(UnlockResult.success(episodeIndex: widget.episodeIndex));
       } else {
         AppSnackBar.show(context, message: resp?.error ?? l10n.unlockFailed);
       }
@@ -719,11 +818,14 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         await coinNotifier.load();
 
         AppSnackBar.show(context, message: l10n.purchaseSuccess);
-        Navigator.of(context).pop(UnlockResult.success(
-          episodeIndex: widget.episodeIndex,
-        ));
+        Navigator.of(
+          context,
+        ).pop(UnlockResult.success(episodeIndex: widget.episodeIndex));
       } else {
-        AppSnackBar.show(context, message: paymentService.lastError ?? l10n.purchaseFailed);
+        AppSnackBar.show(
+          context,
+          message: paymentService.lastError ?? l10n.purchaseFailed,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -734,7 +836,10 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   }
 
   /// 通过 HaiPay H5 购买解锁
-  Future<void> _performUnlockByHaiPay(UnlockProduct product, PaymentChannel channel) async {
+  Future<void> _performUnlockByHaiPay(
+    UnlockProduct product,
+    PaymentChannel channel,
+  ) async {
     final l10n = AppLocalizations.of(context);
     _setProcessing(product.goodsId, true);
 
@@ -764,7 +869,10 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       if (opened) {
         // WebView pushed. Do nothing — wait for WebView to pop itself.
       } else {
-        AppSnackBar.show(context, message: handler.lastError ?? l10n.purchaseFailed);
+        AppSnackBar.show(
+          context,
+          message: handler.lastError ?? l10n.purchaseFailed,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -847,7 +955,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
       final success = await paymentService.purchase(
         product: products.first,
-        applicationUserName: ref.read(storageServiceProvider).getString('user_id'),
+        applicationUserName: ref
+            .read(storageServiceProvider)
+            .getString('user_id'),
       );
 
       if (!mounted) return;
@@ -860,7 +970,10 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         AppSnackBar.show(context, message: l10n.vipSubscriptionSuccess);
         Navigator.of(context).pop();
       } else {
-        AppSnackBar.show(context, message: paymentService.lastError ?? l10n.vipSubscriptionFailed);
+        AppSnackBar.show(
+          context,
+          message: paymentService.lastError ?? l10n.vipSubscriptionFailed,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -871,7 +984,10 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   }
 
   /// VIP 订阅购买 - HaiPay
-  Future<void> _performVipByHaiPay(UnlockProduct product, PaymentChannel channel) async {
+  Future<void> _performVipByHaiPay(
+    UnlockProduct product,
+    PaymentChannel channel,
+  ) async {
     final l10n = AppLocalizations.of(context);
 
     try {
@@ -912,7 +1028,10 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         // When the user completes payment, the WebView pops itself
         // and we land back here — caller should refresh state then.
       } else {
-        AppSnackBar.show(context, message: handler.lastError ?? l10n.vipSubscriptionFailed);
+        AppSnackBar.show(
+          context,
+          message: handler.lastError ?? l10n.vipSubscriptionFailed,
+        );
       }
     } catch (e) {
       if (mounted) {

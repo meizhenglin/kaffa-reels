@@ -31,25 +31,21 @@ class UnlockConfig extends Equatable {
 
   @override
   List<Object?> get props => [
-        videoId,
-        episodeUnlockPrice,
-        dramaUnlockPrice,
-        episodeUnlockGoodsId,
-        dramaUnlockGoodsId,
-        vipProducts,
-        coinProducts,
-        episodeUnlockProducts,
-        dramaUnlockProducts,
-        allProducts,
-      ];
+    videoId,
+    episodeUnlockPrice,
+    dramaUnlockPrice,
+    episodeUnlockGoodsId,
+    dramaUnlockGoodsId,
+    vipProducts,
+    coinProducts,
+    episodeUnlockProducts,
+    dramaUnlockProducts,
+    allProducts,
+  ];
 }
 
 /// 解锁商品类型
-enum UnlockProductType {
-  vip,
-  episode,
-  season,
-}
+enum UnlockProductType { vip, coinRecharge, episode, season }
 
 /// 解锁商品模型
 class UnlockProduct extends Equatable {
@@ -75,13 +71,17 @@ class UnlockProduct extends Equatable {
 
   /// Google Play 商品ID
   final String? googlePlayId;
+
   /// iOS 商品ID
   final String? iosProductId;
 
   bool get hasDiscount => originalPrice != null && originalPrice! > price;
 
   /// 从 RechargeProduct 转换
-  factory UnlockProduct.fromRechargeProduct(RechargeProduct product, UnlockProductType type) {
+  factory UnlockProduct.fromRechargeProduct(
+    RechargeProduct product,
+    UnlockProductType type,
+  ) {
     final priceValue = double.tryParse(product.price) ?? 0.0;
     return UnlockProduct(
       goodsId: product.goodsId,
@@ -129,7 +129,7 @@ enum UnlockResultType {
   success,
   failed,
   cancelled,
-  loginRequired,  // 需要登录
+  loginRequired, // 需要登录
 }
 
 class UnlockResult {

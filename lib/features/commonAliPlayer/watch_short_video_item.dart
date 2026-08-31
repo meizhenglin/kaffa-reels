@@ -14,8 +14,10 @@ class WatchShortVideoItem extends StatefulWidget {
   final VoidCallback? onLockedWatchNowTap;
   // 看广告解锁按钮的回调（激励广告就绪时显示）
   final VoidCallback? onWatchAdToUnlock;
-  final Widget Function(BuildContext context, VideoInfo videoInfo)? overlayBuilder;
-  final Widget Function(BuildContext context, VideoInfo videoInfo)? topOverlayBuilder;
+  final Widget Function(BuildContext context, VideoInfo videoInfo)?
+  overlayBuilder;
+  final Widget Function(BuildContext context, VideoInfo videoInfo)?
+  topOverlayBuilder;
   final bool showDebugInfo;
   final VoidCallback? onCompleted;
   final String quality; // '480P', '720P', '1080P'
@@ -84,7 +86,8 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
   void initState() {
     super.initState();
     _currentUrl = _getUrlForQuality(widget.quality);
-    _hasResolvedPlayableUrl = !widget.resolvePlayableUrl || _currentUrl.isNotEmpty;
+    _hasResolvedPlayableUrl =
+        !widget.resolvePlayableUrl || _currentUrl.isNotEmpty;
     _isForegroundActive = widget.autoPlay;
     _isLoading = widget.autoPlay && _currentUrl.isNotEmpty;
 
@@ -103,8 +106,12 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
       });
     }
 
-    if (widget.resolvePlayableUrl && _currentUrl.isEmpty && !_isPlaybackBlocked) {
-      scheduleMicrotask(() => prefetchPlayableUrl(playIfReady: widget.autoPlay));
+    if (widget.resolvePlayableUrl &&
+        _currentUrl.isEmpty &&
+        !_isPlaybackBlocked) {
+      scheduleMicrotask(
+        () => prefetchPlayableUrl(playIfReady: widget.autoPlay),
+      );
     }
   }
 
@@ -117,34 +124,38 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
     // Always register strategies (they get replaced if already registered)
     final stateMounted = mounted;
     _controller!.strategyManager
-      ..register(FirstFrameStrategy(
-        onPrepared: (cost) {
-          _lastPrepareCostMs = cost.inMilliseconds;
-          debugPrint(
-            '[$_tag][strategy][prepared] id=${widget.videoInfo.id} costMs=$_lastPrepareCostMs url=$url mounted=$stateMounted',
-          );
-          setState(() {
-            _isLoading = false;
-          });
-        },
-        onFirstFrame: (cost) {
-          _lastFirstFrameCostMs = cost.inMilliseconds;
-          debugPrint(
-            '[$_tag][strategy][firstFrame] id=${widget.videoInfo.id} costMs=$_lastFirstFrameCostMs url=$url mounted=$stateMounted',
-          );
-          setState(() {
-            _isLoading = false;
-          });
-        },
-      ))
-      ..register(StutterDetectStrategy(
-        onStutterDetected: (info) {
-          _lastStutterInfo = info;
-          debugPrint(
-            '[$_tag][strategy][stutter] id=${widget.videoInfo.id} count=${info.stutterCount} totalMs=${info.totalStutterDuration.inMilliseconds} rate=${info.stutterRate.toStringAsFixed(4)} url=$url',
-          );
-        },
-      ));
+      ..register(
+        FirstFrameStrategy(
+          onPrepared: (cost) {
+            _lastPrepareCostMs = cost.inMilliseconds;
+            debugPrint(
+              '[$_tag][strategy][prepared] id=${widget.videoInfo.id} costMs=$_lastPrepareCostMs url=$url mounted=$stateMounted',
+            );
+            setState(() {
+              _isLoading = false;
+            });
+          },
+          onFirstFrame: (cost) {
+            _lastFirstFrameCostMs = cost.inMilliseconds;
+            debugPrint(
+              '[$_tag][strategy][firstFrame] id=${widget.videoInfo.id} costMs=$_lastFirstFrameCostMs url=$url mounted=$stateMounted',
+            );
+            setState(() {
+              _isLoading = false;
+            });
+          },
+        ),
+      )
+      ..register(
+        StutterDetectStrategy(
+          onStutterDetected: (info) {
+            _lastStutterInfo = info;
+            debugPrint(
+              '[$_tag][strategy][stutter] id=${widget.videoInfo.id} count=${info.stutterCount} totalMs=${info.totalStutterDuration.inMilliseconds} rate=${info.stutterRate.toStringAsFixed(4)} url=$url',
+            );
+          },
+        ),
+      );
     _hasPlayer = true;
     _isLoading = autoPlay && url.isNotEmpty;
 
@@ -184,15 +195,21 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
   void didUpdateWidget(covariant WatchShortVideoItem oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    debugPrint('[$_tag][didUpdateWidget] quality: ${oldWidget.quality} -> ${widget.quality} _hasPlayer=$_hasPlayer');
+    debugPrint(
+      '[$_tag][didUpdateWidget] quality: ${oldWidget.quality} -> ${widget.quality} _hasPlayer=$_hasPlayer',
+    );
 
     // Handle quality change - reload video with new URL
     if (widget.quality != oldWidget.quality) {
       final newUrl = _getUrlForQuality(widget.quality);
-      debugPrint('[$_tag][qualityChange] from=${oldWidget.quality} to=${widget.quality} newUrl=$newUrl currentUrl=$_currentUrl');
+      debugPrint(
+        '[$_tag][qualityChange] from=${oldWidget.quality} to=${widget.quality} newUrl=$newUrl currentUrl=$_currentUrl',
+      );
       _currentUrl = newUrl;
       _isLoading = true;
-      debugPrint('[$_tag][qualityChange] _hasPlayer=$_hasPlayer _isPlaybackBlocked=$_isPlaybackBlocked');
+      debugPrint(
+        '[$_tag][qualityChange] _hasPlayer=$_hasPlayer _isPlaybackBlocked=$_isPlaybackBlocked',
+      );
       if (_hasPlayer && !_isPlaybackBlocked) {
         debugPrint('[$_tag][qualityChange] calling _configurePlayer');
         _configurePlayer(_currentUrl, autoPlay: _isPlaying);
@@ -274,7 +291,10 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
       _hasResolvedPlayableUrl = true;
       if (_currentUrl.isNotEmpty) {
         if (_controller == null) {
-          _configurePlayer(_currentUrl, autoPlay: playIfReady || (widget.autoPlay && _isForegroundActive));
+          _configurePlayer(
+            _currentUrl,
+            autoPlay: playIfReady || (widget.autoPlay && _isForegroundActive),
+          );
           if (mounted) {
             setState(() {});
           }
@@ -291,7 +311,10 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
 
     if (_hasResolvedPlayableUrl && _currentUrl.isNotEmpty) {
       if (_controller == null) {
-        _configurePlayer(_currentUrl, autoPlay: playIfReady || (widget.autoPlay && _isForegroundActive));
+        _configurePlayer(
+          _currentUrl,
+          autoPlay: playIfReady || (widget.autoPlay && _isForegroundActive),
+        );
         if (mounted) {
           setState(() {});
         }
@@ -516,9 +539,7 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.58),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.14),
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
               ),
               child: const Text(
                 '2x',
@@ -569,7 +590,8 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
       child: Image.network(
         coverUrl,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => Container(color: Colors.black),
+        errorBuilder: (context, error, stackTrace) =>
+            Container(color: Colors.black),
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null) return child;
           return Container(
@@ -607,20 +629,19 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (hasWatchNow)
+              if (hasWatchAd)
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: widget.onLockedWatchNowTap,
+                  onTap: widget.onWatchAdToUnlock,
                   child: Image.asset(
-                    'assets/images/watch_now.png',
-                    width: 156,
-                    height: 110,
+                    'assets/images/unlock.png',
+                    width: 500,
+                    height: 300,
                     fit: BoxFit.contain,
                   ),
                 ),
               if (hasWatchNow && hasWatchAd) const SizedBox(height: 16),
-              if (hasWatchAd)
-                _buildWatchAdButton(),
+              if (hasWatchNow) _buildPurchaseVipButton(),
             ],
           ),
         ),
@@ -628,38 +649,19 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
     );
   }
 
-  /// 「看广告解锁该集」按钮（激励广告入口）
-  Widget _buildWatchAdButton() {
+  /// 会员购买入口。
+  Widget _buildPurchaseVipButton() {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: widget.onWatchAdToUnlock,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFD700),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(Icons.play_circle_outline, color: Colors.white, size: 18),
-            SizedBox(width: 6),
-            Text(
-              'Watch Ad to Unlock',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+      onTap: widget.onLockedWatchNowTap,
+      child: const Text(
+        'Purchase VIP',
+        style: TextStyle(
+          color: Color(0xFFFFE389),
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          decoration: TextDecoration.underline,
+          decorationColor: Color(0xFFFFE389),
         ),
       ),
     );
@@ -714,13 +716,13 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
                     BottomBarElements.subtitle,
                     BottomBarElements.refresh,
                   },
-                    SlotType.playControl: {
-                      PlayControlElements.doubleTap,
-                      PlayControlElements.longPress,
-                      PlayControlElements.leftVerticalDrag,
-                      PlayControlElements.rightVerticalDrag,
-                      PlayControlElements.horizontalDrag,
-                    },
+                  SlotType.playControl: {
+                    PlayControlElements.doubleTap,
+                    PlayControlElements.longPress,
+                    PlayControlElements.leftVerticalDrag,
+                    PlayControlElements.rightVerticalDrag,
+                    PlayControlElements.horizontalDrag,
+                  },
                   SlotType.overlays: const <String>{},
                 },
               ),
@@ -749,9 +751,7 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
             Positioned.fill(
               child: IgnorePointer(
                 ignoring: true,
-                child: ColoredBox(
-                  color: Colors.black.withValues(alpha: 0.28),
-                ),
+                child: ColoredBox(color: Colors.black.withValues(alpha: 0.28)),
               ),
             ),
           _buildAnimatedWatchControls(),
@@ -765,7 +765,10 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
               top: 96,
               child: IgnorePointer(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.72),
                     borderRadius: BorderRadius.circular(10),
@@ -829,7 +832,10 @@ class _WatchShortVideoProgressBarState
                 final bufferValue = totalMs > 0 ? bufferedMs / totalMs : 0.0;
 
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
                       Expanded(

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/widgets/gradient_scaffold.dart';
@@ -45,16 +45,14 @@ class _RechargePageState extends ConsumerState<RechargePage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(product.name),
-            const SizedBox(height: 8),
             Text(
               product.price,
-              style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                ctx,
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Text('${product.totalAmount} ${l10n.coins ?? 'coins'}'),
+            Text(product.displayAmount ?? product.name),
           ],
         ),
         actions: [
@@ -146,14 +144,21 @@ class _RechargePageState extends ConsumerState<RechargePage> {
                         const SizedBox(height: 40),
                         Row(
                           children: [
-                            const Icon(Icons.monetization_on, color: Colors.amber, size: 48),
+                            const Icon(
+                              Icons.monetization_on,
+                              color: Colors.amber,
+                              size: 48,
+                            ),
                             const SizedBox(width: 16),
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   l10n.myCoins,
-                                  style: const TextStyle(color: Colors.white70, fontSize: 14),
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 14,
+                                  ),
                                 ),
                                 Text(
                                   '${coinState.balance}',
@@ -196,21 +201,19 @@ class _RechargePageState extends ConsumerState<RechargePage> {
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     sliver: SliverGrid(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.85,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final product = state.products[index];
-                          final isSelected = _selectedIndex == index;
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 0.85,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                          ),
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final product = state.products[index];
+                        final isSelected = _selectedIndex == index;
 
-                          return _buildProductCard(product, isSelected, index);
-                        },
-                        childCount: state.products.length,
-                      ),
+                        return _buildProductCard(product, isSelected, index);
+                      }, childCount: state.products.length),
                     ),
                   )
                 else
@@ -232,17 +235,18 @@ class _RechargePageState extends ConsumerState<RechargePage> {
           PositionedDirectional(
             top: MediaQuery.of(context).padding.top + 8,
             start: 8,
-            child: RtlBackButton(
-              onPressed: _handleBack,
-              color: Colors.white,
-            ),
+            child: RtlBackButton(onPressed: _handleBack, color: Colors.white),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildProductCard(RechargeProduct product, bool isSelected, int index) {
+  Widget _buildProductCard(
+    RechargeProduct product,
+    bool isSelected,
+    int index,
+  ) {
     final l10n = AppLocalizations.of(context);
     return GestureDetector(
       onTap: () {
@@ -254,7 +258,9 @@ class _RechargePageState extends ConsumerState<RechargePage> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.amber.withOpacity(0.2) : Colors.white.withOpacity(0.1),
+          color: isSelected
+              ? Colors.amber.withOpacity(0.2)
+              : Colors.white.withOpacity(0.1),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? Colors.amber : Colors.white.withOpacity(0.2),
@@ -272,22 +278,42 @@ class _RechargePageState extends ConsumerState<RechargePage> {
             ),
             const SizedBox(height: 12),
             Text(
-              '${product.totalAmount}',
+              product.displayAmount ?? product.name,
               style: TextStyle(
                 color: isSelected ? Colors.amber : Colors.white,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            Text(
-              l10n.coins,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
+            if (product.bonusAmount > 0) ...[
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.card_giftcard,
+                    color: Colors.orangeAccent,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '+${product.bonusAmount} K-Coin',
+                    style: const TextStyle(
+                      color: Colors.orangeAccent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.amber : Colors.white.withOpacity(0.2),
+                color: isSelected
+                    ? Colors.amber
+                    : Colors.white.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(

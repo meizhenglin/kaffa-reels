@@ -137,7 +137,8 @@ class _GameWebViewPageState extends ConsumerState<GameWebViewPage> {
       }
 
       final action = data['action'] as String?;
-      final callbackId = data['callbackId'] as String?;
+      // SDK 使用 requestId，兼容旧桥接使用的 callbackId。
+      final callbackId = (data['callbackId'] ?? data['requestId']) as String?;
 
       switch (action) {
         case 'showRewardedAd':
@@ -416,12 +417,13 @@ class _GameWebViewPageState extends ConsumerState<GameWebViewPage> {
               var data = typeof msg === 'string' ? JSON.parse(msg) : msg;
               console.log('[QahwaNative] postMessage:', data);
 
-              if (data.action === 'showRewardedAd' && data.requestId) {
+              if ((data.action === 'showRewardedAd' || data.action === 'showInterstitialAd') && data.requestId) {
                 var requestId = data.requestId;
+                var action = data.action;
 
                 // 调用 Flutter 的 QahwaAdChannel
                 if (window.QahwaAdChannel) {
-                  window.QahwaAdChannel.postMessage('action=showRewardedAd&requestId=' + requestId);
+                  window.QahwaAdChannel.postMessage('action=' + action + '&requestId=' + requestId);
                 }
               } else if (data.action === 'setOrientation') {
                 // 屏幕方向设置 - 直接通过 QahwaAdChannel 发送 JSON

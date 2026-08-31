@@ -19,7 +19,7 @@ MobSDK {
                 id 9
                 sortId 9
                 appKey "ZUV2bEZaNWtVYmFPUTljeDZhUzc6MTpjaQ"
-                appSecret "TcZfOscMGrfbMwt84ceA7goYGYtZ173mKFHlurgxkco0ymOu3z"
+                appSecret "TcZfOscMGrfbvMwt84ceA7goYGYtZ173mKFHlumgxkc0ymOu3z"
                 callbackUri "twittersdk://callback"
                 IsUseV2 true
                 shareByAppClient false

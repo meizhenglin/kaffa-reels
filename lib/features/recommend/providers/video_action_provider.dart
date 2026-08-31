@@ -19,10 +19,14 @@ class VideoActionState {
   final Set<String> pendingLikeIds;
   final Set<String> pendingCollectIds;
 
-  bool isLiked(String videoId, {bool fallback = false}) => likeStatus[videoId] ?? fallback;
-  bool isCollected(String videoId, {bool fallback = false}) => collectStatus[videoId] ?? fallback;
-  int likeCount(String videoId, {int fallback = 0}) => likeCounts[videoId] ?? fallback;
-  int collectCount(String videoId, {int fallback = 0}) => collectCounts[videoId] ?? fallback;
+  bool isLiked(String videoId, {bool fallback = false}) =>
+      likeStatus[videoId] ?? fallback;
+  bool isCollected(String videoId, {bool fallback = false}) =>
+      collectStatus[videoId] ?? fallback;
+  int likeCount(String videoId, {int fallback = 0}) =>
+      likeCounts[videoId] ?? fallback;
+  int collectCount(String videoId, {int fallback = 0}) =>
+      collectCounts[videoId] ?? fallback;
   bool isLikePending(String videoId) => pendingLikeIds.contains(videoId);
   bool isCollectPending(String videoId) => pendingCollectIds.contains(videoId);
 
@@ -47,8 +51,8 @@ class VideoActionState {
 
 final videoActionProvider =
     StateNotifierProvider<VideoActionNotifier, VideoActionState>((ref) {
-  return VideoActionNotifier(ref);
-});
+      return VideoActionNotifier(ref);
+    });
 
 class VideoActionNotifier extends StateNotifier<VideoActionState> {
   VideoActionNotifier(this._ref) : super(const VideoActionState());
@@ -61,22 +65,27 @@ class VideoActionNotifier extends StateNotifier<VideoActionState> {
     bool? isCollected,
     int? likeCount,
     int? collectCount,
+    bool overwrite = false,
   }) {
     final nextLikeStatus = Map<String, bool>.from(state.likeStatus);
     final nextCollectStatus = Map<String, bool>.from(state.collectStatus);
     final nextLikeCounts = Map<String, int>.from(state.likeCounts);
     final nextCollectCounts = Map<String, int>.from(state.collectCounts);
 
-    if (isLiked != null && !nextLikeStatus.containsKey(videoId)) {
+    if (isLiked != null &&
+        (overwrite || !nextLikeStatus.containsKey(videoId))) {
       nextLikeStatus[videoId] = isLiked;
     }
-    if (isCollected != null && !nextCollectStatus.containsKey(videoId)) {
+    if (isCollected != null &&
+        (overwrite || !nextCollectStatus.containsKey(videoId))) {
       nextCollectStatus[videoId] = isCollected;
     }
-    if (likeCount != null && !nextLikeCounts.containsKey(videoId)) {
+    if (likeCount != null &&
+        (overwrite || !nextLikeCounts.containsKey(videoId))) {
       nextLikeCounts[videoId] = likeCount;
     }
-    if (collectCount != null && !nextCollectCounts.containsKey(videoId)) {
+    if (collectCount != null &&
+        (overwrite || !nextCollectCounts.containsKey(videoId))) {
       nextCollectCounts[videoId] = collectCount;
     }
 
@@ -103,7 +112,8 @@ class VideoActionNotifier extends StateNotifier<VideoActionState> {
       ..[videoId] = nextValue
           ? currentCount + 1
           : (currentCount > 0 ? currentCount - 1 : 0);
-    final nextPendingLikeIds = Set<String>.from(state.pendingLikeIds)..add(videoId);
+    final nextPendingLikeIds = Set<String>.from(state.pendingLikeIds)
+      ..add(videoId);
 
     state = state.copyWith(
       likeStatus: nextLikeStatus,
@@ -111,13 +121,16 @@ class VideoActionNotifier extends StateNotifier<VideoActionState> {
       pendingLikeIds: nextPendingLikeIds,
     );
 
-    final response = await _ref.read(apiServiceProviderRef).setVideoLike(
+    final response = await _ref
+        .read(apiServiceProviderRef)
+        .setVideoLike(
           videoId: videoId,
           episodesId: episodesId,
           type: nextValue ? 1 : 2,
         );
 
-    final clearedPending = Set<String>.from(state.pendingLikeIds)..remove(videoId);
+    final clearedPending = Set<String>.from(state.pendingLikeIds)
+      ..remove(videoId);
 
     if (!response.isSuccess) {
       final rollback = Map<String, bool>.from(state.likeStatus)
@@ -151,7 +164,8 @@ class VideoActionNotifier extends StateNotifier<VideoActionState> {
       ..[videoId] = nextValue
           ? currentCount + 1
           : (currentCount > 0 ? currentCount - 1 : 0);
-    final nextPendingCollectIds = Set<String>.from(state.pendingCollectIds)..add(videoId);
+    final nextPendingCollectIds = Set<String>.from(state.pendingCollectIds)
+      ..add(videoId);
 
     state = state.copyWith(
       collectStatus: nextCollectStatus,
@@ -159,13 +173,16 @@ class VideoActionNotifier extends StateNotifier<VideoActionState> {
       pendingCollectIds: nextPendingCollectIds,
     );
 
-    final response = await _ref.read(apiServiceProviderRef).setVideoCollect(
+    final response = await _ref
+        .read(apiServiceProviderRef)
+        .setVideoCollect(
           videoId: videoId,
           episodesId: episodesId,
           type: nextValue ? 1 : 2,
         );
 
-    final clearedPending = Set<String>.from(state.pendingCollectIds)..remove(videoId);
+    final clearedPending = Set<String>.from(state.pendingCollectIds)
+      ..remove(videoId);
 
     if (!response.isSuccess) {
       final rollback = Map<String, bool>.from(state.collectStatus)

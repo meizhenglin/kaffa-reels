@@ -18,6 +18,7 @@ class RechargeProduct extends Equatable {
     this.isPopular = false,
     this.isBestValue = false,
     this.description,
+    this.displayAmount,
   });
 
   final int goodsId;
@@ -28,6 +29,7 @@ class RechargeProduct extends Equatable {
   final int bonusAmount;
   final String name;
   final String? description;
+  final String? displayAmount;
   final int sort;
   final bool isEnable;
   final bool isPopular;
@@ -53,9 +55,12 @@ class RechargeProduct extends Equatable {
       iosProductId: item.goodsIosId,
       price: item.price,
       coinAmount: _parseCoinAmount(item),
-      bonusAmount: 0,
+      bonusAmount: item.rechargeGoodsGive,
       name: item.goodsName,
       description: item.description,
+      displayAmount: item.description?.isNotEmpty == true
+          ? item.description
+          : item.goodsName,
       sort: item.sort,
       isEnable: item.isEnable,
     );
@@ -66,7 +71,9 @@ class RechargeProduct extends Equatable {
 
     for (final source in sources) {
       if (source == null || source.isEmpty) continue;
-      final match = RegExp(r'(\d+)\s*(?:coin|币|k)').firstMatch(source.toLowerCase());
+      final match = RegExp(
+        r'(\d+)\s*(?:coin|币|k)',
+      ).firstMatch(source.toLowerCase());
       if (match != null) {
         return int.tryParse(match.group(1) ?? '') ?? 0;
       }
@@ -76,17 +83,16 @@ class RechargeProduct extends Equatable {
 
   @override
   List<Object?> get props => [
-        goodsId,
-        googlePlayId,
-        iosProductId,
-        price,
-        coinAmount,
-        bonusAmount,
-        name,
-        description,
-        sort,
-        isEnable,
-      ];
+    goodsId,
+    googlePlayId,
+    iosProductId,
+    price,
+    coinAmount,
+    bonusAmount,
+    name,
+    description,
+    displayAmount,
+  ];
 }
 
 /// Recharge products state
@@ -120,18 +126,12 @@ class RechargeProductsState {
 
 /// Coin balance state
 class CoinBalanceState {
-  const CoinBalanceState({
-    this.balance = 0,
-    this.isLoading = false,
-  });
+  const CoinBalanceState({this.balance = 0, this.isLoading = false});
 
   final int balance;
   final bool isLoading;
 
-  CoinBalanceState copyWith({
-    int? balance,
-    bool? isLoading,
-  }) {
+  CoinBalanceState copyWith({int? balance, bool? isLoading}) {
     return CoinBalanceState(
       balance: balance ?? this.balance,
       isLoading: isLoading ?? this.isLoading,

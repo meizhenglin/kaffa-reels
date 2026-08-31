@@ -4,11 +4,7 @@ import '../models/game_carousel_item.dart';
 
 /// 游戏轮播图组件 - 无限轮播
 class GameCarousel extends StatefulWidget {
-  const GameCarousel({
-    super.key,
-    required this.items,
-    this.onItemTap,
-  });
+  const GameCarousel({super.key, required this.items, this.onItemTap});
 
   final List<GameCarouselItem> items;
   final void Function(GameCarouselItem item)? onItemTap;
@@ -24,10 +20,10 @@ class _GameCarouselState extends State<GameCarousel> {
   late PageController _pageController;
   int _currentIndex = 0;
   Timer? _autoPlayTimer;
-  
+
   // 初始位置设为中间的大数字，实现伪无限滚动
   static const int _initialPage = 10000;
-  
+
   @override
   void initState() {
     super.initState();
@@ -199,7 +195,7 @@ class _CarouselItem extends StatelessWidget {
     if (item.imageUrl != null && item.imageUrl!.isNotEmpty) {
       return Image.network(
         item.imageUrl!,
-        fit: BoxFit.contain,
+        fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
         loadingBuilder: (context, child, progress) {

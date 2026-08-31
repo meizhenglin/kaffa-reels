@@ -16,7 +16,7 @@ class ShareService {
       );
       register.setupTwitter(
         'ZUV2bEZaNWtVYmFPUTljeDZhUzc6MTpjaQ',
-        'TcZfOscMGrfbMwt84ceA7goYGYlZ173mKFHlurgxkco0ymOu3z',
+        'TcZfOscMGrfbvMwt84ceA7goYGYtZ173mKFHlumgxkc0ymOu3z',
         'https://qahwatv.com/twitter/callback',
       );
       SharesdkPlugin.regist(register);

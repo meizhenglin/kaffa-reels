@@ -6,10 +6,7 @@ import 'meta_ad_manager.dart';
 import 'ad_config.dart';
 
 /// 广告平台枚举
-enum AdPlatform {
-  admob,
-  meta,
-}
+enum AdPlatform { admob, meta }
 
 /// 统一的广告中介器
 /// 同时管理 AdMob 和 Meta 广告，提供统一的接口
@@ -73,7 +70,8 @@ class AdMediator {
     switch (_loadMode) {
       case AdLoadMode.primary:
         // 禁用 AdMob 时只检查 Meta
-        if (AdConfig.isAdmobEnabled && _admobManager.isRewardedAdReady()) return true;
+        if (AdConfig.isAdmobEnabled && _admobManager.isRewardedAdReady())
+          return true;
         if (_metaManager.isRewardedAdReady()) return true;
         return false;
       case AdLoadMode.parallel:
@@ -88,13 +86,16 @@ class AdMediator {
   AdPlatform? getReadyPlatform() {
     if (!AdConfig.isAdEnabled) return null;
 
-    final bool admobReady = AdConfig.isAdmobEnabled && _admobManager.isRewardedAdReady();
+    final bool admobReady =
+        AdConfig.isAdmobEnabled && _admobManager.isRewardedAdReady();
     final bool metaReady = _metaManager.isRewardedAdReady();
 
     // 两个都就绪时，随机选择（50% 概率）
     if (admobReady && metaReady) {
       final selected = Random().nextBool() ? AdPlatform.admob : AdPlatform.meta;
-      debugPrint('[AdMediator] Both platforms ready, randomly selected: $selected');
+      debugPrint(
+        '[AdMediator] Both platforms ready, randomly selected: $selected',
+      );
       return selected;
     }
 
@@ -110,18 +111,22 @@ class AdMediator {
   /// [onNotReady] 所有广告平台都未就绪时回调
   /// [onDismissed] 广告关闭时回调
   /// [preferredPlatform] 优先使用的广告平台（可选）
+  /// [allowPlatformFallback] 指定平台未就绪时是否可切换到另一平台
   Future<bool> showRewardedAd({
     required void Function() onRewardEarned,
     void Function()? onNotReady,
     void Function()? onDismissed,
     AdPlatform? preferredPlatform,
+    bool allowPlatformFallback = true,
   }) async {
     if (!AdConfig.isAdEnabled) {
       onNotReady?.call();
       return false;
     }
 
-    debugPrint('[AdMediator] showRewardedAd called, mode=$_loadMode, preferredPlatform=$preferredPlatform');
+    debugPrint(
+      '[AdMediator] showRewardedAd called, mode=$_loadMode, preferredPlatform=$preferredPlatform',
+    );
 
     // 确定使用哪个平台的广告
     AdPlatform? platformToUse = preferredPlatform;
@@ -130,14 +135,18 @@ class AdMediator {
       platformToUse = getReadyPlatform();
     }
 
-    // 如果指定平台没准备好，尝试另一个
-    if (platformToUse == AdPlatform.admob && !_admobManager.isRewardedAdReady()) {
+    // 如果指定平台没准备好，按需尝试另一个平台。
+    if (allowPlatformFallback &&
+        platformToUse == AdPlatform.admob &&
+        !_admobManager.isRewardedAdReady()) {
       if (_metaManager.isRewardedAdReady()) {
         platformToUse = AdPlatform.meta;
       } else {
         platformToUse = null;
       }
-    } else if (platformToUse == AdPlatform.meta && !_metaManager.isRewardedAdReady()) {
+    } else if (allowPlatformFallback &&
+        platformToUse == AdPlatform.meta &&
+        !_metaManager.isRewardedAdReady()) {
       if (_admobManager.isRewardedAdReady()) {
         platformToUse = AdPlatform.admob;
       } else {
@@ -145,7 +154,13 @@ class AdMediator {
       }
     }
 
-    if (platformToUse == null) {
+    if (platformToUse == null ||
+        (!allowPlatformFallback &&
+            platformToUse == AdPlatform.admob &&
+            !_admobManager.isRewardedAdReady()) ||
+        (!allowPlatformFallback &&
+            platformToUse == AdPlatform.meta &&
+            !_metaManager.isRewardedAdReady())) {
       debugPrint('[AdMediator] No ad platform ready');
       onNotReady?.call();
       return false;
@@ -218,11 +233,13 @@ class AdMediator {
     switch (_loadMode) {
       case AdLoadMode.primary:
         // 禁用 AdMob 时只检查 Meta
-        if (AdConfig.isAdmobEnabled && _admobManager.isInterstitialAdReady()) return true;
+        if (AdConfig.isAdmobEnabled && _admobManager.isInterstitialAdReady())
+          return true;
         if (_metaManager.isInterstitialAdReady()) return true;
         return false;
       case AdLoadMode.parallel:
-        return (AdConfig.isAdmobEnabled && _admobManager.isInterstitialAdReady()) ||
+        return (AdConfig.isAdmobEnabled &&
+                _admobManager.isInterstitialAdReady()) ||
             _metaManager.isInterstitialAdReady();
     }
   }
@@ -231,13 +248,16 @@ class AdMediator {
   AdPlatform? getReadyInterstitialPlatform() {
     if (!AdConfig.isAdEnabled) return null;
 
-    final bool admobReady = AdConfig.isAdmobEnabled && _admobManager.isInterstitialAdReady();
+    final bool admobReady =
+        AdConfig.isAdmobEnabled && _admobManager.isInterstitialAdReady();
     final bool metaReady = _metaManager.isInterstitialAdReady();
 
     // 两个都就绪时，随机选择（50% 概率）
     if (admobReady && metaReady) {
       final selected = Random().nextBool() ? AdPlatform.admob : AdPlatform.meta;
-      debugPrint('[AdMediator] Both interstitial platforms ready, randomly selected: $selected');
+      debugPrint(
+        '[AdMediator] Both interstitial platforms ready, randomly selected: $selected',
+      );
       return selected;
     }
 
@@ -255,13 +275,15 @@ class AdMediator {
     AdPlatform? platformToUse = getReadyInterstitialPlatform();
 
     // 如果指定平台没准备好或被禁用，尝试另一个
-    if (platformToUse == AdPlatform.admob && (!AdConfig.isAdmobEnabled || !_admobManager.isInterstitialAdReady())) {
+    if (platformToUse == AdPlatform.admob &&
+        (!AdConfig.isAdmobEnabled || !_admobManager.isInterstitialAdReady())) {
       if (_metaManager.isInterstitialAdReady()) {
         platformToUse = AdPlatform.meta;
       } else {
         platformToUse = null;
       }
-    } else if (platformToUse == AdPlatform.meta && !_metaManager.isInterstitialAdReady()) {
+    } else if (platformToUse == AdPlatform.meta &&
+        !_metaManager.isInterstitialAdReady()) {
       if (AdConfig.isAdmobEnabled && _admobManager.isInterstitialAdReady()) {
         platformToUse = AdPlatform.admob;
       } else {

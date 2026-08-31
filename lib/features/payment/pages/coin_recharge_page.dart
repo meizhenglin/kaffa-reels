@@ -12,7 +12,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../core/config/build_flavor.dart';
 import '../../home/models/home_card_layout.dart';
 import '../models/recharge_product.dart';
-import '../providers/coin_record_provider.dart';
+import '../providers/coin_record_provider.dart' as coin_record;
 import '../providers/membership_provider.dart';
 import '../services/unified_payment_handler.dart';
 import '../widgets/payment_channel_selector.dart';
@@ -40,7 +40,7 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
 
   Future<void> _handlePurchase(RechargeProduct product) async {
     final l10n = AppLocalizations.of(context);
-    
+
     // 游客不能充值K币
     final authState = ref.read(authProvider);
     if (!authState.isAuthenticated || (authState.user?.isTourist ?? true)) {
@@ -56,15 +56,7 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(product.name),
-            const SizedBox(height: 8),
-            Text(
-              '${product.totalAmount} K-Coin',
-              style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFFFFD700),
-                  ),
-            ),
+            Text(product.displayAmount ?? product.name),
             const SizedBox(height: 16),
             Text(
               '\$${product.price}',
@@ -99,7 +91,7 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
           AppSnackBar.show(context, message: reason);
         } else if (success && mounted) {
           AppSnackBar.show(context, message: l10n.purchaseSuccessful);
-          await ref.read(coinBalanceInfoProvider.notifier).load();
+          await ref.read(coin_record.coinBalanceInfoProvider.notifier).load();
         }
         return;
       }
@@ -120,39 +112,53 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
 
       if (channel == null) return;
 
-      bool success = false;
-      String? errorMessage;
-
       if (channel.isGooglePlay) {
         final handler = ref.read(rechargePurchaseHandlerProvider);
-        success = await handler.purchase(product);
-        errorMessage = handler.lastError;
+        final success = await handler.purchase(product);
+        if (!success && mounted) {
+          final reason = handler.lastError ?? l10n.purchaseFailedPleaseRetry;
+          AppSnackBar.show(context, message: reason);
+        } else if (success && mounted) {
+          AppSnackBar.show(context, message: l10n.purchaseSuccessful);
+          await ref.read(coin_record.coinBalanceInfoProvider.notifier).load();
+        }
       } else {
-        success = await unifiedHandler.purchaseRecharge(
+        // HaiPay completion is handled silently. The gateway may update the
+        // balance shortly after its status endpoint confirms payment, so retry
+        // the user-center lookup after returning from the WebView.
+        final balanceNotifier = ref.read(
+          coin_record.coinBalanceInfoProvider.notifier,
+        );
+        final completed = await unifiedHandler.purchaseRecharge(
           product: product,
           price: product.price,
           context: context,
           channel: channel,
           onPaymentComplete: (paid) {
             if (paid) {
-              ref.read(coinBalanceInfoProvider.notifier).load();
-              AppSnackBar.show(context, message: l10n.purchaseSuccessful);
+              balanceNotifier.load();
             }
           },
         );
-        errorMessage = unifiedHandler.lastError;
-      }
-
-      if (!success && mounted) {
-        final reason = errorMessage ?? l10n.purchaseFailedPleaseRetry;
-        AppSnackBar.show(context, message: reason);
-      } else if (success && mounted) {
-        // Success snackbar will be shown in onPaymentComplete callback
+        if (completed) {
+          await _refreshHaiPayBalance(balanceNotifier);
+        }
       }
     } finally {
       if (mounted) {
         setState(() => _isPurchasing = false);
       }
+    }
+  }
+
+  Future<void> _refreshHaiPayBalance(
+    coin_record.CoinBalanceNotifier balanceNotifier,
+  ) async {
+    for (var attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
+      await balanceNotifier.load();
     }
   }
 
@@ -192,9 +198,7 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
             ),
 
             // Body
-            Expanded(
-              child: _buildBody(context, state, l10n),
-            ),
+            Expanded(child: _buildBody(context, state, l10n)),
 
             // Bottom Pay button
             if (state.products.isNotEmpty && _selectedIndex != null)
@@ -234,7 +238,8 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => ref.read(rechargeProductsProvider.notifier).load(),
+              onPressed: () =>
+                  ref.read(rechargeProductsProvider.notifier).load(),
               child: Text(l10n.retry),
             ),
           ],
@@ -243,9 +248,7 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
     }
 
     if (state.products.isEmpty) {
-      return AppEmptyState(
-        message: l10n.noDataAvailableAtTheMoment,
-      );
+      return AppEmptyState(message: l10n.noDataAvailableAtTheMoment);
     }
 
     return RefreshIndicator(
@@ -310,7 +313,9 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
                   disabledBackgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
                   foregroundColor: const Color(0xFF753900),
-                  disabledForegroundColor: const Color(0xFF753900).withAlpha(153),
+                  disabledForegroundColor: const Color(
+                    0xFF753900,
+                  ).withAlpha(153),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(21),
                   ),
@@ -398,9 +403,7 @@ class _ProductCard extends ConsumerWidget {
 
             // Amount (show total if bonus)
             Text(
-              product.totalAmount > product.coinAmount
-                  ? '${product.totalAmount} K'
-                  : '${product.coinAmount} K',
+              product.displayAmount ?? product.name,
               style: const TextStyle(
                 color: Color(0xFFFFD700),
                 fontSize: 20,
@@ -409,25 +412,31 @@ class _ProductCard extends ConsumerWidget {
             ),
             const SizedBox(height: 2),
 
-            // Bonus tag
             if (product.bonusAmount > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF6B6B),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  '+${product.bonusAmount}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.card_giftcard,
+                      color: Color(0xFFFF6B6B),
+                      size: 13,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      '+${product.bonusAmount} K-Coin',
+                      style: const TextStyle(
+                        color: Color(0xFFFF8A8A),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               )
             else
-              const SizedBox(height: 17),
+              const SizedBox(height: 15),
 
             const SizedBox(height: 2),
 

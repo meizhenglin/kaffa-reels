@@ -7,8 +7,8 @@ import 'package:preload_page_view/preload_page_view.dart';
 import '../../l10n/app_localizations.dart';
 import '../home/pages/main_page.dart';
 import '../home/providers/last_watched_provider.dart';
-import '../../core/ads/ad_manager.dart';
 import '../../core/ads/ad_mediator.dart';
+import '../../core/ads/ad_config.dart';
 import '../../core/network/api_service.dart';
 import '../../core/storage/storage_service.dart';
 import '../../core/widgets/app_snack_bar.dart';
@@ -32,26 +32,29 @@ const bool _showWatchPlaybackDebug = false;
 
 enum _EpisodeSheetTab { episodes, content }
 
-typedef ShortVideoOverlayBuilder = Widget Function(
-  BuildContext context,
-  VideoInfo videoInfo,
-  int index,
-  ShortVideoListController controller,
-);
+typedef ShortVideoOverlayBuilder =
+    Widget Function(
+      BuildContext context,
+      VideoInfo videoInfo,
+      int index,
+      ShortVideoListController controller,
+    );
 
-typedef ShortVideoTopOverlayBuilder = Widget Function(
-  BuildContext context,
-  VideoInfo videoInfo,
-  int index,
-  ShortVideoListController controller,
-);
+typedef ShortVideoTopOverlayBuilder =
+    Widget Function(
+      BuildContext context,
+      VideoInfo videoInfo,
+      int index,
+      ShortVideoListController controller,
+    );
 
-typedef ShortVideoForegroundBuilder = Widget Function(
-  BuildContext context,
-  List<VideoInfo> episodes,
-  int currentIndex,
-  ShortVideoListController controller,
-);
+typedef ShortVideoForegroundBuilder =
+    Widget Function(
+      BuildContext context,
+      List<VideoInfo> episodes,
+      int currentIndex,
+      ShortVideoListController controller,
+    );
 
 class ShortVideoListController {
   VoidCallback? _showEpisodePickerHandler;
@@ -88,8 +91,11 @@ class ShortVideoPage extends StatelessWidget {
   final ShortVideoOverlayBuilder? overlayBuilder;
   final ShortVideoTopOverlayBuilder? topOverlayBuilder;
   final ShortVideoForegroundBuilder? foregroundBuilder;
-  final Widget Function(BuildContext context, ShortVideoListController controller)?
-      floatingOverlayBuilder;
+  final Widget Function(
+    BuildContext context,
+    ShortVideoListController controller,
+  )?
+  floatingOverlayBuilder;
   final bool showDefaultTopOverlay;
   final bool showDefaultSideOverlay;
 
@@ -134,8 +140,11 @@ class ShortVideoListPage extends ConsumerStatefulWidget {
   final ShortVideoOverlayBuilder? overlayBuilder;
   final ShortVideoTopOverlayBuilder? topOverlayBuilder;
   final ShortVideoForegroundBuilder? foregroundBuilder;
-  final Widget Function(BuildContext context, ShortVideoListController controller)?
-      floatingOverlayBuilder;
+  final Widget Function(
+    BuildContext context,
+    ShortVideoListController controller,
+  )?
+  floatingOverlayBuilder;
   final bool showDefaultTopOverlay;
   final bool showDefaultSideOverlay;
 
@@ -168,15 +177,15 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     final videoId = videoInfo.videoId.toString();
     if (videoId.isEmpty || videoId == '0') return;
 
-    final currentValue = ref.read(videoActionProvider).isLiked(
-          videoId,
-          fallback: videoInfo.isLike == 1,
-        );
-    final currentCount = ref.read(videoActionProvider).likeCount(
-          videoId,
-          fallback: videoInfo.likeNum,
-        );
-    await ref.read(videoActionProvider.notifier).toggleLike(
+    final currentValue = ref
+        .read(videoActionProvider)
+        .isLiked(videoId, fallback: videoInfo.isLike == 1);
+    final currentCount = ref
+        .read(videoActionProvider)
+        .likeCount(videoId, fallback: videoInfo.likeNum);
+    await ref
+        .read(videoActionProvider.notifier)
+        .toggleLike(
           videoId: videoId,
           episodesId: videoInfo.id.toString(),
           currentValue: currentValue,
@@ -188,15 +197,15 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     final videoId = videoInfo.videoId.toString();
     if (videoId.isEmpty || videoId == '0') return;
 
-    final currentValue = ref.read(videoActionProvider).isCollected(
-          videoId,
-          fallback: videoInfo.isCollect == 1,
-        );
-    final currentCount = ref.read(videoActionProvider).collectCount(
-          videoId,
-          fallback: videoInfo.collectNum,
-        );
-    await ref.read(videoActionProvider.notifier).toggleCollect(
+    final currentValue = ref
+        .read(videoActionProvider)
+        .isCollected(videoId, fallback: videoInfo.isCollect == 1);
+    final currentCount = ref
+        .read(videoActionProvider)
+        .collectCount(videoId, fallback: videoInfo.collectNum);
+    await ref
+        .read(videoActionProvider.notifier)
+        .toggleCollect(
           videoId: videoId,
           episodesId: videoInfo.id.toString(),
           currentValue: currentValue,
@@ -245,7 +254,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     _setupAuthListener();
 
     if (_usePreloadMode) {
-      _preloadPageController = PreloadPageController(initialPage: _currentIndex);
+      _preloadPageController = PreloadPageController(
+        initialPage: _currentIndex,
+      );
       _preloadPageController.addListener(_handlePreloadPageChanged);
     } else {
       _pageController = PageController(initialPage: _currentIndex);
@@ -266,56 +277,58 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     AdMediator.instance.preloadInterstitialAd();
 
     if (_shouldFollowHomeTabVisibility) {
-      _tabIndexSubscription = ref.listenManual<int>(
-        currentTabIndexProvider,
-        (previous, next) {
-          if (!mounted) return;
-          _isCurrentTabActive = next == 2;
-          if (_isCurrentTabActive) {
-            _resumeCurrent();
-          } else {
-            _pauseCurrent();
-          }
-        },
-      );
+      _tabIndexSubscription = ref.listenManual<int>(currentTabIndexProvider, (
+        previous,
+        next,
+      ) {
+        if (!mounted) return;
+        _isCurrentTabActive = next == 2;
+        if (_isCurrentTabActive) {
+          _resumeCurrent();
+        } else {
+          _pauseCurrent();
+        }
+      });
     }
   }
 
   void _setupAuthListener() {
-    debugPrint('[_shortVideoPage] _setupAuthListener called, videoId=${widget.videoId}');
+    debugPrint(
+      '[_shortVideoPage] _setupAuthListener called, videoId=${widget.videoId}',
+    );
 
     // 监听 loginReturnProvider 来处理登录返回
     // 登录成功后刷新视频列表，确保 isCanPlay 状态是最新的
-    ref.listenManual<int>(
-      loginReturnProvider,
-      (previous, next) {
-        debugPrint('[_shortVideoPage] loginReturnProvider changed: prev=$previous, next=$next');
-        if (next <= (previous ?? 0)) return;
-        if (!mounted) return;
+    ref.listenManual<int>(loginReturnProvider, (previous, next) {
+      debugPrint(
+        '[_shortVideoPage] loginReturnProvider changed: prev=$previous, next=$next',
+      );
+      if (next <= (previous ?? 0)) return;
+      if (!mounted) return;
 
-        // 登录返回后，刷新视频列表以更新 isCanPlay 状态
-        debugPrint('[_shortVideoPage] refreshing video list after login');
+      // 登录返回后，刷新视频列表以更新 isCanPlay 状态
+      debugPrint('[_shortVideoPage] refreshing video list after login');
 
-        // 获取登录前要跳转的索引
-        final targetIdx = ref.read(loginTargetVideoIndexProvider);
-        final lockedIdx = ref.read(pendingUnlockEpisodeIndexProvider);
-        debugPrint('[_shortVideoPage] login returned, targetIdx=$targetIdx, lockedIdx=$lockedIdx');
+      // 获取登录前要跳转的索引
+      final targetIdx = ref.read(loginTargetVideoIndexProvider);
+      final lockedIdx = ref.read(pendingUnlockEpisodeIndexProvider);
+      debugPrint(
+        '[_shortVideoPage] login returned, targetIdx=$targetIdx, lockedIdx=$lockedIdx',
+      );
 
-        // 设置刷新标记，这样 _fetchByVideoId 会使用 targetIdx
-        ref.read(isRefreshingAfterLoginProvider.notifier).state = true;
+      // 设置刷新标记，这样 _fetchByVideoId 会使用 targetIdx
+      ref.read(isRefreshingAfterLoginProvider.notifier).state = true;
 
-        // 刷新视频列表，完成后 _checkAndShowUnlockDialog 会处理解锁弹窗
-        _refreshVideoList();
-      },
-    );
+      // 刷新视频列表，完成后 _checkAndShowUnlockDialog 会处理解锁弹窗
+      _refreshVideoList();
+    });
 
     // 同时监听 auth 状态用于其他用途（比如VIP状态变化）
-    ref.listenManual<AuthState>(
-      authProvider,
-      (previous, next) {
-        debugPrint('[_shortVideoPage] auth changed: prev=${previous?.isAuthenticated}, next=${next.isAuthenticated}');
-      },
-    );
+    ref.listenManual<AuthState>(authProvider, (previous, next) {
+      debugPrint(
+        '[_shortVideoPage] auth changed: prev=${previous?.isAuthenticated}, next=${next.isAuthenticated}',
+      );
+    });
   }
 
   @override
@@ -359,7 +372,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   Future<void> _fetchByVideoId() async {
     if (widget.videoId.isEmpty) return;
 
-    debugPrint('[$_tag] fetching by videoId=${widget.videoId}, _isDataLoaded=$_isDataLoaded');
+    debugPrint(
+      '[$_tag] fetching by videoId=${widget.videoId}, _isDataLoaded=$_isDataLoaded',
+    );
     final l10n = AppLocalizations.of(context);
 
     try {
@@ -371,9 +386,16 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         return;
       }
 
-      final dirData = dirResp.data as Map<String, dynamic>;
-      final videoEpisodes = dirData['videoEpisodes'] as int? ?? 10;
-      final videoIntroduce = (dirData['videoIntroduce'] as String?)?.trim() ?? '';
+      final dirData = Map<String, dynamic>.from(dirResp.data as Map);
+      final videoMetadata = <String, dynamic>{
+        ...dirData,
+        if (dirData['videoInfo'] is Map)
+          ...Map<String, dynamic>.from(dirData['videoInfo'] as Map),
+      };
+      final videoEpisodes =
+          int.tryParse('${videoMetadata['videoEpisodes'] ?? ''}') ?? 10;
+      final videoIntroduce =
+          (videoMetadata['videoIntroduce'] as String?)?.trim() ?? '';
 
       final playResp = await apiServiceProvider.getVideoListByVideoId(
         videoId: widget.videoId,
@@ -385,26 +407,44 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         return;
       }
 
-      final videos = (playResp.data as List)
-          .whereType<Map>()
-          .map(
-            (item) {
-              final episode = VideoInfo.fromJson(
-                Map<String, dynamic>.from(item).cast<String, dynamic>(),
-              );
-              if (episode.content.isEmpty && videoIntroduce.isNotEmpty) {
-                return episode.copyWith(content: videoIntroduce);
-              }
-              return episode;
-            },
-          )
-          .where((item) => item.videoUrl.isNotEmpty)
-          .toList()
-        ..sort((a, b) => a.serialNum.compareTo(b.serialNum));
+      final videoMetadataInfo = VideoInfo.fromJson(videoMetadata);
+      final videos =
+          (playResp.data as List)
+              .whereType<Map>()
+              .map((item) {
+                final episode = VideoInfo.fromJson(
+                  Map<String, dynamic>.from(item).cast<String, dynamic>(),
+                );
+                return episode.copyWith(
+                  content: episode.content.isEmpty && videoIntroduce.isNotEmpty
+                      ? videoIntroduce
+                      : episode.content,
+                  isCollect:
+                      episode.isCollect == 0 && videoMetadataInfo.isCollect == 1
+                      ? 1
+                      : episode.isCollect,
+                  collectNum: episode.collectNum > 0
+                      ? episode.collectNum
+                      : videoMetadataInfo.collectNum,
+                  isLike: episode.isLike == 0 && videoMetadataInfo.isLike == 1
+                      ? 1
+                      : episode.isLike,
+                  likeNum: episode.likeNum > 0
+                      ? episode.likeNum
+                      : videoMetadataInfo.likeNum,
+                );
+              })
+              .where((item) => item.videoUrl.isNotEmpty)
+              .toList()
+            ..sort((a, b) => a.serialNum.compareTo(b.serialNum));
 
-      debugPrint('[$_tag] fetched ${videos.length} videos, checking isCanPlay for each:');
+      debugPrint(
+        '[$_tag] fetched ${videos.length} videos, checking isCanPlay for each:',
+      );
       for (int i = 0; i < videos.length && i < 15; i++) {
-        debugPrint('[$_tag]   episode[$i] serialNum=${videos[i].serialNum}, isCanPlay=${videos[i].isCanPlay}');
+        debugPrint(
+          '[$_tag]   episode[$i] serialNum=${videos[i].serialNum}, isCanPlay=${videos[i].isCanPlay}',
+        );
       }
 
       if (videos.isEmpty) {
@@ -419,18 +459,25 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       final loginTargetIdx = ref.read(loginTargetVideoIndexProvider);
 
       final seedEpisodeId = widget.seedVideo?.id ?? 0;
-      final savedEpisodesNum = StorageService().getLastEpisodesNum(widget.videoId);
+      final savedEpisodesNum = StorageService().getLastEpisodesNum(
+        widget.videoId,
+      );
       final seedSerialNum = widget.seedVideo?.serialNum ?? savedEpisodesNum;
       final resolvedInitialIndex = seedEpisodeId > 0
           ? videoInfoList.indexWhere((item) => item.id == seedEpisodeId)
           : seedSerialNum > 0
-              ? videoInfoList.indexWhere((item) => item.serialNum == seedSerialNum)
-              : -1;
+          ? videoInfoList.indexWhere((item) => item.serialNum == seedSerialNum)
+          : -1;
 
       // 如果是登录后刷新，优先使用 loginTargetIdx
-      if (isLoginRefresh && loginTargetIdx != null && loginTargetIdx >= 0 && loginTargetIdx < videoInfoList.length) {
+      if (isLoginRefresh &&
+          loginTargetIdx != null &&
+          loginTargetIdx >= 0 &&
+          loginTargetIdx < videoInfoList.length) {
         _currentIndex = loginTargetIdx;
-        debugPrint('[$_tag] login refresh: using loginTargetIdx=$loginTargetIdx for current index');
+        debugPrint(
+          '[$_tag] login refresh: using loginTargetIdx=$loginTargetIdx for current index',
+        );
       } else {
         _currentIndex = resolvedInitialIndex >= 0
             ? resolvedInitialIndex
@@ -440,7 +487,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       if (_usePreloadMode) {
         _preloadPageController.removeListener(_handlePreloadPageChanged);
         _preloadPageController.dispose();
-        _preloadPageController = PreloadPageController(initialPage: _currentIndex);
+        _preloadPageController = PreloadPageController(
+          initialPage: _currentIndex,
+        );
         _preloadPageController.addListener(_handlePreloadPageChanged);
       } else {
         _pageController.dispose();
@@ -450,7 +499,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       // 复用已有的 _itemKeys，只在需要时扩展
       if (_itemKeys.length < videoInfoList.length) {
         final needed = videoInfoList.length - _itemKeys.length;
-        _itemKeys.addAll(List.generate(needed, (_) => GlobalKey<WatchShortVideoItemState>()));
+        _itemKeys.addAll(
+          List.generate(needed, (_) => GlobalKey<WatchShortVideoItemState>()),
+        );
       }
 
       _aliPlayerPreload?.destroy();
@@ -523,13 +574,19 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     }
 
     // 检查该剧集是否已经解锁（isCanPlay == 1 表示可播放）
-    if (videoInfoList.isNotEmpty && lockedIdx >= 0 && lockedIdx < videoInfoList.length) {
+    if (videoInfoList.isNotEmpty &&
+        lockedIdx >= 0 &&
+        lockedIdx < videoInfoList.length) {
       final isCanPlay = videoInfoList[lockedIdx].isCanPlay;
-      debugPrint('[_checkAndShowUnlockDialog] lockedIdx=$lockedIdx, isCanPlay=$isCanPlay');
+      debugPrint(
+        '[_checkAndShowUnlockDialog] lockedIdx=$lockedIdx, isCanPlay=$isCanPlay',
+      );
 
       if (isCanPlay == 1) {
         // 已经解锁，不需要显示解锁弹窗
-        debugPrint('[_checkAndShowUnlockDialog] episode is already unlocked, skipping unlock dialog');
+        debugPrint(
+          '[_checkAndShowUnlockDialog] episode is already unlocked, skipping unlock dialog',
+        );
         _clearLoginState();
         return;
       }
@@ -671,7 +728,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
     final item = videoInfoList[index];
     final episodesId = item.id.toString();
-    if (widget.videoId.isEmpty || episodesId.isEmpty || episodesId == '0') return;
+    if (widget.videoId.isEmpty || episodesId.isEmpty || episodesId == '0')
+      return;
 
     Future.microtask(() async {
       final response = await apiServiceProvider.setUserViewAddHistory(
@@ -705,7 +763,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   }
 
   Future<void> _showMembershipReminderDialog({int? lockedIndex}) async {
-    debugPrint('[_showMembershipReminderDialog] called with lockedIndex=$lockedIndex, currentIndex=$_currentIndex, videoInfoList.length=${videoInfoList.length}');
+    debugPrint(
+      '[_showMembershipReminderDialog] called with lockedIndex=$lockedIndex, currentIndex=$_currentIndex, videoInfoList.length=${videoInfoList.length}',
+    );
     if (_pendingLockedDialogIndex == lockedIndex) return;
     _pendingLockedDialogIndex = lockedIndex;
 
@@ -714,7 +774,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     // 先尝试自动解锁
     debugPrint('[_showMembershipReminderDialog] trying auto unlock first...');
     final autoUnlockSuccess = await _tryAutoUnlockWithBalance(index);
-    debugPrint('[_showMembershipReminderDialog] autoUnlockSuccess=$autoUnlockSuccess');
+    debugPrint(
+      '[_showMembershipReminderDialog] autoUnlockSuccess=$autoUnlockSuccess',
+    );
 
     if (autoUnlockSuccess) {
       _pendingLockedDialogIndex = null;
@@ -727,11 +789,15 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     _pendingLockedDialogIndex = null;
     if (!mounted) return;
 
-    debugPrint('[_showMembershipReminderDialog] after bottom sheet, setting state');
+    debugPrint(
+      '[_showMembershipReminderDialog] after bottom sheet, setting state',
+    );
     setState(() {
       _pendingLockedEpisodeIndex = lockedIndex ?? _pendingLockedEpisodeIndex;
       _showWatchNowOverlay = _pendingLockedEpisodeIndex != null;
-      debugPrint('[_showMembershipReminderDialog] _showWatchNowOverlay=$_showWatchNowOverlay, _pendingLockedEpisodeIndex=$_pendingLockedEpisodeIndex');
+      debugPrint(
+        '[_showMembershipReminderDialog] _showWatchNowOverlay=$_showWatchNowOverlay, _pendingLockedEpisodeIndex=$_pendingLockedEpisodeIndex',
+      );
     });
   }
 
@@ -752,9 +818,13 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         dioClient: ref.read(dioClientProvider),
         storage: ref.read(storageServiceProvider),
       );
-      debugPrint('[_showUnlockBottomSheet] Fetching products for videoId: $videoId');
+      debugPrint(
+        '[_showUnlockBottomSheet] Fetching products for videoId: $videoId',
+      );
       final resp = await apiService.getQuickRechargeList(videoId: videoId);
-      debugPrint('[_showUnlockBottomSheet] Response success: ${resp.isSuccess}, data: ${resp.data}, error: ${resp.error}');
+      debugPrint(
+        '[_showUnlockBottomSheet] Response success: ${resp.isSuccess}, data: ${resp.data}, error: ${resp.error}',
+      );
       if (resp.isSuccess && resp.data != null) {
         final data = resp.data!;
         debugPrint('[_showUnlockBottomSheet] Data type: ${data.runtimeType}');
@@ -762,30 +832,46 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           debugPrint('[_showUnlockBottomSheet] List length: ${data.length}');
           for (final item in data) {
             if (item is Map<String, dynamic>) {
-              debugPrint('[_showUnlockBottomSheet] Item: ${item['rechargeGoodsName']}');
+              debugPrint(
+                '[_showUnlockBottomSheet] Item: ${item['rechargeGoodsName']}',
+              );
               final goodsType = item['rechargeGoodsType'] as int? ?? 0;
               UnlockProductType type = UnlockProductType.episode;
-              if (goodsType == 2) {
+              if (goodsType == 1) {
+                type = UnlockProductType.coinRecharge;
+              } else if (goodsType == 2) {
                 type = UnlockProductType.episode; // 整剧解锁
               } else if (goodsType == 0) {
-                final name = (item['rechargeGoodsName'] ?? '').toString().toLowerCase();
-                if (name.contains('vip') || name.contains('monthly') || name.contains('season') || name.contains('annual')) {
+                final name = (item['rechargeGoodsName'] ?? '')
+                    .toString()
+                    .toLowerCase();
+                if (name.contains('vip') ||
+                    name.contains('monthly') ||
+                    name.contains('season') ||
+                    name.contains('annual')) {
                   type = UnlockProductType.vip;
                 }
               }
-              allProducts.add(UnlockProduct(
-                goodsId: item['id'] as int? ?? 0,
-                goodsName: item['rechargeGoodsName']?.toString() ?? '',
-                price: (item['rechargeGoodsPrice'] as num?)?.toDouble() ?? 0.0,
-                type: type,
-                originalPrice: _parseOriginalPrice(item['rechargeGoodsSubname']?.toString()),
-                googlePlayId: item['remarks']?.toString(),
-              ));
+              allProducts.add(
+                UnlockProduct(
+                  goodsId: item['id'] as int? ?? 0,
+                  goodsName: item['rechargeGoodsName']?.toString() ?? '',
+                  price:
+                      (item['rechargeGoodsPrice'] as num?)?.toDouble() ?? 0.0,
+                  type: type,
+                  originalPrice: _parseOriginalPrice(
+                    item['rechargeGoodsSubname']?.toString(),
+                  ),
+                  googlePlayId: item['remarks']?.toString(),
+                ),
+              );
             }
           }
         }
       }
-      debugPrint('[_showUnlockBottomSheet] allProducts length: ${allProducts.length}');
+      debugPrint(
+        '[_showUnlockBottomSheet] allProducts length: ${allProducts.length}',
+      );
     } catch (e, stack) {
       debugPrint('[_showUnlockBottomSheet] Failed to load products: $e');
       debugPrint('[_showUnlockBottomSheet] Stack trace: $stack');
@@ -810,7 +896,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       onUnlockSuccess: (episodeIndex) {
         // 解锁成功后更新状态
         if (episodeIndex < videoInfoList.length) {
-          final updatedInfo = videoInfoList[episodeIndex].copyWith(isCanPlay: 1);
+          final updatedInfo = videoInfoList[episodeIndex].copyWith(
+            isCanPlay: 1,
+          );
           videoInfoList[episodeIndex] = updatedInfo;
         }
       },
@@ -821,18 +909,24 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       },
     );
 
-    debugPrint('[_showUnlockBottomSheet] returned from bottom sheet, result=$result, index=$index');
+    debugPrint(
+      '[_showUnlockBottomSheet] returned from bottom sheet, result=$result, index=$index',
+    );
 
     if (!mounted) return;
 
     // 处理解锁结果
     if (result == null) {
       // 用户关闭弹窗或取消，恢复 watch now 状态
-      debugPrint('[_showUnlockBottomSheet] result is null, restoring overlay. _pendingLockedEpisodeIndex=$_pendingLockedEpisodeIndex, currentIndex=$index');
+      debugPrint(
+        '[_showUnlockBottomSheet] result is null, restoring overlay. _pendingLockedEpisodeIndex=$_pendingLockedEpisodeIndex, currentIndex=$index',
+      );
       if (mounted) {
         setState(() {
           _showWatchNowOverlay = _pendingLockedEpisodeIndex != null;
-          debugPrint('[_showUnlockBottomSheet] setState called: _showWatchNowOverlay=$_showWatchNowOverlay');
+          debugPrint(
+            '[_showUnlockBottomSheet] setState called: _showWatchNowOverlay=$_showWatchNowOverlay',
+          );
         });
       }
       return;
@@ -864,17 +958,26 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       debugPrint('[_showUnlockBottomSheet] result.isCancelled');
     } else if (result.isLoginRequired) {
       // 游客需要登录，记录当前锁定的集索引和 videoId 到全局状态
-      debugPrint('[_showUnlockBottomSheet] result.isLoginRequired, setting _preLoginLockedIndex=$index');
+      debugPrint(
+        '[_showUnlockBottomSheet] result.isLoginRequired, setting _preLoginLockedIndex=$index',
+      );
       _preLoginLockedIndex = index;
       ref.read(pendingUnlockEpisodeIndexProvider.notifier).state = index;
       ref.read(pendingUnlockVideoIdProvider.notifier).state = widget.videoId;
       ref.read(loginTargetVideoIndexProvider.notifier).state = index;
-      debugPrint('[_showUnlockBottomSheet] saved to providers: idx=$index, videoId=${widget.videoId}');
+      debugPrint(
+        '[_showUnlockBottomSheet] saved to providers: idx=$index, videoId=${widget.videoId}',
+      );
       if (mounted) {
         // 使用 push 导航到登录页，ShortVideoPage 会保留在栈中
-        final redirectUrl = '/short-video?videoId=${Uri.encodeComponent(widget.videoId)}&initialIndex=$index';
-        debugPrint('[_showUnlockBottomSheet] going to login with redirect: $redirectUrl');
-        context.push('/auth/login?redirect=${Uri.encodeComponent(redirectUrl)}');
+        final redirectUrl =
+            '/short-video?videoId=${Uri.encodeComponent(widget.videoId)}&initialIndex=$index';
+        debugPrint(
+          '[_showUnlockBottomSheet] going to login with redirect: $redirectUrl',
+        );
+        context.push(
+          '/auth/login?redirect=${Uri.encodeComponent(redirectUrl)}',
+        );
       }
     }
   }
@@ -899,6 +1002,16 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       _prefetchAround(_currentIndex);
     }
     _pauseNearbyItems(index);
+    // Verify the balance and complete automatic coin unlock before rendering
+    // the locked-state actions. This prevents them flashing for funded users.
+    debugPrint('[_guardLockedEpisode] trying auto unlock...');
+    final autoUnlockSuccess = await _tryAutoUnlockWithBalance(index);
+    debugPrint('[_guardLockedEpisode] autoUnlockSuccess=$autoUnlockSuccess');
+    if (autoUnlockSuccess) {
+      return true;
+    }
+
+    // Only show ad and purchase actions when automatic coin unlock is unavailable.
     if (mounted) {
       setState(() {
         _pendingLockedEpisodeIndex = index;
@@ -906,17 +1019,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       });
     }
 
-    // 检查 K币余额，如果足够则自动解锁
-    debugPrint('[_guardLockedEpisode] trying auto unlock...');
-    final autoUnlockSuccess = await _tryAutoUnlockWithBalance(index);
-    debugPrint('[_guardLockedEpisode] autoUnlockSuccess=$autoUnlockSuccess');
-    if (autoUnlockSuccess) {
-      return true; // 自动解锁成功，继续播放
-    }
-
-    // 余额不足，显示解锁半屏
-    debugPrint('[_guardLockedEpisode] balance insufficient, showing unlock sheet');
-    await _showMembershipReminderDialog(lockedIndex: index);
+    debugPrint(
+      '[_guardLockedEpisode] automatic unlock unavailable, showing locked actions',
+    );
     return false;
   }
 
@@ -931,8 +1036,10 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
     // 检查是否按顺序解锁：只能解锁第一个未解锁的剧集
     final firstUnlockedIndex = _getFirstUnlockedIndex();
-    debugPrint('[_tryUnlockWithRewardedAd] firstUnlockedIndex=$firstUnlockedIndex, requested index=$index');
-    
+    debugPrint(
+      '[_tryUnlockWithRewardedAd] firstUnlockedIndex=$firstUnlockedIndex, requested index=$index',
+    );
+
     if (index != firstUnlockedIndex) {
       // 不是按顺序解锁，提示用户
       if (mounted) {
@@ -944,28 +1051,36 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
     // 广告未就绪时，先尝试触发加载（AdMediator 内部会自动重试）
     if (!AdMediator.instance.isRewardedAdReady()) {
-      debugPrint('[_tryUnlockWithRewardedAd] No ad platform ready, triggering preload...');
+      debugPrint(
+        '[_tryUnlockWithRewardedAd] No ad platform ready, triggering preload...',
+      );
       AdMediator.instance.preloadRewardedAd();
     }
 
     final episode = videoInfoList[index];
 
-    // 弹出激励广告；用户看完广告（onUserEarnedReward）后调用后端接口走正常解锁流程
+    // This endpoint verifies an AdMob placement, so Meta rewards cannot unlock
+    // episodes through this entry point.
     final shown = await AdMediator.instance.showRewardedAd(
+      preferredPlatform: AdPlatform.admob,
+      allowPlatformFallback: false,
       onRewardEarned: () async {
-        debugPrint('[_tryUnlockWithRewardedAd] user earned reward, unlocking episode');
+        debugPrint(
+          '[_tryUnlockWithRewardedAd] user earned AdMob reward, unlocking episode',
+        );
         try {
           final apiService = ApiService(
             dioClient: ref.read(dioClientProvider),
             storage: ref.read(storageServiceProvider),
           );
-          // 走和 K币解锁同样的后端接口，由后端决定是否记账/零额解锁
-          final unlockResp = await apiService.getUserPayEpisodes(
+          final unlockResp = await apiService.admobUnlockEpisodes(
             videoId: widget.videoId,
-            episodesId: episode.id.toString(),
             episodesNum: episode.serialNum,
+            adUnitId: AdConfig.admobRewardedAdUnitId,
           );
-          debugPrint('[_tryUnlockWithRewardedAd] backend unlock isSuccess=${unlockResp.isSuccess}');
+          debugPrint(
+            '[_tryUnlockWithRewardedAd] backend unlock isSuccess=${unlockResp.isSuccess}',
+          );
 
           if (!mounted) return;
           if (unlockResp.isSuccess) {
@@ -1002,7 +1117,10 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         debugPrint('[_tryUnlockWithRewardedAd] No ad ready on any platform');
         // 所有广告平台都未就绪时，提示用户稍后重试
         if (mounted) {
-          AppSnackBar.show(context, message: 'Ad is loading, please try again in a moment');
+          AppSnackBar.show(
+            context,
+            message: 'Ad is loading, please try again in a moment',
+          );
         }
       },
     );
@@ -1028,13 +1146,17 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
     final episode = videoInfoList[index];
     final episodePrice = episode.unlockPrice ?? 0;
-    debugPrint('[_tryAutoUnlockWithBalance] episode id=${episode.id}, price=$episodePrice');
+    debugPrint(
+      '[_tryAutoUnlockWithBalance] episode id=${episode.id}, price=$episodePrice',
+    );
 
     // 获取当前余额
     final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
     await coinNotifier.load();
     final balance = ref.read(coinBalanceInfoProvider).balance;
-    debugPrint('[_tryAutoUnlockWithBalance] balance=$balance, episodePrice=$episodePrice');
+    debugPrint(
+      '[_tryAutoUnlockWithBalance] balance=$balance, episodePrice=$episodePrice',
+    );
 
     // 检查余额是否足够
     if (balance < episodePrice) {
@@ -1058,7 +1180,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         episodesNum: episode.serialNum,
       );
 
-      debugPrint('[_tryAutoUnlockWithBalance] unlockResp.isSuccess=${unlockResp.isSuccess}, error=${unlockResp.error}');
+      debugPrint(
+        '[_tryAutoUnlockWithBalance] unlockResp.isSuccess=${unlockResp.isSuccess}, error=${unlockResp.error}',
+      );
 
       if (unlockResp.isSuccess) {
         // 解锁成功，扣减余额并刷新
@@ -1075,7 +1199,10 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         // 显示成功提示
         if (mounted) {
           final l10n = AppLocalizations.of(context);
-          AppSnackBar.show(context, message: '${l10n.unlockSuccess} -$episodePrice K Coin');
+          AppSnackBar.show(
+            context,
+            message: '${l10n.unlockSuccess} -$episodePrice K Coin',
+          );
         }
         debugPrint('[_tryAutoUnlockWithBalance] SUCCESS');
         return true;
@@ -1126,50 +1253,12 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
   Future<void> _playNextEpisode() async {
     final nextIndex = _currentIndex + 1;
-    if (nextIndex >= videoInfoList.length) {
+    if (nextIndex >= videoInfoList.length || !mounted) {
       return;
     }
 
-    // 每隔一定集数展示一次插屏广告
-    const adInterval = 2;
-    if ((_currentIndex + 1) % adInterval == 0) {
-      // 暂停当前视频
-      _pauseAtIndex(_currentIndex);
-
-      // 如果广告没准备好，先预加载并等待
-      if (!AdMediator.instance.isInterstitialAdReady()) {
-        debugPrint('[_playNextEpisode] Interstitial not ready, triggering preload...');
-        AdMediator.instance.preloadInterstitialAd();
-        
-        // 等待广告加载完成（最多等10秒）
-        const maxWaitSeconds = 10;
-        for (int i = 0; i < maxWaitSeconds; i++) {
-          await Future.delayed(const Duration(seconds: 1));
-          if (AdMediator.instance.isInterstitialAdReady()) {
-            debugPrint('[_playNextEpisode] Interstitial ad ready after ${i + 1}s');
-            break;
-          }
-        }
-      }
-
-      // 广告加载完成后再展示
-      if (AdMediator.instance.isInterstitialAdReady()) {
-        debugPrint('[_playNextEpisode] Showing interstitial ad...');
-        await AdMediator.instance.showInterstitialAd(
-          onDismissed: () {
-            debugPrint('[_playNextEpisode] Ad dismissed, switching to episode $nextIndex');
-            _jumpToEpisode(nextIndex);
-          },
-        );
-      } else {
-        // 广告加载失败，直接播放下一集
-        debugPrint('[_playNextEpisode] Interstitial ad failed to load, playing next episode');
-        _jumpToEpisode(nextIndex);
-      }
-      return;
-    }
-
-    if (!mounted) return;
+    // Free episodes advance directly. Ads remain available only when a user
+    // explicitly chooses the rewarded-ad option to unlock a locked episode.
     await _jumpToEpisode(nextIndex);
   }
 
@@ -1197,7 +1286,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           currentIndex: _currentIndex,
           title: currentEpisode.title,
           coverUrl: currentEpisode.coverUrl,
-          isVipUnlocked: ref.watch(featureAccessProvider(Feature.premiumContent)),
+          isVipUnlocked: ref.watch(
+            featureAccessProvider(Feature.premiumContent),
+          ),
           onEpisodeTap: (index) async {
             Navigator.of(sheetContext).pop();
             await _jumpToEpisode(index);
@@ -1239,7 +1330,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   }
 
   Widget _buildTopOverlayContent(BuildContext context, VideoInfo videoInfo) {
-    final episodeLabel = videoInfo.serialNum > 0 ? ' EP.${videoInfo.serialNum}' : '';
+    final episodeLabel = videoInfo.serialNum > 0
+        ? ' EP.${videoInfo.serialNum}'
+        : '';
     return SafeArea(
       bottom: false,
       child: Padding(
@@ -1287,11 +1380,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
               ),
             ),
             const SizedBox(width: 2),
-            Image.asset(
-              'assets/images/hd_icon.png',
-              width: 24,
-              height: 24,
-            ),
+            Image.asset('assets/images/hd_icon.png', width: 24, height: 24),
           ],
         ),
       ),
@@ -1377,7 +1466,11 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     });
   }
 
-  Widget _buildQualityItem(String label, bool isVipUnlocked, BuildContext sheetContext) {
+  Widget _buildQualityItem(
+    String label,
+    bool isVipUnlocked,
+    BuildContext sheetContext,
+  ) {
     final is1080 = label == '1080P';
     final canTap = !is1080 || isVipUnlocked;
     return GestureDetector(
@@ -1474,11 +1567,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
     final alreadyVip = ref.read(isVipProvider);
     if (!alreadyVip) {
-      await openMembershipPage(
-        context,
-        ref,
-        showLoginPrompt: false,
-      );
+      await openMembershipPage(context, ref, showLoginPrompt: false);
     }
 
     if (!mounted) return;
@@ -1501,10 +1590,22 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     final videoId = videoInfo.videoId.toString();
     final actionState = ref.watch(videoActionProvider);
 
-    final isLiked = actionState.isLiked(videoId, fallback: videoInfo.isLike == 1);
-    final isCollected = actionState.isCollected(videoId, fallback: videoInfo.isCollect == 1);
-    final likeCount = actionState.likeCount(videoId, fallback: videoInfo.likeNum);
-    final collectCount = actionState.collectCount(videoId, fallback: videoInfo.collectNum);
+    final isLiked = actionState.isLiked(
+      videoId,
+      fallback: videoInfo.isLike == 1,
+    );
+    final isCollected = actionState.isCollected(
+      videoId,
+      fallback: videoInfo.isCollect == 1,
+    );
+    final likeCount = actionState.likeCount(
+      videoId,
+      fallback: videoInfo.likeNum,
+    );
+    final collectCount = actionState.collectCount(
+      videoId,
+      fallback: videoInfo.collectNum,
+    );
 
     return Positioned(
       right: 12,
@@ -1580,7 +1681,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     final videoItem = videoInfoList[index];
     final autoPlay = index == _currentIndex;
     final lockedPreviewMode =
-        _showWatchNowOverlay && index == _currentIndex && _isEpisodeLocked(index);
+        _showWatchNowOverlay &&
+        index == _currentIndex &&
+        _isEpisodeLocked(index);
     return WatchShortVideoItem(
       key: _itemKeys[index],
       videoInfo: videoItem,
@@ -1611,7 +1714,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           children.add(_buildDefaultTopOverlay(ctx, vi));
         }
         if (widget.topOverlayBuilder != null) {
-          children.add(widget.topOverlayBuilder!(ctx, vi, index, _listController));
+          children.add(
+            widget.topOverlayBuilder!(ctx, vi, index, _listController),
+          );
         }
         return Stack(children: children);
       },
@@ -1641,7 +1746,10 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
             const SizedBox(height: 16),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text(l10n.back, style: const TextStyle(color: Colors.white)),
+              child: Text(
+                l10n.back,
+                style: const TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ),
@@ -1664,7 +1772,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
             onPageChanged: _handlePageChanged,
           );
 
-    if (widget.foregroundBuilder == null && widget.floatingOverlayBuilder == null) {
+    if (widget.foregroundBuilder == null &&
+        widget.floatingOverlayBuilder == null) {
       return pageView;
     }
 
@@ -1705,7 +1814,8 @@ class _WatchEpisodeBottomSheet extends StatefulWidget {
   final VoidCallback onReportTap;
 
   @override
-  State<_WatchEpisodeBottomSheet> createState() => _WatchEpisodeBottomSheetState();
+  State<_WatchEpisodeBottomSheet> createState() =>
+      _WatchEpisodeBottomSheetState();
 }
 
 class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
@@ -1738,15 +1848,23 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
 
   List<int> get _currentSegmentEpisodes {
     if (_episodeSegments.isEmpty) return const [];
-    return _episodeSegments[_selectedSegment.clamp(0, _episodeSegments.length - 1)];
+    return _episodeSegments[_selectedSegment.clamp(
+      0,
+      _episodeSegments.length - 1,
+    )];
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final mediaQuery = MediaQuery.of(context);
-    final safeIndex = widget.currentIndex.clamp(0, widget.episodes.isEmpty ? 0 : widget.episodes.length - 1);
-    final currentEpisode = widget.episodes.isNotEmpty ? widget.episodes[safeIndex] : null;
+    final safeIndex = widget.currentIndex.clamp(
+      0,
+      widget.episodes.isEmpty ? 0 : widget.episodes.length - 1,
+    );
+    final currentEpisode = widget.episodes.isNotEmpty
+        ? widget.episodes[safeIndex]
+        : null;
     final maxHeight = mediaQuery.size.height * 0.72;
 
     return Container(
@@ -1771,7 +1889,9 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
             Expanded(
               child: _activeTab == _EpisodeSheetTab.episodes
                   ? _buildEpisodesPanel()
-                  : (currentEpisode != null ? _buildContentPanel(currentEpisode) : const SizedBox()),
+                  : (currentEpisode != null
+                        ? _buildContentPanel(currentEpisode)
+                        : const SizedBox()),
             ),
           ],
         ),
@@ -1809,43 +1929,43 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                Text(
-                  widget.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                    color: Colors.white,
+                  Text(
+                    widget.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
-                    color: Color(0xFF999999),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                      color: Color(0xFF999999),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  currentEpisode.serialNum > 0
-                      ? '${widget.title} EP.${currentEpisode.serialNum}'
-                      : '${widget.title} EP.${widget.currentIndex + 1}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: Colors.white,
+                  const SizedBox(height: 4),
+                  Text(
+                    currentEpisode.serialNum > 0
+                        ? '${widget.title} EP.${currentEpisode.serialNum}'
+                        : '${widget.title} EP.${widget.currentIndex + 1}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1862,11 +1982,7 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.help_outline,
-              size: 16,
-              color: Colors.white,
-            ),
+            const Icon(Icons.help_outline, size: 16, color: Colors.white),
             const SizedBox(width: 4),
             Text(
               l10n.report,
@@ -1965,7 +2081,8 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
               separatorBuilder: (_, __) => const SizedBox(width: 18),
               itemBuilder: (context, index) {
                 final segment = segments[index];
-                final startEpisode = widget.episodes[segment.first].serialNum > 0
+                final startEpisode =
+                    widget.episodes[segment.first].serialNum > 0
                     ? widget.episodes[segment.first].serialNum
                     : segment.first + 1;
                 final endEpisode = widget.episodes[segment.last].serialNum > 0
@@ -1995,13 +2112,16 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
                 const minSpacing = 12.0;
                 final columnCount = math.max(
                   1,
-                  ((constraints.maxWidth + minSpacing) / (itemSize + minSpacing)).floor(),
+                  ((constraints.maxWidth + minSpacing) /
+                          (itemSize + minSpacing))
+                      .floor(),
                 );
                 final totalItemWidth = columnCount * itemSize;
                 final spacing = columnCount > 1
                     ? math.max(
                         minSpacing,
-                        (constraints.maxWidth - totalItemWidth) / (columnCount - 1),
+                        (constraints.maxWidth - totalItemWidth) /
+                            (columnCount - 1),
                       )
                     : 0.0;
 
@@ -2036,10 +2156,7 @@ class _WatchEpisodeBottomSheetState extends State<_WatchEpisodeBottomSheet> {
           color: _tabColor,
           borderRadius: BorderRadius.circular(8),
           border: isCurrent
-              ? Border.all(
-                  width: 2,
-                  color: const Color(0xFF8F4EFF),
-                )
+              ? Border.all(width: 2, color: const Color(0xFF8F4EFF))
               : null,
         ),
         child: Stack(
