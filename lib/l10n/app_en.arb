@@ -308,6 +308,7 @@
   },
   "unlockSuccess": "Unlock successful!",
   "unlockFailed": "Unlock failed",
+  "rechargeProcessing": "Recharge received, please try unlocking again in a moment",
   "unlockToContinue": "Unlock to Continue",
   "productUnavailable": "Product unavailable, please try again later",
   "purchaseSuccess": "Purchase successful!",

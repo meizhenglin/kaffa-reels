@@ -859,6 +859,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get unlockFailed => 'فشل الفتح';
 
   @override
+  String get rechargeProcessing =>
+      'تم استلام عملية الشحن، يرجى المحاولة مرة أخرى بعد لحظات';
+
+  @override
   String get unlockToContinue => 'فتح للمتابعة';
 
   @override

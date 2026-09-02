@@ -1730,6 +1730,12 @@ abstract class AppLocalizations {
   /// **'Unlock failed'**
   String get unlockFailed;
 
+  /// No description provided for @rechargeProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Recharge received, please try unlocking again in a moment'**
+  String get rechargeProcessing;
+
   /// No description provided for @unlockToContinue.
   ///
   /// In en, this message translates to:

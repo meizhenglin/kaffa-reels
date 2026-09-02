@@ -7,10 +7,10 @@ import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../../features/home/models/home_card_layout.dart';
 import '../../../l10n/app_localizations.dart';
-import '../providers/coin_record_provider.dart';
-import '../models/coin_record_model.dart';
+import '../models/recharge_record_model.dart';
+import '../providers/recharge_records_provider.dart';
 
-/// Recharge records list page
+/// 充值/消费记录列表页面（后端真实数据）
 class RechargeRecordsPage extends ConsumerStatefulWidget {
   const RechargeRecordsPage({super.key});
 
@@ -30,25 +30,12 @@ class _RechargeRecordsPageState extends ConsumerState<RechargeRecordsPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    return _buildRecordsPage(
-      context,
-      title: l10n.rechargeRecords,
-      provider: rechargeRecordsProvider,
-      emptyText: l10n.noRechargeRecords,
-    );
-  }
+    final state = ref.watch(rechargeRecordsProvider);
 
-  Widget _buildRecordsPage(
-    BuildContext context, {
-    required String title,
-    required StateNotifierProvider<CoinRecordsNotifier, CoinRecordListState> provider,
-    required String emptyText,
-  }) {
     return GradientScaffold(
       body: SafeArea(
         child: Column(
           children: [
-            // Header
             Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: HomeCardLayout.sectionHorizontalPadding(context),
@@ -62,7 +49,7 @@ class _RechargeRecordsPageState extends ConsumerState<RechargeRecordsPage> {
                   ),
                   Expanded(
                     child: Text(
-                      title,
+                      l10n.rechargeRecords,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white,
@@ -75,68 +62,46 @@ class _RechargeRecordsPageState extends ConsumerState<RechargeRecordsPage> {
                 ],
               ),
             ),
-
-            Expanded(
-              child: _buildRecordsList(provider, emptyText),
-            ),
+            Expanded(child: _buildBody(state, l10n)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildRecordsList(
-    StateNotifierProvider<CoinRecordsNotifier, CoinRecordListState> provider,
-    String emptyText,
-  ) {
-    final state = ref.watch(provider);
-
+  Widget _buildBody(RechargeRecordListState state, AppLocalizations l10n) {
     if (state.isLoading && state.records.isEmpty) {
       return const Center(
         child: CircularProgressIndicator(color: Color(0xFFFFD700)),
       );
     }
-
     if (state.records.isEmpty) {
-      return AppEmptyState(message: emptyText);
+      return AppEmptyState(message: l10n.noRechargeRecords);
     }
-
     return RefreshIndicator(
-      onRefresh: () => ref.read(provider.notifier).refresh(),
+      onRefresh: () => ref.read(rechargeRecordsProvider.notifier).refresh(),
       color: const Color(0xFFFFD700),
       backgroundColor: const Color(0xFF1A1A1A),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: state.records.length + (state.hasMore ? 1 : 0),
+        itemCount: state.records.length,
         itemBuilder: (context, index) {
-          if (index >= state.records.length) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(
-                  color: Color(0xFFFFD700),
-                  strokeWidth: 2,
-                ),
-              ),
-            );
-          }
-
-          final record = state.records[index];
-          return _RecordItem(record: record);
+          return _RechargeRecordItem(record: state.records[index]);
         },
       ),
     );
   }
 }
 
-class _RecordItem extends StatelessWidget {
-  final CoinRecord record;
+class _RechargeRecordItem extends StatelessWidget {
+  final RechargeRecord record;
 
-  const _RecordItem({required this.record});
+  const _RechargeRecordItem({required this.record});
 
   @override
   Widget build(BuildContext context) {
-    final isPositive = record.amount > 0;
+    final isPaid = record.payStatus == 1;
+    final l10n = AppLocalizations.of(context);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -146,31 +111,28 @@ class _RecordItem extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Icon
           Container(
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: _getIconBgColor().withValues(alpha: 0.2),
+              color: const Color(0xFFFFD700).withOpacity(0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              _getIcon(),
-              color: _getIconBgColor(),
+            child: const Icon(
+              Icons.account_balance_wallet,
+              color: Color(0xFFFFD700),
               size: 24,
             ),
           ),
-
           const SizedBox(width: 14),
-
-          // Content
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _getTitle(),
+                  record.detail.isNotEmpty ? record.detail : l10n.recharge,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 15,
@@ -185,40 +147,46 @@ class _RecordItem extends StatelessWidget {
                     fontSize: 12,
                   ),
                 ),
-                if (record.description != null && record.description!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    record.description!,
-                    style: const TextStyle(
-                      color: Colors.white38,
-                      fontSize: 11,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 2),
+                Text(
+                  'No. ${record.orderNo}',
+                  style: const TextStyle(
+                    color: Colors.white38,
+                    fontSize: 11,
                   ),
-                ],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
-
-          // Amount
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${isPositive ? '+' : ''}${record.amount}',
+                '\$${record.payPrice.toStringAsFixed(2)}',
                 style: TextStyle(
-                  color: isPositive ? Colors.green : Colors.red,
+                  color: isPaid ? Colors.green : Colors.orange,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                'Bal: ${record.balance}',
-                style: const TextStyle(
-                  color: Colors.white54,
-                  fontSize: 11,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: (isPaid ? Colors.green : Colors.orange).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  record.payStatusStr.isNotEmpty
+                      ? record.payStatusStr
+                      : (isPaid ? 'Paid' : 'Unpaid'),
+                  style: TextStyle(
+                    color: isPaid ? Colors.green : Colors.orange,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -228,20 +196,10 @@ class _RecordItem extends StatelessWidget {
     );
   }
 
-  Color _getIconBgColor() {
-    return const Color(0xFFFFD700);
-  }
-
-  IconData _getIcon() {
-    return Icons.account_balance_wallet;
-  }
-
-  String _getTitle() {
-    return 'K-Coin Recharge';
-  }
-
   String _formatDate(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} '
-        '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    final local = date.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${local.year}-${two(local.month)}-${two(local.day)} '
+        '${two(local.hour)}:${two(local.minute)}';
   }
 }

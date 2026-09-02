@@ -130,6 +130,7 @@ enum UnlockResultType {
   failed,
   cancelled,
   loginRequired, // 需要登录
+  vip, // VIP 订阅成功
 }
 
 class UnlockResult {
@@ -161,6 +162,10 @@ class UnlockResult {
     return const UnlockResult._(resultType: UnlockResultType.loginRequired);
   }
 
+  factory UnlockResult.vip() {
+    return const UnlockResult._(resultType: UnlockResultType.vip);
+  }
+
   final UnlockResultType resultType;
   final int? episodeIndex;
   final String? errorMessage;
@@ -169,6 +174,7 @@ class UnlockResult {
   bool get isFailed => resultType == UnlockResultType.failed;
   bool get isCancelled => resultType == UnlockResultType.cancelled;
   bool get isLoginRequired => resultType == UnlockResultType.loginRequired;
+  bool get isVip => resultType == UnlockResultType.vip;
 }
 
 /// 解锁商品列表状态

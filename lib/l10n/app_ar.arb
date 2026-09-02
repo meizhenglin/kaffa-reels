@@ -207,6 +207,7 @@
   "insufficientBalanceMessage": "رصيد K Coin غير كافٍ. هل تريد شراء \"{title}\" عبر Google Play؟",
   "unlockSuccess": "تم الفتح بنجاح!",
   "unlockFailed": "فشل الفتح",
+  "rechargeProcessing": "تم استلام عملية الشحن، يرجى المحاولة مرة أخرى بعد لحظات",
   "productUnavailable": "المنتج غير متاح، يرجى المحاولة لاحقاً",
   "purchaseSuccess": "تم الشراء بنجاح!",
   "purchaseFailed": "فشل الشراء",

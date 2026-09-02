@@ -442,7 +442,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab>
               ),
             ),
             if (!isLoggedIn)
-              _buildLoginButton(l10n)
+              _buildLoginButton(context, l10n)
             else
               _buildActivateButton(context, l10n, isVip),
           ],
@@ -497,7 +497,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab>
             ),
           ),
           if (!isLoggedIn)
-            _buildLoginButton(l10n)
+            _buildLoginButton(context, l10n)
           else
             _buildActivateButton(context, l10n, isVip),
         ],
@@ -505,26 +505,11 @@ class _ProfileTabState extends ConsumerState<ProfileTab>
     );
   }
 
-  Widget _buildLoginButton(AppLocalizations l10n) {
+  Widget _buildLoginButton(BuildContext context, AppLocalizations l10n) {
     return GestureDetector(
       onTap: () {
-        final messenger = ScaffoldMessenger.of(context);
-        messenger.hideCurrentSnackBar();
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              l10n.loginSubtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.black),
-            ),
-            backgroundColor: const Color(0xFFFFFFFF),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
+        final backTarget = Uri.encodeComponent(GoRouterState.of(context).uri.toString());
+        context.push('/auth/login?redirect=/membership&back=$backTarget');
       },
       child: Container(
         margin: const EdgeInsets.only(top: 8),
@@ -556,7 +541,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab>
     bool isVip,
   ) {
     return GestureDetector(
-      onTap: () => openMembershipPage(context, ref),
+      onTap: () => openMembershipPage(context, ref, showLoginPrompt: false),
       child: Container(
         margin: const EdgeInsets.only(top: 8),
         padding: const EdgeInsetsDirectional.symmetric(

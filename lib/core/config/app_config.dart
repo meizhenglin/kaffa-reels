@@ -16,13 +16,13 @@ class AppConfig {
 
   // ==================== API 配置 ====================
   /// 正式环境 API 地址（私有常量）
-  // static const String apiBaseUrl = 'https://tvapi.qahwatv.com/';
+  static const String apiBaseUrl = 'https://tvapi.qahwatv.com/';
 
   // test 环境 API 地址
   // static const String apiBaseUrl ="http://101.46.59.160:8082/";
  
   // 开发环境
-  static const String apiBaseUrl = 'http://192.168.1.51:8082/';
+  // static const String apiBaseUrl = 'http://192.168.1.51:8082/';
 
 
   /// 如需切回联调环境，可临时使用：

@@ -858,6 +858,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get unlockFailed => 'Unlock failed';
 
   @override
+  String get rechargeProcessing =>
+      'Recharge received, please try unlocking again in a moment';
+
+  @override
   String get unlockToContinue => 'Unlock to Continue';
 
   @override

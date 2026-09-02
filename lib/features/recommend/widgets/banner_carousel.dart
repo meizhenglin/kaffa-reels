@@ -204,7 +204,7 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
                     final authState = ref.read(authProvider);
                     final isTourist = authState.user == null || authState.user!.isTourist;
                     if (isTourist) {
-                      AppSnackBar.show(context, message: AppLocalizations.of(context).loginSubtitle);
+                      openMembershipPage(context, ref, showLoginPrompt: false);
                       return;
                     }
                     openMembershipPage(context, ref);

@@ -124,9 +124,20 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       top: false,
       child: Container(
         constraints: BoxConstraints(maxHeight: mediaQuery.size.height * 0.88),
-        decoration: const BoxDecoration(
-          color: Color(0xFF2D2440),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF1E1232), Color(0xFF2D2440)],
+          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.4),
+              blurRadius: 24,
+              offset: const Offset(0, -4),
+            ),
+          ],
         ),
         child: SingleChildScrollView(
           child: Padding(
@@ -134,11 +145,12 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildTopDecoration(),
-                _buildTitleSection(l10n),
+                _buildDragHandle(),
+                _buildHeader(l10n),
                 _buildPriceInfoRow(l10n),
                 _buildProductsGrid(l10n),
                 _buildAgreementText(),
+                const SizedBox(height: 8),
               ],
             ),
           ),
@@ -147,110 +159,87 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     );
   }
 
-  Widget _buildTopDecoration() {
-    return Stack(
-      clipBehavior: Clip.none,
-      alignment: Alignment.topCenter,
-      children: [
-        Container(
-          height: 30,
-          decoration: const BoxDecoration(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-        ),
-        PositionedDirectional(
-          start: 20,
-          top: -10,
-          child: Container(
-            width: 50,
-            height: 50,
-            decoration: const BoxDecoration(
-              color: Color(0xFFFFD700),
-              shape: BoxShape.circle,
-            ),
-            child: const Center(
-              child: Text(
-                'K',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
+  Widget _buildDragHandle() {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      width: 40,
+      height: 4,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.25),
+        borderRadius: BorderRadius.circular(2),
+      ),
+    );
+  }
+
+  Widget _buildHeader(AppLocalizations l10n) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 12),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF8B5CF6).withOpacity(0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.lock_outline, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.unlockToContinue,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${l10n.episode} ${widget.episodeIndex + 1} · ${widget.dramaTitle}',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.6),
+                    fontSize: 13,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
-        ),
-        PositionedDirectional(
-          end: 12,
-          top: 0,
-          child: GestureDetector(
+          GestureDetector(
             onTap: () {
               widget.onDismiss?.call();
-              if (mounted) {
-                Navigator.of(context).pop();
-              }
+              if (mounted) Navigator.of(context).pop();
             },
             child: Container(
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: Colors.grey.withValues(alpha: 0.3),
+                color: Colors.white.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.close, color: Colors.white, size: 20),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTitleSection(AppLocalizations l10n) {
-    final isRtl = Directionality.of(context) == TextDirection.rtl;
-    return Padding(
-      padding: EdgeInsetsDirectional.fromSTEB(
-        isRtl ? 50 : 16,
-        8,
-        isRtl ? 16 : 50,
-        8,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsetsDirectional.only(
-              start: isRtl ? 0 : 60,
-              end: isRtl ? 60 : 0,
-              top: 4,
-            ),
-            child: ShaderMask(
-              shaderCallback: (bounds) => const LinearGradient(
-                colors: [Color(0xFF8B4513), Color(0xFFD2691E)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ).createShader(bounds),
-              child: Text(
-                l10n.unlockToContinue,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: Icon(
+                Icons.close,
+                color: Colors.white.withOpacity(0.7),
+                size: 18,
               ),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Padding(
-            padding: EdgeInsetsDirectional.only(
-              start: isRtl ? 0 : 60,
-              end: isRtl ? 60 : 0,
-            ),
-            child: Text(
-              '${l10n.episode} ${widget.episodeIndex + 1} - ${widget.dramaTitle}',
-              style: const TextStyle(color: Colors.white70, fontSize: 11),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -264,227 +253,277 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(4),
+        color: Colors.white.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.1),
+          width: 1,
+        ),
       ),
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 12,
-        runSpacing: 4,
+      child: Row(
         children: [
-          _buildPriceDetail(
-            label: l10n.episodePrice,
-            value: '${episodePrice.toInt()} ${l10n.kCoin}',
+          Expanded(
+            child: _buildPriceInfoItem(
+              icon: Icons.lock_open,
+              label: l10n.episodePrice,
+              value: '${episodePrice.toInt()} ${l10n.kCoin}',
+              valueColor: const Color(0xFFFF6B6B),
+            ),
           ),
-          _buildPriceDetail(
-            label: l10n.accountBalance,
-            value: '$balance ${l10n.kCoin}',
+          Container(
+            width: 1,
+            height: 36,
+            color: Colors.white.withOpacity(0.12),
+          ),
+          Expanded(
+            child: _buildPriceInfoItem(
+              icon: Icons.account_balance_wallet,
+              label: l10n.accountBalance,
+              value: '$balance ${l10n.kCoin}',
+              valueColor: balance >= episodePrice
+                  ? const Color(0xFF4ADE80)
+                  : const Color(0xFFFFA940),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPriceDetail({required String label, required String value}) {
-    return Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(
-            text: '$label: ',
-            style: const TextStyle(color: Color(0xFF333333), fontSize: 12),
-          ),
-          TextSpan(
-            text: value,
-            style: const TextStyle(
-              color: Colors.red,
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
+  Widget _buildPriceInfoItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color valueColor,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 14, color: Colors.white.withOpacity(0.5)),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 12,
+              ),
             ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            color: valueColor,
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
           ),
-        ],
-      ),
-      textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 
   Widget _buildProductsGrid(AppLocalizations l10n) {
     final allProducts = widget.config.allProducts;
-    debugPrint('[UnlockBottomSheet] allProducts length: ${allProducts.length}');
-    debugPrint('[UnlockBottomSheet] allProducts: $allProducts');
 
     if (allProducts.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.all(20),
-        child: Text(
-          l10n.noProductsAvailable,
-          style: const TextStyle(color: Colors.white70, fontSize: 14),
+        padding: const EdgeInsets.all(32),
+          child: Text(
+            l10n.noProductsAvailable,
+            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14),
+          textAlign: TextAlign.center,
         ),
       );
     }
 
-    // Keep every product card wide enough for localized names, prices, and tags.
-    // Three columns leave too little usable width on compact phones.
     final crossAxisCount = allProducts.length == 1 ? 1 : 2;
-    final childAspectRatio = crossAxisCount == 1 ? 3.2 : 1.75;
+    final childAspectRatio = crossAxisCount == 1 ? 3.0 : 1.85;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount,
-          mainAxisSpacing: 6,
-          crossAxisSpacing: 6,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
           childAspectRatio: childAspectRatio,
         ),
         itemCount: allProducts.length,
         itemBuilder: (context, index) {
           final product = allProducts[index];
-          return _buildProductItem(product);
+          return _buildProductCard(product);
         },
       ),
     );
   }
 
-  Widget _buildProductItem(UnlockProduct product) {
+  Widget _buildProductCard(UnlockProduct product) {
     final l10n = AppLocalizations.of(context);
     final price = product.price;
     final originalPrice = product.originalPrice;
     final hasDiscount = originalPrice != null && originalPrice > price;
-
-    final priceInt = price.toInt();
-    final mainLabel = price - priceInt == 0
-        ? '¥$priceInt'
-        : '¥${price.toStringAsFixed(2)}';
-    final subLabel = product.goodsName.isNotEmpty ? product.goodsName : '';
+    final isProcessing = _isProcessingProduct(product.goodsId);
 
     String? tagLabel;
+    Color tagColor;
     if (hasDiscount) {
       tagLabel = l10n.limitedOffer;
+      tagColor = const Color(0xFFFF6B6B);
     } else if (product.isBestValue) {
       tagLabel = l10n.bestValue;
+      tagColor = const Color(0xFF8B5CF6);
     } else if (product.isPopular) {
       tagLabel = l10n.hot;
+      tagColor = const Color(0xFFFFA940);
+    } else {
+      tagLabel = null;
+      tagColor = Colors.transparent;
     }
 
     return GestureDetector(
-      onTap: _isProcessingProduct(product.goodsId)
-          ? null
-          : () => _handleProductTap(product),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(
-            color: tagLabel != null
-                ? const Color(0xFF5D4391)
-                : const Color(0xFFE0E0E0),
-            width: tagLabel != null ? 1.2 : 0.8,
+      onTap: isProcessing ? null : () => _handleProductTap(product),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 200),
+        opacity: isProcessing ? 0.55 : 1.0,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withOpacity(0.12),
+                Colors.white.withOpacity(0.06),
+              ],
+            ),
+            border: Border.all(
+              color: Colors.white.withOpacity(tagLabel != null ? 0.3 : 0.15),
+              width: tagLabel != null ? 1.4 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-        ),
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (subLabel.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        subLabel,
-                        style: const TextStyle(
-                          color: Color(0xFF333333),
-                          fontSize: 11,
+          child: Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (product.goodsName.isNotEmpty) ...[
+                      Text(
+                        product.goodsName,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.85),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
                         ),
                         textAlign: TextAlign.center,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        mainLabel,
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      if (hasDiscount) ...[
-                        const SizedBox(width: 4),
+                      const SizedBox(height: 8),
+                    ],
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
                         Text(
-                          '¥${originalPrice.toStringAsFixed(2)}',
+                          '\$${price.toStringAsFixed(0)}',
                           style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 11,
-                            decoration: TextDecoration.lineThrough,
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Text(
+                            l10n.kCoin,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.5),
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ],
+                    ),
+                    if (hasDiscount) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '\$${originalPrice.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.4),
+                          fontSize: 12,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
                     ],
-                  ),
-                ],
+                    if (tagLabel != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: tagColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: tagColor.withOpacity(0.4),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          tagLabel,
+                          style: TextStyle(
+                            color: tagColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            ),
-            if (tagLabel != null)
-              Positioned(
-                top: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+              if (isProcessing)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    borderRadius: const BorderRadius.only(
-                      topRight: Radius.circular(5),
-                      bottomLeft: Radius.circular(6),
-                    ),
-                  ),
-                  child: Text(
-                    tagLabel,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
+                    child: const Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            if (_isProcessingProduct(product.goodsId))
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.7),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Center(
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Color(0xFF5D4391),
-                    ),
-                  ),
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -493,26 +532,42 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   Widget _buildAgreementText() {
     final l10n = AppLocalizations.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             l10n.chargingAgreement,
-            style: const TextStyle(color: Colors.white70, fontSize: 11),
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.35),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(
             l10n.chargingRule1,
-            style: const TextStyle(color: Colors.white60, fontSize: 10),
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.25),
+              fontSize: 10,
+              height: 1.6,
+            ),
           ),
           Text(
             l10n.chargingRule2,
-            style: const TextStyle(color: Colors.white60, fontSize: 10),
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.25),
+              fontSize: 10,
+              height: 1.6,
+            ),
           ),
           Text(
             l10n.chargingRule3,
-            style: const TextStyle(color: Colors.white60, fontSize: 10),
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.25),
+              fontSize: 10,
+              height: 1.6,
+            ),
           ),
         ],
       ),
@@ -542,6 +597,8 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     // be compared with the user's K-Coin balance.
     if (product.type == UnlockProductType.episode ||
         product.type == UnlockProductType.season) {
+      final confirmed = await _confirmPurchase(product);
+      if (confirmed != true) return;
       await _confirmAndUnlockByPurchase(
         product,
         showBalanceDialog: false,
@@ -554,6 +611,28 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     } else {
       await _confirmAndUnlockByPurchase(product);
     }
+  }
+
+  /// 通用"确认购买"提示框：用于不依赖余额判断的商品（整剧解锁等）。
+  Future<bool?> _confirmPurchase(UnlockProduct product) async {
+    final l10n = AppLocalizations.of(context);
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.confirmPurchase),
+        content: Text(product.goodsName),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(l10n.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(l10n.purchase),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Confirm and start payment for a K-coin recharge package.
@@ -585,7 +664,11 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       if (BuildFlavor.isGoogle) {
         final handler = ref.read(rechargePurchaseHandlerProvider);
         final success = await handler.purchase(rechargeProduct);
-        if (!success && mounted) {
+        if (!mounted) return;
+        _setProcessing(product.goodsId, false);
+        if (success) {
+          await _unlockCurrentEpisodeAfterRecharge(product.goodsId);
+        } else {
           AppSnackBar.show(
             context,
             message: handler.lastError ?? l10n.purchaseFailed,
@@ -649,18 +732,32 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     final balanceNotifier = ref.read(coinBalanceInfoProvider.notifier);
     final episodePrice = widget.config.episodeUnlockPrice;
     var balance = 0;
-    for (var attempt = 0; attempt < 5; attempt++) {
+    var lastBalance = 0;
+    var balanceArrived = false;
+    // 海派支付/Google Play 充值到账通常是异步的,后端可能需要数秒。
+    // 我们轮询余额,只要余额有增长就视为到账(避免误报"余额不足")。
+    for (var attempt = 0; attempt < 10; attempt++) {
       await balanceNotifier.load();
       if (!mounted) return;
       balance = ref.read(coinBalanceInfoProvider).balance;
-      if (balance >= episodePrice || attempt == 4) break;
+      if (balance > lastBalance) {
+        lastBalance = balance;
+        balanceArrived = true;
+        if (balance >= episodePrice) break;
+      }
       await Future<void>.delayed(const Duration(seconds: 2));
     }
 
     if (!mounted) return;
     if (balance < episodePrice) {
       _setProcessing(rechargeGoodsId, false);
-      AppSnackBar.show(context, message: l10n.insufficientBalance);
+      if (balanceArrived) {
+        // 到账了但还不到解锁价——通常不该发生(单集价 < 单包金币价)
+        AppSnackBar.show(context, message: l10n.insufficientBalance);
+      } else {
+        // 充值扣款成功,但后端异步到账可能延迟,告诉用户稍后重试
+        AppSnackBar.show(context, message: l10n.rechargeProcessing);
+      }
       return;
     }
 
@@ -911,7 +1008,6 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
     try {
       final handler = ref.read(unifiedPaymentHandlerProvider);
-      var paymentCompleted = false;
       final opened = await handler.unlockEpisode(
         product: product,
         price: product.price.toStringAsFixed(2),
@@ -922,9 +1018,13 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         channel: channel,
         onPaymentComplete: (paid) {
           if (paid) {
-            paymentCompleted = true;
             widget.onUnlockSuccess.call(widget.episodeIndex);
             AppSnackBar.show(context, message: l10n.purchaseSuccessful);
+            // Close the unlock sheet immediately so the caller can trigger
+            // automatic playback now that the payment is confirmed.
+            Navigator.of(
+              context,
+            ).pop(UnlockResult.success(episodeIndex: widget.episodeIndex));
           }
         },
       );
@@ -932,15 +1032,12 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       if (!mounted) return;
       _setProcessing(product.goodsId, false);
 
+      // pop 已在 onPaymentComplete 内触发；这里只负责错误提示。
       if (!opened) {
         AppSnackBar.show(
           context,
           message: handler.lastError ?? l10n.purchaseFailed,
         );
-      } else if (paymentCompleted && mounted) {
-        Navigator.of(
-          context,
-        ).pop(UnlockResult.success(episodeIndex: widget.episodeIndex));
       }
     } catch (e) {
       if (mounted) {
@@ -1036,7 +1133,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         await coinNotifier.load();
 
         AppSnackBar.show(context, message: l10n.vipSubscriptionSuccess);
-        Navigator.of(context).pop();
+        Navigator.of(
+          context,
+        ).pop(UnlockResult.vip());
       } else {
         AppSnackBar.show(
           context,
@@ -1073,9 +1172,10 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         displayName: product.goodsName,
         goodsId: product.goodsId,
       );
-      // success=true here only means "payment page was opened".
-      // The in-app WebView handles its own dismissal; we must NOT pop
-      // the calling sheet or it will dismiss the WebView too.
+      // success=true here means the WebView already closed and the user
+      // completed payment. By the time we reach this point the WebView is
+      // no longer in the navigation stack, so it is safe to pop the
+      // unlock sheet.
       final opened = await handler.purchaseVip(
         product: subProduct,
         price: product.price.toStringAsFixed(2),
@@ -1092,9 +1192,8 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       _setProcessing(product.goodsId, false);
 
       if (opened) {
-        // Keep the sheet open. The WebView is now on top.
-        // When the user completes payment, the WebView pops itself
-        // and we land back here — caller should refresh state then.
+        AppSnackBar.show(context, message: l10n.vipSubscriptionSuccess);
+        Navigator.of(context).pop(UnlockResult.vip());
       } else {
         AppSnackBar.show(
           context,

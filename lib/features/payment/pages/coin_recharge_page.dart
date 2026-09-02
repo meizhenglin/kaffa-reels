@@ -44,7 +44,7 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
     // 游客不能充值K币
     final authState = ref.read(authProvider);
     if (!authState.isAuthenticated || (authState.user?.isTourist ?? true)) {
-      await openMembershipPage(context, ref);
+      await openMembershipPage(context, ref, showLoginPrompt: false);
       return;
     }
 

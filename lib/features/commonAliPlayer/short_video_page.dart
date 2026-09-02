@@ -840,7 +840,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
               if (goodsType == 1) {
                 type = UnlockProductType.coinRecharge;
               } else if (goodsType == 2) {
-                type = UnlockProductType.episode; // 整剧解锁
+                type = UnlockProductType.season; // 整剧解锁
               } else if (goodsType == 0) {
                 final name = (item['rechargeGoodsName'] ?? '')
                     .toString()
@@ -979,6 +979,22 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           '/auth/login?redirect=${Uri.encodeComponent(redirectUrl)}',
         );
       }
+    } else if (result.isVip) {
+      // VIP 订阅成功:关闭锁定 overlay,刷新用户信息与 VIP 状态,
+      // 然后跳到当前集播放(VIP 用户通常可以直接观看)。
+      debugPrint('[_showUnlockBottomSheet] result.isVip');
+      _clearPendingLockedOverlay();
+      if (mounted) {
+        setState(() {
+          videoInfoList[index] = videoInfo.copyWith(isCanPlay: 1);
+        });
+        await ref.read(authProvider.notifier).refreshUserInfo();
+        ref.invalidate(isVipProvider);
+        final retryIndex = lockedIndex ?? _pendingLockedEpisodeIndex;
+        if (retryIndex != null) {
+          await _jumpToEpisode(retryIndex);
+        }
+      }
     }
   }
 
@@ -1027,6 +1043,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
   /// 尝试使用激励广告解锁剧集
   /// 用户完整看完一则激励广告，即可解锁当前 VIP 锁定剧集
+  /// 这条路径对游客和登录用户都开放,无需登录。
   /// 返回 true 表示解锁成功，false 表示用户未完成观看或广告未就绪
   Future<bool> _tryUnlockWithRewardedAd(int index) async {
     debugPrint('[_tryUnlockWithRewardedAd] START - index=$index');
@@ -1049,7 +1066,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       return false;
     }
 
-    // 广告未就绪时，先尝试触发加载（AdMediator 内部会自动重试）
+    // 广告未就绪时，先尝试触发加载（AdMediator 内部会自动重试）。
+    // 游客场景下 token 为空也能走到这里,后端 request 会以无 token 方式发请求。
     if (!AdMediator.instance.isRewardedAdReady()) {
       debugPrint(
         '[_tryUnlockWithRewardedAd] No ad platform ready, triggering preload...',
