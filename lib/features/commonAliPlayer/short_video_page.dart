@@ -22,7 +22,8 @@ import '../payment/widgets/unlock_bottom_sheet.dart';
 import '../payment/models/unlock_product.dart';
 import '../../app/providers/app_providers.dart';
 import '../../core/widgets/share_button.dart';
-import 'ali_player_preload.dart';
+import 'ali_player_preload.dart'
+    if (dart.library.html) 'ali_player_preload_web.dart';
 import 'watch_short_video_item.dart'
     if (dart.library.html) 'watch_short_video_item_web.dart';
 

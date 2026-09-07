@@ -175,7 +175,7 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
                 _onPlayTap(widget.banners[_currentIndex]);
               },
               child: Image.asset(
-                'assets/images/logo.png', // 这里才是真正显示图片的地方
+                'assets/images/logo_new.png', // 这里才是真正显示图片的地方
                 width: HomeCardLayout.bannerScaled(context, 74),
                 height: HomeCardLayout.bannerScaled(context, 32),
               ),

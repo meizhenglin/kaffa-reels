@@ -103,7 +103,13 @@ class HaiPayService {
   /// [payType]     = the id returned by /api/pay/getPayMethods
   /// [payConfigId] = the goods/pay-config id that selects VIP / recharge / unlock
   ///
-  /// Returns the merchant order number on success, null on failure.
+  /// Returns the HiPay platform order number on success, null on failure.
+  /// Backend shape: { code, orderNo, merchantOrderNo }
+  ///   - orderNo          = HiPay platform order number (used by initPay +
+  ///                        getOrderIsPay polling)
+  ///   - merchantOrderNo  = our internal / merchant-side order number
+  /// We prefer `orderNo`; if the backend ever omits it we fall back to
+  /// `merchantOrderNo`.
   Future<String?> userRechange({
     required int payType,
     required int payConfigId,
@@ -126,7 +132,10 @@ class HaiPayService {
           final orderNo = _s(data?['orderNo'] ?? body['orderNo']);
           final merchantOrderNo =
               _s(data?['merchantOrderNo'] ?? body['merchantOrderNo']);
-          final n = merchantOrderNo.isNotEmpty ? merchantOrderNo : orderNo;
+          // Prefer HiPay's platform orderNo (this is what initPay / getOrderIsPay
+          // expect). Fall back to merchantOrderNo only when the backend omits
+          // orderNo entirely.
+          final n = orderNo.isNotEmpty ? orderNo : merchantOrderNo;
           if (n.isNotEmpty) return n;
         }
         debugPrint(
@@ -140,16 +149,18 @@ class HaiPayService {
   }
 
   /// POST /api/pay/initPay
-  /// Payload: { orderNo: <merchantOrderNo> }
+  /// Payload: { orderNo: <HiPay platform order number> }
+  ///   - `orderNo` is the HiPay-side identifier returned by /api/pay/userRechange.
+  ///   - It is NOT the merchant-side order number.
   ///
   /// Response:
   /// { code: 200, message: 'success', payUrl, orderNo, merchantOrderNo }
-  Future<HaiPayOrder?> initPay({required String merchantOrderNo}) async {
+  Future<HaiPayOrder?> initPay({required String orderNo}) async {
     try {
       final headers = (await _authHeaders()) ?? {};
       final response = await _dio.post(
         '/api/pay/initPay',
-        data: {'orderNo': merchantOrderNo},
+        data: {'orderNo': orderNo},
         options: Options(headers: headers),
       );
 
@@ -183,16 +194,32 @@ class HaiPayService {
   }
 
   /// Convenience: combine the two-step flow and return the openable order.
+  ///
+  /// The HiPay platform order number returned by [userRechange] is what
+  /// /api/pay/initPay expects on input AND what /pay/getOrderIsPay expects
+  /// when polling. The backend may return a different `orderNo` field in
+  /// the initPay response (e.g. an internal id), so we explicitly re-pin
+  /// `HaiPayOrder.orderNo` to the value we got from userRechange. This
+  /// guarantees that callers poll with the correct platform-side id.
   Future<HaiPayOrder?> createAndInit({
     required int payType,
     required int payConfigId,
   }) async {
-    final merchantOrderNo = await userRechange(
+    final platformOrderNo = await userRechange(
       payType: payType,
       payConfigId: payConfigId,
     );
-    if (merchantOrderNo == null || merchantOrderNo.isEmpty) return null;
-    return initPay(merchantOrderNo: merchantOrderNo);
+    if (platformOrderNo == null || platformOrderNo.isEmpty) return null;
+    final order = await initPay(orderNo: platformOrderNo);
+    if (order == null) return null;
+    // Always pin the polling orderNo to the HiPay platform id from userRechange.
+    return HaiPayOrder(
+      payInfo: order.payInfo,
+      orderNo: platformOrderNo,
+      merchantOrderNo: order.merchantOrderNo.isNotEmpty
+          ? order.merchantOrderNo
+          : platformOrderNo,
+    );
   }
 
   /// Poll payment status.
@@ -227,21 +254,32 @@ class HaiPayService {
   }
 
   /// Start polling for payment status.
+  ///
+  /// The stream will terminate (so the consumer sees `onDone`) as soon as
+  /// *any* of the following is true:
+  ///   - the backend reports `isPay == 1`
+  ///   - [maxAttempts] polls have been made (default 30)
+  ///   - [timeout] elapses (default 3 minutes)
   Stream<HaiPayStatus> startPolling({
     required String type,
     required String orderNo,
     Duration interval = const Duration(seconds: 2),
-    Duration timeout = const Duration(minutes: 10),
+    Duration timeout = const Duration(minutes: 3),
+    int maxAttempts = 30,
   }) async* {
     final endTime = DateTime.now().add(timeout);
+    var attempts = 0;
 
-    while (DateTime.now().isBefore(endTime)) {
+    while (DateTime.now().isBefore(endTime) && attempts < maxAttempts) {
+      attempts++;
       final status = await pollPaymentStatus(type: type, orderNo: orderNo);
       yield status;
 
       if (status.isPaid) break;
-
-      await Future.delayed(interval);
+      if (attempts >= maxAttempts) break;
+      if (DateTime.now().isBefore(endTime)) {
+        await Future.delayed(interval);
+      }
     }
   }
 

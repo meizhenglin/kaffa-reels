@@ -458,16 +458,16 @@ class _RegisterEmailPageState extends ConsumerState<RegisterEmailPage> {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(18),
                       child: Image.asset(
-                        'assets/images/APP_LOGO_NEW_SMALL.png',
+                        'assets/images/APP_LOGO_NEW_SMALL_purple.png',
                         width: 92,
                         height: 92,
                         errorBuilder: (_, __, ___) => Container(
                           width: 92,
                           height: 92,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
-                            ),
+                            // gradient: const LinearGradient(
+                            //   colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
+                            // ),
                             borderRadius: BorderRadius.circular(18),
                           ),
                           child: const Icon(

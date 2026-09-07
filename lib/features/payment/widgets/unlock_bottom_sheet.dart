@@ -88,6 +88,8 @@ class UnlockBottomSheet extends ConsumerStatefulWidget {
 class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   /// 正在处理的商品ID集合，支持同时处理多个商品
   final Set<int> _processingProductIds = {};
+  /// 余额是否已懒加载过（避免重复请求）
+  bool _balanceLazyLoaded = false;
 
   bool _isProcessingProduct(int goodsId) =>
       _processingProductIds.contains(goodsId);
@@ -102,12 +104,16 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     });
   }
 
+  /// 懒加载余额：首次需要余额时（余额支付通道被点击）才发请求。
+  Future<void> _ensureBalanceLoaded() async {
+    if (_balanceLazyLoaded) return;
+    _balanceLazyLoaded = true;
+    await ref.read(coinBalanceInfoProvider.notifier).load();
+  }
+
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
-      ref.read(coinBalanceInfoProvider.notifier).load();
-    });
   }
 
   int get _userBalance => ref.watch(coinBalanceInfoProvider).balance;
@@ -248,6 +254,13 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   }
 
   Widget _buildPriceInfoRow(AppLocalizations l10n) {
+    // UI 展示余额：优先用本地状态，没有则触发懒加载，
+    // 但不阻塞 UI（避免选支付方式阶段就立刻请求 userPersonalCenter）。
+    if (!_balanceLazyLoaded && _userBalance == 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _ensureBalanceLoaded();
+      });
+    }
     final balance = _userBalance;
     final episodePrice = widget.config.episodeUnlockPrice;
 
@@ -581,6 +594,8 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       return;
     }
 
+    // 懒加载余额：只在需要判断余额是否足够时才请求（余额支付通道被点击）
+    await _ensureBalanceLoaded();
     final balance = _userBalance;
 
     if (product.type == UnlockProductType.vip) {

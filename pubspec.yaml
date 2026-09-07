@@ -92,9 +92,12 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/APP_LOGO_NEW.png"
+  image_path: "assets/images/APP_LOGO_NEW_purple.png"
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/APP_LOGO_NEW.png"
+  adaptive_icon_foreground: "assets/images/APP_LOGO_NEW_purple.png"
+  web:
+    generate: true
+    image_path: "assets/images/APP_LOGO_NEW_purple.png"
 
 flutter:
   uses-material-design: true

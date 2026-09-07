@@ -124,7 +124,7 @@ class PassportType {
   static const int douyin = 3;
 
   /// Facebook 登录
-  static const int facebook = 2;
+  static const int facebook = 4;
 
   /// Google 登录
   static const int google = 5;

@@ -79,6 +79,9 @@ class PaymentChannelSelector extends StatelessWidget {
     return showModalBottomSheet<PaymentChannel>(
       context: context,
       backgroundColor: Colors.transparent,
+      constraints: const BoxConstraints(
+        maxWidth: double.infinity,
+      ),
       builder: (ctx) => PaymentChannelSelector(
         price: price,
         productName: productName,

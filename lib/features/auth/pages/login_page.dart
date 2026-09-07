@@ -11,6 +11,11 @@ import '../../payment/providers/membership_provider.dart'
 import '../../../app/providers/app_providers.dart';
 import '../../../core/config/build_flavor.dart';
 
+/// 是否在登录页显示 Facebook 登录按钮。
+///
+/// 临时关闭：保持按钮代码存在，只是不渲染。改回 `true` 即可恢复。
+const bool kShowFacebookLogin = false;
+
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key, this.redirect, this.backTarget = '/'});
 
@@ -136,16 +141,16 @@ class _LoginPageState extends ConsumerState<LoginPage>
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(18),
                       child: Image.asset(
-                        'assets/images/APP_LOGO_NEW_SMALL.png',
+                        'assets/images/APP_LOGO_NEW_SMALL_purple.png',
                         width: 92,
                         height: 92,
                         errorBuilder: (_, __, ___) => Container(
                           width: 92,
                           height: 92,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
-                            ),
+                            // gradient: const LinearGradient(
+                            //   colors: [Color(0xFF8F4EFF), Color(0xFFA237FF)],
+                            // ),
                             borderRadius: BorderRadius.circular(18),
                           ),
                         ),
@@ -429,45 +434,47 @@ class _LoginPageState extends ConsumerState<LoginPage>
                               );
                             },
                           ),
-                          const SizedBox(height: 16),
-                          Consumer(
-                            builder: (_, ref, __) {
-                              final isLoading = ref
-                                  .watch(authProvider)
-                                  .isLoading;
-                              return _PlatformButton(
-                                label: 'Continue with Facebook',
-                                icon: Icons.facebook,
-                                iconPath: 'assets/images/facebook_icon.png',
-                                isLoading: isLoading,
-                                onTap: () async {
-                                  if (!_appIsInForeground) return;
-                                  ref.read(authProvider.notifier).clearError();
-                                  final success = await ref
-                                      .read(authProvider.notifier)
-                                      .signInWithFacebook();
-                                  if (!mounted) return;
-                                  if (success) {
-                                    if (Navigator.canPop(context)) {
-                                      Navigator.of(
-                                        context,
-                                        rootNavigator: true,
-                                      ).pop();
+                          if (kShowFacebookLogin) ...[
+                            const SizedBox(height: 16),
+                            Consumer(
+                              builder: (_, ref, __) {
+                                final isLoading = ref
+                                    .watch(authProvider)
+                                    .isLoading;
+                                return _PlatformButton(
+                                  label: 'Continue with Facebook',
+                                  icon: Icons.facebook,
+                                  iconPath: 'assets/images/facebook_icon.png',
+                                  isLoading: isLoading,
+                                  onTap: () async {
+                                    if (!_appIsInForeground) return;
+                                    ref.read(authProvider.notifier).clearError();
+                                    final success = await ref
+                                        .read(authProvider.notifier)
+                                        .signInWithFacebook();
+                                    if (!mounted) return;
+                                    if (success) {
+                                      if (Navigator.canPop(context)) {
+                                        Navigator.of(
+                                          context,
+                                          rootNavigator: true,
+                                        ).pop();
+                                      }
+                                      if (widget.redirect != null &&
+                                          widget.redirect!.contains(
+                                            '/short-video',
+                                          )) {
+                                        ref
+                                            .read(loginReturnProvider.notifier)
+                                            .state++;
+                                      }
+                                      context.go(widget.backTarget);
                                     }
-                                    if (widget.redirect != null &&
-                                        widget.redirect!.contains(
-                                          '/short-video',
-                                        )) {
-                                      ref
-                                          .read(loginReturnProvider.notifier)
-                                          .state++;
-                                    }
-                                    context.go(widget.backTarget);
-                                  }
-                                },
-                              );
-                            },
-                          ),
+                                  },
+                                );
+                              },
+                            ),
+                          ],
                           if (!kIsWeb &&
                               defaultTargetPlatform == TargetPlatform.iOS) ...[
                             const SizedBox(height: 16),

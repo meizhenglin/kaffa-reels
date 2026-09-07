@@ -7,4 +7,6 @@
     <!-- Replace with the Client Token from Meta App Settings > Basic. -->
     <string name="facebook_client_token">c8fbb86b18d593cb0c68a13680d700eb</string>
     <string name="facebook_application_id">1153560107115108</string>
+    <!-- Facebook Login 深度链接回调 scheme，必须为 fb<APP_ID> 格式 -->
+    <string name="fb_login_protocol_scheme">fb1153560107115108</string>
 </resources>

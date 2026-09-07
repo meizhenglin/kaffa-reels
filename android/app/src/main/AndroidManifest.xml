@@ -146,5 +146,18 @@
         </intent>
         <package android:name="com.google.android.gms"/>
         <package android:name="com.twitter.android"/>
+        <!-- Facebook Login (Android 11+ package visibility): 让 SDK 能查询 Facebook App / Chrome CustomTabs -->
+        <package android:name="com.facebook.katana"/>
+        <package android:name="com.facebook.lite"/>
+        <package android:name="com.facebook.android"/>
+        <package android:name="com.facebook.orca"/>
+        <package android:name="com.facebook.messenger"/>
+        <package android:name="com.chrome.beta"/>
+        <package android:name="com.chrome.canary"/>
+        <package android:name="com.chrome.dev"/>
+        <package android:name="com.google.android.apps.chrome"/>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService"/>
+        </intent>
     </queries>
 </manifest>
