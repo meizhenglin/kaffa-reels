@@ -434,7 +434,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                               );
                             },
                           ),
-                          if (kShowFacebookLogin) ...[
+                          if (kShowFacebookLogin && !kIsWeb) ...[
                             const SizedBox(height: 16),
                             Consumer(
                               builder: (_, ref, __) {

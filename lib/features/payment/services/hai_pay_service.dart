@@ -231,24 +231,36 @@ class HaiPayService {
     try {
       final headers = (await _authHeaders()) ?? {};
       final response = await _dio.post(
-        '/pay/getOrderIsPay',
-        data: {
-          'type': type,
-          'orderNo': orderNo,
-        },
+        '/api/pay/getOrderIsPay',
+        data:  orderNo,
         options: Options(headers: headers),
       );
 
       if (response.statusCode == 200 && response.data != null) {
         final body = response.data;
-        if (_ok(body)) {
+        final code = body['code'];
+        final msg = body['msg']?.toString() ?? 'Unknown error';
+
+        if (code == 0 || code == 200) {
+          // code=0 → 正常返回，解析 isPay 字段
           final data = _data(body);
           if (data != null) return HaiPayStatus.fromJson(data);
+          // data 为空也按未支付处理
+          return const HaiPayStatus(isPay: '1');
+        } else {
+          // code != 0 → 业务错误（如 Parameter error），停止轮询
+          throw HaiPayApiException(
+            code: code,
+            message: msg,
+          );
         }
       }
+      // HTTP 非 200 → 网络问题，继续轮询
       return const HaiPayStatus(isPay: '1');
     } catch (e) {
+      if (e is HaiPayApiException) rethrow; // 业务错误，向上传播，停止轮询
       debugPrint('[HaiPayService] pollPaymentStatus error: $e');
+      // 网络异常，继续轮询
       return const HaiPayStatus(isPay: '1');
     }
   }
@@ -291,6 +303,17 @@ class HaiPayService {
     final status = await pollPaymentStatus(type: type, orderNo: orderNo);
     return status.isPaid;
   }
+}
+
+/// HiPay API 业务异常（如 code=1 Parameter error），表示永久性错误，不应继续轮询
+class HaiPayApiException implements Exception {
+  const HaiPayApiException({required this.code, required this.message});
+
+  final dynamic code;
+  final String message;
+
+  @override
+  String toString() => '[HaiPayApiException] code=$code, msg=$message';
 }
 
 /// Provider for HaiPayService

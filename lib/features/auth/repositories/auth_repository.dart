@@ -16,6 +16,16 @@ import '../../../core/network/api_service.dart';
 import '../../../core/storage/storage_service.dart';
 import '../models/user_model.dart';
 
+/// [DEBUG] Facebook 登录 Mock 开关。
+///
+/// 仅当：
+///   1. kDebugMode = true（debug 构建）
+///   2. kEnableFacebookMock = true（手动开启）
+/// 时会走 Mock 流程，绕过 Facebook 服务器端拒绝。
+///
+/// 上线前请确保 kEnableFacebookMock = false。
+const bool kEnableFacebookMock = false;
+
 class AuthRepository {
   AuthRepository(this._storage, this._apiService);
 
@@ -573,6 +583,13 @@ class AuthRepository {
       );
     }
 
+    // [DEBUG] Facebook 审核未通过时的 Mock 入口，仅 debug 模式生效
+    // 临时验证：代码逻辑 → 后端调用 → UserModel → VIP 同步 → 缓存
+    // 开启方式：app_config.dart 里设 kEnableFacebookMock = true
+    if (kEnableFacebookMock && kDebugMode) {
+      return _signInWithFacebookMock();
+    }
+
     try {
       final result = await const MethodChannel(
         'com.video.storydrama/facebook_login',
@@ -652,6 +669,59 @@ class AuthRepository {
       if (value != null && value.isNotEmpty && value != 'null') return value;
     }
     return null;
+  }
+
+  /// [DEBUG] Facebook 登录 Mock 实现，仅 kDebugMode + kEnableFacebookMock=true 时触发
+  /// 用于绕过 Facebook 服务器端拒绝（Bussiness Verification 未通过），验证后续代码路径
+  Future<UserModel> _signInWithFacebookMock() async {
+    debugPrint('[FacebookLoginMock] ⚠️ Using mock data — NOT for production');
+    final mockData = <String, dynamic>{
+      'id': '1234567890',
+      'name': 'Test User',
+      'email': 'testuser@example.com',
+      'access_token': 'mock_token_${DateTime.now().millisecondsSinceEpoch}',
+      'picture':
+          'https://graph.facebook.com/1234567890/picture?type=large',
+    };
+
+    final accessToken = _firstString(mockData, const [
+      'access_token',
+      'accessToken',
+      'token',
+    ])!;
+    final facebookId = _firstString(mockData, const ['id', 'userID', 'userId'])!;
+    final email = _firstString(mockData, const ['email']);
+    final displayName = _firstString(mockData, const ['name', 'nickname']);
+    final avatar = _firstString(mockData, const ['icon', 'picture', 'avatar']);
+
+    final backendSynced = await _syncBackendToken(
+      () => apiServiceProvider.facebookLogin(
+        passportName: accessToken,
+        accessToken: accessToken,
+        email: email,
+        displayName: displayName,
+        avatar: avatar,
+      ),
+    );
+    if (!backendSynced) {
+      throw StateError(
+        'Facebook mock sign-in: backend token sync failed.',
+      );
+    }
+
+    final model = UserModel.fromJson({
+      ...mockData,
+      'userId': facebookId,
+      if (email != null) 'email': email,
+      if (displayName != null) 'nickName': displayName,
+      if (avatar != null) 'userAvatar': avatar,
+      'passportType': PassportType.facebook,
+      'isGuest': false,
+    });
+    final updatedModel = await _refreshVipStatusFromBackend(model);
+    await cacheUser(updatedModel);
+    debugPrint('[FacebookLoginMock] ✅ Mock flow complete');
+    return updatedModel;
   }
 
   Future<UserModel> signInWithApple() async {

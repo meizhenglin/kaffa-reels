@@ -27,6 +27,7 @@ class ProfileTab extends ConsumerStatefulWidget {
 class _ProfileTabState extends ConsumerState<ProfileTab>
     with WidgetsBindingObserver {
   ProviderSubscription<AuthState>? _authStateSubscription;
+  bool _isLoadingUserInfo = false;
 
   @override
   void initState() {
@@ -94,50 +95,34 @@ class _ProfileTabState extends ConsumerState<ProfileTab>
   }
 
   Future<void> _loadUserInfo() async {
-    ref.read(coinBalanceInfoProvider.notifier).load();
-
-    final authState = ref.read(authProvider);
-    final currentUser = authState.user;
-    debugPrint(
-      '[ProfileTab._loadUserInfo] '
-      'status=${authState.status} '
-      'isTourist=${currentUser?.isTourist} '
-      'user=${currentUser?.toJson()}',
-    );
-    if (authState.status == AuthStatus.unauthenticated || currentUser == null) {
-      debugPrint(
-        '[ProfileTab._loadUserInfo] skip refresh for missing user/unauthenticated',
-      );
-      return;
-    }
-
-    final isTourist = currentUser.isTourist;
-
-    debugPrint(
-      '[ProfileTab._loadUserInfo] requesting user center '
-      'status=${authState.status} '
-      'isTourist=$isTourist '
-      'id=${currentUser.id}',
-    );
+    // 防止多个 listenManual（tab 切换 / AuthState 变化 / didChangeDependencies /
+    // VIP 变化 / 应用前后台切换）在同一帧内并发触发 _loadUserInfo 导致
+    // getUserCenter 被连续调用多次。
+    if (_isLoadingUserInfo) return;
+    _isLoadingUserInfo = true;
 
     try {
-      final resp = await ref.read(apiServiceProviderRef).getUserCenter();
-      if (resp.isSuccess && resp.data != null && mounted) {
-        final userData = resp.data as Map<String, dynamic>;
-        debugPrint(
-          '[ProfileTab._loadUserInfo] getUserCenter success: $userData',
-        );
-        ref.read(authProvider.notifier).updateUserFromData(userData);
+      final authState = ref.read(authProvider);
+      final currentUser = authState.user;
+      if (authState.status == AuthStatus.unauthenticated ||
+          currentUser == null) {
         return;
       }
-      debugPrint(
-        '[ProfileTab._loadUserInfo] getUserCenter failed: '
-        'success=${resp.isSuccess} data=${resp.data} isTourist=$isTourist',
-      );
-    } catch (e) {
-      debugPrint(
-        '[ProfileTab._loadUserInfo] getUserCenter error: $e isTourist=$isTourist',
-      );
+
+      // 只请求一次 getUserCenter，然后同时更新 coinBalanceInfo 和 authProvider
+      try {
+        final resp = await ref.read(apiServiceProviderRef).getUserCenter();
+        if (resp.isSuccess && resp.data != null && mounted) {
+          final userData = resp.data as Map<String, dynamic>;
+          // 同时更新余额状态和用户信息（同一个接口返回的数据，不重复请求）
+          ref.read(coinBalanceInfoProvider.notifier).updateFromData(userData);
+          ref.read(authProvider.notifier).updateUserFromData(userData);
+        }
+      } catch (e) {
+        debugPrint('[ProfileTab._loadUserInfo] getUserCenter error: $e');
+      }
+    } finally {
+      _isLoadingUserInfo = false;
     }
   }
 

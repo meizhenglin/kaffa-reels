@@ -93,7 +93,7 @@ class _GamesPageState extends ConsumerState<GamesPage> {
         children: [
           ClipOval(
             child: Image.asset(
-              'assets/images/app_logo.png',
+              'assets/images/APP_LOGO_NEW_SMALL_purple.png',
               width: 48,
               height: 48,
               fit: BoxFit.cover,

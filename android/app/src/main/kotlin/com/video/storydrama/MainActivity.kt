@@ -12,6 +12,7 @@ import com.facebook.ads.*
 import com.facebook.GraphRequest
 import com.facebook.login.LoginManager
 import com.facebook.login.LoginResult
+import com.facebook.login.LoginBehavior
 import com.facebook.FacebookCallback
 import com.facebook.FacebookException
 import com.facebook.CallbackManager
@@ -107,8 +108,16 @@ class MainActivity : FlutterFragmentActivity() {
                             result.error("IN_PROGRESS", "Facebook login is already in progress", null)
                         } else {
                             facebookLoginResult = result
-                            LoginManager.getInstance().logInWithReadPermissions(
+                            // SDK 13+ 推荐用 logIn(activity, callbackManager, permissions)
+                            // 老 API logInWithReadPermissions 在 SDK 17 已弃用
+                            // 强制用 NATIVE_WITH_FALLBACK：优先用 Facebook App，其次 WebView
+                            // 不依赖设备是否装了 Facebook App，更稳定
+                            LoginManager.getInstance().setLoginBehavior(
+                                LoginBehavior.NATIVE_WITH_FALLBACK,
+                            )
+                            LoginManager.getInstance().logIn(
                                 this,
+                                facebookCallbackManager,
                                 listOf("email", "public_profile"),
                             )
                         }

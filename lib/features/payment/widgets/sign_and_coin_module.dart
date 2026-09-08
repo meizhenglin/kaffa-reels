@@ -21,8 +21,14 @@ class _SignAndCoinModuleState extends ConsumerState<SignAndCoinModule> {
   @override
   void initState() {
     super.initState();
+    // 注意：coinBalanceInfoProvider 的首次加载由 ProfileTab._loadUserInfo()
+    // 统一触发，这里不再重复调用，避免 userPersonalCenter 接口被并发触发两次。
+    // 如果将来需要单独使用 SignAndCoinModule（脱离 ProfileTab），再恢复：
+    //   Future.microtask(() {
+    //     ref.read(coinBalanceInfoProvider.notifier).load();
+    //     ref.read(signStateProvider.notifier).load();
+    //   });
     Future.microtask(() {
-      ref.read(coinBalanceInfoProvider.notifier).load();
       ref.read(signStateProvider.notifier).load();
     });
   }

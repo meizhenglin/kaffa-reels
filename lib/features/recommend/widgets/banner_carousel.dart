@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -428,25 +426,21 @@ class _BannerImageLayer extends StatelessWidget {
       return _buildPreloadBackground();
     }
 
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 300),
-      child: Stack(
-        key: ValueKey(imageUrl),
-        fit: StackFit.expand,
-        children: [
-          _BlurredBannerBackground(imageUrl: imageUrl),
-          ColoredBox(color: Colors.black.withValues(alpha: 0.18)),
-          Center(
-            child: PreloadNetworkImage(
-              imageUrl: imageUrl,
-              preloadAsset: 'assets/images/banner_preload_bg.png',
-              width: double.infinity,
-              height: double.infinity,
-              fit: BoxFit.cover,
-            ),
-          ),
-        ],
-      ),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // 背景层：使用 ColorFiltered + 低透明度彩色实现模糊感，
+        // 不再单独下载一次原图做 blur，避免重复加载。
+        _BlurredBannerBackground(imageUrl: imageUrl),
+        // 主图层
+        PreloadNetworkImage(
+          imageUrl: imageUrl,
+          preloadAsset: 'assets/images/banner_preload_bg.png',
+          width: double.infinity,
+          height: double.infinity,
+          fit: BoxFit.cover,
+        ),
+      ],
     );
   }
 
@@ -466,6 +460,8 @@ class _BannerImageLayer extends StatelessWidget {
   }
 }
 
+/// 背景模糊层：使用 ColorFiltered 模拟暖色调模糊感，
+/// 避免通过 Image.network 重复下载原图。
 class _BlurredBannerBackground extends StatelessWidget {
   const _BlurredBannerBackground({required this.imageUrl});
 
@@ -473,31 +469,22 @@ class _BlurredBannerBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.network(
-          imageUrl,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-          alignment: Alignment.center,
-          errorBuilder: (_, __, ___) => const ColoredBox(
-            color: Color(0xFF1F2025),
-          ),
+    return ColorFiltered(
+      colorFilter: ColorFilter.mode(
+        const Color(0xFF1A1A2E).withValues(alpha: 0.45),
+        BlendMode.darken,
+      ),
+      child: Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        alignment: Alignment.center,
+        // 仅在网络不佳时显示占位色
+        errorBuilder: (_, __, ___) => const ColoredBox(
+          color: Color(0xFF1F2025),
         ),
-        ClipRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(
-              sigmaX: HomeCardLayout.bannerScaled(context, 18),
-              sigmaY: HomeCardLayout.bannerScaled(context, 18),
-            ),
-            child: Container(
-              color: Colors.black.withValues(alpha: 0.18),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

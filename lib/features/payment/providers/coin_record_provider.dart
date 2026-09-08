@@ -28,9 +28,12 @@ class CoinBalanceNotifier extends StateNotifier<CoinBalance> {
   CoinBalanceNotifier(this._apiService) : super(const CoinBalance());
 
   final ApiService _apiService;
+  bool _isLoading = false;
 
   /// Load coin balance from API
   Future<void> load() async {
+    if (_isLoading) return;
+    _isLoading = true;
     try {
       final resp = await _apiService.getUserCenter();
       if (resp.isSuccess && resp.data != null) {
@@ -39,16 +42,26 @@ class CoinBalanceNotifier extends StateNotifier<CoinBalance> {
       }
     } catch (e) {
       // Handle error silently, keep current balance
+    } finally {
+      _isLoading = false;
     }
   }
 
-  /// Update balance locally (after recharge or consume)
-  void updateBalance(int newBalance) {
+  /// Update balance from raw API response data (avoids a second HTTP request)
+  void updateFromData(Map<String, dynamic> data) {
     state = CoinBalance(
-      balance: newBalance,
-      rechargeAmount: state.rechargeAmount,
-      consumeAmount: state.consumeAmount,
-      giveAmount: state.giveAmount,
+      balance: data['balance'] as int? ??
+          data['userAmount'] as int? ??
+          0,
+      rechargeAmount: data['rechargeAmount'] as int? ??
+          data['recharge_amount'] as int? ??
+          0,
+      consumeAmount: data['consumeAmount'] as int? ??
+          data['consume_amount'] as int? ??
+          0,
+      giveAmount: data['giveAmount'] as int? ??
+          data['give_amount'] as int? ??
+          0,
     );
   }
 

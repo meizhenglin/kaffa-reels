@@ -183,12 +183,17 @@ class HaiPayStatus extends Equatable {
   /// "1" = unpaid, "0" = paid
   final String isPay;
 
-  bool get isPaid => isPay == '0';
-  bool get isUnpaid => isPay == '1';
+  /// 统一约定：isPay == '1' → 已支付（true），isPay == '0' → 未支付（false）
+  /// 与后端 isPaid 惯例一致：isPaid=1 = paid，isPaid=0 = unpaid
+  bool get isPaid => isPay == '1';
+  bool get isUnpaid => isPay == '0';
 
   factory HaiPayStatus.fromJson(Map<String, dynamic> json) {
-    final rawIsPay = json['isPay'];
-    return HaiPayStatus(isPay: rawIsPay?.toString() ?? '1');
+    // 优先取 isPay（字符串），fallback 到 isPaid（整数，0/1）
+    final rawIsPay = json['isPay'] ?? json['isPaid'];
+    if (rawIsPay == null) return const HaiPayStatus(isPay: '1');
+    // isPaid 可能是 int (0/1) 也可能是 string ('0'/'1')，统一转 string
+    return HaiPayStatus(isPay: rawIsPay.toString());
   }
 
   @override
