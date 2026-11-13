@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Qahwa SDK Login</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; overflow: hidden; }
+    #qahwa-sdk-container { height: 100%; display: flex; align-items: center; justify-content: center; }
+  </style>
+</head>
+<body>
+  <div id="qahwa-sdk-container">
+    <button id="qahwa-sdk-open-login">Open Login</button>
+  </div>
+
+  <script src="qahwa-sdk-secure.js"></script>
+  <script>
+    // 使用相对路径，通过 nginx 反向代理访问 API（解决 CORS 问题）
+    QahwaSDK.init({
+      apiBaseUrl: '',  // 留空表示相对路径，通过 nginx /api/ 代理
+      appId: 'qahwa-web-sdk'
+    });
+    
+    // Unity 集成：监听登录成功/失败事件
+    document.getElementById('qahwa-sdk-open-login').onclick = function() {
+      QahwaSDK.showLogin({
+        onSuccess: function(userId, token) {
+          // 登录成功 - Unity 可以在这里接收数据
+          console.log('Login Success:', { userId: userId, token: token });
+          
+          // 方式1：通过 URL Scheme 通知 Unity
+          // window.location.href = 'qahwasdk://login?userId=' + userId + '&token=' + token;
+          
+          // 方式2：通过 postMessage 通知 Unity
+          // window.parent.postMessage({ type: 'qahwa-login-success', userId: userId, token: token }, '*');
+          
+          // 方式3：直接调用 Unity 的方法（如果可用）
+          if (typeof Unity !== 'undefined' && Unity.call) {
+            Unity.call('OnLoginSuccess', JSON.stringify({ userId: userId, token: token }));
+          }
+        },
+        onError: function(error) {
+          // 登录失败
+          console.log('Login Error:', error);
+        },
+        onClose: function() {
+          // 用户关闭登录弹窗
+          console.log('Login Modal Closed');
+        }
+      });
+    };
+    
+    // 自动打开登录弹窗（可选，取消注释即可）
+    // setTimeout(function() {
+    //   document.getElementById('qahwa-sdk-open-login').click();
+    // }, 100);
+  </script>
+</body>
+</html>

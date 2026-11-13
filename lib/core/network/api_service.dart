@@ -1,15 +1,15 @@
+import 'dart:convert';
 import 'dart:ui' show Locale, PlatformDispatcher;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
-import '../config/app_config.dart';
 import '../constants/api_error_code.dart';
 import '../constants/app_constants.dart';
 import '../model/api_endpoints.dart';
 import '../storage/storage_service.dart';
-import '../../app/providers/app_providers.dart';
 import 'dio_client.dart';
+import 'x_client_header.dart';
 
 /// ============================================================================
 /// API 服务层
@@ -36,32 +36,21 @@ class ApiService {
 
   Dio get _dio => _dioClient.dio;
 
-  String _buildXClientHeader() {
+  /// 构造 `X-Client` 请求头。
+  ///
+  /// 统一走 [XClientHeader] —— 这里原来自己拼了一份，和 `dio_client.dart`
+  /// 那份内容不一样（少了 `channel` / `build`）。而 dio_client 的拦截器
+  /// 是最后写 `X-Client` 的那个，所以真正发出去的一直是少了两个字段的
+  /// 那份。现在两边同源。
+  Future<String> _buildXClientHeader() async {
     final savedLang = _storage.getString(AppConstants.deviceLangKey);
     final locale = PlatformDispatcher.instance.locale;
-    final lang = _normalizeLang(savedLang, fallbackLocale: locale);
-    final xClient = AppConfig.currentXClient;
-    final version = AppConfig.appVersion;
-    final osName = AppConfig.platformType;
-    return '$xClient;version=$version;osName=$osName;x-lang=$lang';
+    return XClientHeader.build(savedLang: savedLang, fallbackLocale: locale);
   }
 
-  String _normalizeLang(String? value, {Locale? fallbackLocale}) {
-    final normalized = value?.trim();
-    if (normalized == 'ar-SA') {
-      return 'ar-SA';
-    }
-    if (normalized == 'en-US') {
-      return 'en-US';
-    }
-    if (normalized == 'ar') {
-      return 'ar-SA';
-    }
-    if (normalized == 'en') {
-      return 'en-US';
-    }
-    return formatDeviceLang(fallbackLocale ?? const Locale('en'));
-  }
+  /// 语言归一化 —— 委托给 [XClientHeader]，避免两处各写一份规则。
+  String _normalizeLang(String? value, {Locale? fallbackLocale}) =>
+      XClientHeader.normalizeLang(value, fallbackLocale: fallbackLocale);
 
   // ==================== 统一请求方法 ====================
 
@@ -84,7 +73,7 @@ class ApiService {
         'Content-Type': isForm
             ? 'application/x-www-form-urlencoded'
             : 'application/json',
-        'X-Client': _buildXClientHeader(),
+        'X-Client': await _buildXClientHeader(),
         if (token != null && token.isNotEmpty) 'token': token,
         if (clientParams.isNotEmpty) ...{
           'client_params': clientParams,
@@ -92,7 +81,8 @@ class ApiService {
         },
       };
 
-      debugPrint('[ApiService] REQUEST[$method] => $url body=$data');
+      // 请求和响应只记录排查所需的状态，不输出 code 或 token。
+      debugPrint('[ApiService] REQUEST[$method] => $url');
 
       final Response response;
       if (isForm) {
@@ -110,7 +100,7 @@ class ApiService {
       }
 
       final body = response.data;
-      debugPrint('[ApiService] RESPONSE[$url] => $body');
+      debugPrint('[ApiService] RESPONSE[$url] status=${response.statusCode}');
 
       if (response.statusCode == 200) {
         final code = body['code'] as int?;
@@ -138,7 +128,13 @@ class ApiService {
           return ApiResponse.expired(body?['msg'] ?? 'Token expired');
         }
       }
-      return ApiResponse.error(e.message ?? 'Network error');
+      // 把 HTTP 状态码带回去：调用方（如启动时的登录态恢复）需要靠 401
+      // 区分「token 已失效」和「网络/服务端临时故障」，否则会被误判成断网，
+      // 进而在失效场景下错误地沿用本地缓存的登录态。
+      return ApiResponse.error(
+        e.message ?? 'Network error',
+        code: e.response?.statusCode,
+      );
     } catch (e) {
       debugPrint('[ApiService] Exception => $e');
       return ApiResponse.error(e.toString());
@@ -245,6 +241,51 @@ class ApiService {
     return request(
       ApiEndpoints.weixinLogin,
       data: {'passportType': PassportType.wechat, 'code': code},
+    );
+  }
+
+  /// TikTok 登录
+  ///
+  /// 后端使用统一的 userAuthorization 接口，passportType=7 走 TikTok 业务分支
+  /// （⚠️ 7 这个值待后端最终确认，4 已被 Facebook 占用）。
+  /// 后端内部用 client_secret 把 code 换成 TikTok access_token，返回 app token。
+  ///
+  /// [code] TikTok authorize 返回的 auth code
+  /// [redirectUri] 本次请求 code 时实际用的 redirect URI
+  ///   —— TikTok 换 token 时要求它与请求 code 时**完全一致**，
+  ///      后端拿不到就无从校验，所以必须原样透传。
+  /// [invitedCode] 邀请码（可选，后端支持）
+  /// [codeVerifier] 启用 PKCE 时必传。
+  ///   —— 后端用 code 换 access_token 时要带上它，且必须与生成
+  ///      `code_challenge` 时用的字符串逐字节一致，否则 TikTok 返回
+  ///      `invalid_grant`。未启用 PKCE 时为 null，后端按非 PKCE 流程处理。
+  Future<ApiResponse> tiktokLogin({
+    required String code,
+    String? redirectUri,
+    String? codeVerifier,
+    String? invitedCode,
+  }) {
+    return request(
+      ApiEndpoints.tiktokLogin,
+      data: {
+        'passportType': PassportType.tiktok,
+        // 【passportName 必须每用户唯一】
+        // 之前这里硬编码成 'TikTok_access_token'，等于所有 TikTok 用户共用
+        // 同一个 passportName。后端 `passport_name` 很可能有唯一索引
+        // （Google 登录之所以把 idToken 包成 JSON 再塞进 passportName，
+        // 就是为了满足这一点），常量值会让第二个用户直接撞约束。
+        //
+        // TikTok 不返回 openId，授权阶段能拿到的唯一标识就是 auth code，
+        // 所以这里传 code。后端换完 token 后自行从 user info 读 openId。
+        'passportName': code,
+        'code': code,
+        if (redirectUri != null && redirectUri.isNotEmpty)
+          'redirectUri': redirectUri,
+        if (codeVerifier != null && codeVerifier.isNotEmpty)
+          'codeVerifier': codeVerifier,
+        if (invitedCode != null && invitedCode.isNotEmpty)
+          'invitedCode': invitedCode,
+      },
     );
   }
 
@@ -674,9 +715,27 @@ class ApiService {
     return request(ApiEndpoints.cancelAccount, method: 'POST');
   }
 
-  /// Google 支付回调通知
-  Future<ApiResponse> googleCallBack({required String params}) {
-    return request(ApiEndpoints.googleCallBack, data: {'params': params});
+  /// Google 支付回调通知（`POST /notice/google`）。
+  ///
+  /// 【请求体格式】
+  /// 后端这个接口的 requestBody 在 OpenAPI 里声明为 `type: string`，
+  /// 对应 Spring 的 `@RequestBody String params` —— Spring 会把**整个原始
+  /// body 文本**交给后端，后端自己再 `JSON.parseObject`。
+  ///
+  /// 也就是说这里发出去的 JSON 文本本身就要是「购买信息」，
+  /// **不能**再套一层 `{"params": "..."}`，否则后端解析出来的对象里只有
+  /// 一个 `params` 字段，订单号 / 商品 ID 全是 null。
+  ///
+  /// 为了兼容后端可能写成「先取 params 字段再 parse 一次」，
+  /// 这里同时带上**平铺字段**和一份**同内容的 params 字符串**，
+  /// 两种解析方式都能拿到数据（多余的字段后端会忽略）。
+  ///
+  /// [params] 是购买信息的 Map（orderNo / productId / purchaseToken …）。
+  Future<ApiResponse> googleCallBack({required Map<String, dynamic> params}) {
+    return request(
+      ApiEndpoints.googleCallBack,
+      data: <String, dynamic>{...params, 'params': jsonEncode(params)},
+    );
   }
 
   /// 获取签到配置
@@ -758,7 +817,7 @@ class ApiService {
         },
         options: Options(
           headers: {
-            'X-Client': _buildXClientHeader(),
+            'X-Client': await _buildXClientHeader(),
             if (token != null && token.isNotEmpty) 'token': token,
           },
         ),

@@ -5,7 +5,7 @@ import 'package:video_player/video_player.dart';
 import 'common_video_player.dart' show CommonEpisode;
 
 // Web-only fullscreen player using native video_player
-class _WebFullscreenPlayer extends StatefulWidget {
+class WebFullscreenPlayer extends StatefulWidget {
   final String videoUrl;
   final String? coverUrl;
   final bool autoPlay;
@@ -32,13 +32,13 @@ class _WebFullscreenPlayer extends StatefulWidget {
   });
 
   @override
-  State<WebFullscreenPlayer> createState() => WebFullscreenPlayerState();
+  State<WebFullscreenPlayer> createState() => _WebFullscreenPlayerState();
 }
 
-class _WebFullscreenPlayerState extends State<_WebFullscreenPlayer> {
+class _WebFullscreenPlayerState extends State<WebFullscreenPlayer> {
   VideoPlayerController? _controller;
   bool _isInitialized = false;
-  bool _hasError = false;
+  String? _errorMessage;
   bool _isPlaying = false;
   bool _showControls = true;
   Duration _position = Duration.zero;
@@ -47,8 +47,12 @@ class _WebFullscreenPlayerState extends State<_WebFullscreenPlayer> {
 
   bool get _isLocked => widget.isCanPlay == 0 || widget.isVip == 1;
 
+  bool _isHlsUrl(String url) =>
+      Uri.tryParse(url)?.path.toLowerCase().endsWith('.m3u8') ?? false;
+
   String get _currentVideoUrl {
-    if (widget.allEpisodes.isNotEmpty && _currentIndex < widget.allEpisodes.length) {
+    if (widget.allEpisodes.isNotEmpty &&
+        _currentIndex < widget.allEpisodes.length) {
       return widget.allEpisodes[_currentIndex].videoUrl;
     }
     return widget.videoUrl;
@@ -64,23 +68,26 @@ class _WebFullscreenPlayerState extends State<_WebFullscreenPlayer> {
   @override
   void didUpdateWidget(WebFullscreenPlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final newUrl = _currentVideoUrl;
-    final oldUrl = oldWidget.allEpisodes.isNotEmpty && 
-        oldWidget.currentIndex < oldWidget.allEpisodes.length
+    final nextIndex = widget.currentIndex;
+    final newUrl =
+        widget.allEpisodes.isNotEmpty && nextIndex < widget.allEpisodes.length
+        ? widget.allEpisodes[nextIndex].videoUrl
+        : widget.videoUrl;
+    final oldUrl =
+        oldWidget.allEpisodes.isNotEmpty &&
+            oldWidget.currentIndex < oldWidget.allEpisodes.length
         ? oldWidget.allEpisodes[oldWidget.currentIndex].videoUrl
         : oldWidget.videoUrl;
-    
+
+    _currentIndex = nextIndex;
     if (newUrl != oldUrl) {
+      _controller?.removeListener(_onControllerUpdate);
       _controller?.dispose();
       _controller = null;
       _isInitialized = false;
-      _hasError = false;
+      _errorMessage = null;
       _isPlaying = false;
       _initController();
-    }
-    
-    if (widget.currentIndex != oldWidget.currentIndex) {
-      _currentIndex = widget.currentIndex;
     }
   }
 
@@ -110,7 +117,9 @@ class _WebFullscreenPlayerState extends State<_WebFullscreenPlayer> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _hasError = true;
+        _errorMessage = _isHlsUrl(url)
+            ? 'This browser may not support HLS playback for this video.'
+            : 'Failed to load video.';
       });
     }
   }
@@ -176,11 +185,25 @@ class _WebFullscreenPlayerState extends State<_WebFullscreenPlayer> {
   @override
   Widget build(BuildContext context) {
     if (_currentVideoUrl.isEmpty) {
-      return Container(color: Colors.black, child: const Center(child: Text('No video URL', style: TextStyle(color: Colors.white))));
+      return Container(
+        color: Colors.black,
+        child: const Center(
+          child: Text('No video URL', style: TextStyle(color: Colors.white)),
+        ),
+      );
     }
 
-    if (_hasError) {
-      return Container(color: Colors.black, child: const Center(child: Text('Failed to load video', style: TextStyle(color: Colors.white))));
+    if (_errorMessage != null) {
+      return Container(
+        color: Colors.black,
+        child: Center(
+          child: Text(
+            _errorMessage ?? 'Failed to load video',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
     }
 
     if (!_isInitialized || _controller == null) {
@@ -236,7 +259,10 @@ class _WebFullscreenPlayerState extends State<_WebFullscreenPlayer> {
                   children: [
                     Icon(Icons.lock, color: Colors.white, size: 64),
                     SizedBox(height: 16),
-                    Text('VIP Content', style: TextStyle(color: Colors.white, fontSize: 18)),
+                    Text(
+                      'VIP Content',
+                      style: TextStyle(color: Colors.white, fontSize: 18),
+                    ),
                   ],
                 ),
               ),
@@ -267,15 +293,21 @@ class _WebFullscreenPlayerState extends State<_WebFullscreenPlayer> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: widget.onBackPressed ?? () => Navigator.of(context).pop(),
+                      onPressed:
+                          widget.onBackPressed ??
+                          () => Navigator.of(context).pop(),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        widget.allEpisodes.isNotEmpty && _currentIndex < widget.allEpisodes.length
+                        widget.allEpisodes.isNotEmpty &&
+                                _currentIndex < widget.allEpisodes.length
                             ? widget.allEpisodes[_currentIndex].title
                             : widget.title,
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -290,7 +322,10 @@ class _WebFullscreenPlayerState extends State<_WebFullscreenPlayer> {
               right: 0,
               bottom: 0,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
@@ -301,19 +336,34 @@ class _WebFullscreenPlayerState extends State<_WebFullscreenPlayer> {
                 child: Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.skip_previous, color: Colors.white),
+                      icon: const Icon(
+                        Icons.skip_previous,
+                        color: Colors.white,
+                      ),
                       onPressed: _currentIndex > 0 ? _previousEpisode : null,
                     ),
                     IconButton(
-                      icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, color: Colors.white, size: 32),
+                      icon: Icon(
+                        _isPlaying ? Icons.pause : Icons.play_arrow,
+                        color: Colors.white,
+                        size: 32,
+                      ),
                       onPressed: _togglePlay,
                     ),
                     IconButton(
                       icon: const Icon(Icons.skip_next, color: Colors.white),
-                      onPressed: _currentIndex < widget.allEpisodes.length - 1 ? _nextEpisode : null,
+                      onPressed: _currentIndex < widget.allEpisodes.length - 1
+                          ? _nextEpisode
+                          : null,
                     ),
                     const SizedBox(width: 8),
-                    Text(_formatDuration(_position), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    Text(
+                      _formatDuration(_position),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
                     Expanded(
                       child: SliderTheme(
                         data: SliderTheme.of(context).copyWith(
@@ -321,18 +371,30 @@ class _WebFullscreenPlayerState extends State<_WebFullscreenPlayer> {
                           inactiveTrackColor: Colors.white38,
                           thumbColor: Colors.white,
                           trackHeight: 3,
-                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                          thumbShape: const RoundSliderThumbShape(
+                            enabledThumbRadius: 6,
+                          ),
+                          overlayShape: const RoundSliderOverlayShape(
+                            overlayRadius: 12,
+                          ),
                         ),
                         child: Slider(
                           value: _duration.inMilliseconds > 0
-                              ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
+                              ? (_position.inMilliseconds /
+                                        _duration.inMilliseconds)
+                                    .clamp(0.0, 1.0)
                               : 0.0,
                           onChanged: _onSliderChanged,
                         ),
                       ),
                     ),
-                    Text(_formatDuration(_duration), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    Text(
+                      _formatDuration(_duration),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
                   ],
                 ),
               ),

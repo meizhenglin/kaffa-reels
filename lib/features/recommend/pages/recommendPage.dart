@@ -15,15 +15,12 @@ import 'package:go_router/go_router.dart';
 import 'package:preload_page_view/preload_page_view.dart';
 import 'package:qahwa_tv/l10n/app_localizations.dart';
 
-import '../../home/pages/main_page.dart';
-import '../../commonAliPlayer/short_video_preload_tuning.dart';
+import '../../home/pages/main_page.dart' show currentTabIndexProvider;
 import '../models/video_info.dart';
 import '../providers/recommend_provider.dart';
 import '../providers/video_action_provider.dart';
 import '../../commonAliPlayer/short_video_item.dart'
     if (dart.library.html) '../../commonAliPlayer/short_video_item_web.dart';
-import '../../commonAliPlayer/ali_player_preload.dart'
-    if (dart.library.html) '../../commonAliPlayer/ali_player_preload_web.dart';
 
 const bool _showRecommendPlaybackDebug = false;
 
@@ -98,10 +95,7 @@ class _ErrorView extends StatelessWidget {
             style: const TextStyle(color: Colors.white54),
           ),
           const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: onRetry,
-            child: const Text('Retry'),
-          ),
+          ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
         ],
       ),
     );
@@ -121,7 +115,6 @@ class ShortVideoListPage extends ConsumerStatefulWidget {
 class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     with WidgetsBindingObserver {
   late PreloadPageController _preloadPageController;
-  AliPlayerPreload? _aliPlayerPreload;
   late List<GlobalKey<ShortVideoItemState>> _itemKeys;
   int _currentIndex = 0;
   bool _isCurrentTabActive = false;
@@ -142,39 +135,49 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       _prefetchAround(0);
     });
     _isCurrentTabActive = ref.read(currentTabIndexProvider) == 2;
-    _tabIndexSubscription = ref.listenManual<int>(
-      currentTabIndexProvider,
-      (previous, next) {
-        if (!mounted) return;
-        _isCurrentTabActive = next == 2;
-        if (_isCurrentTabActive && !_isCoveredByFullscreenRoute) {
-          _resumeCurrent();
-        } else {
-          _pauseCurrent();
-        }
-      },
-    );
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_aliPlayerPreload != null) return;
-    _aliPlayerPreload = AliPlayerPreload(
-      context: context,
-      enableCoverUrlStrategy: true,
-    );
-    _aliPlayerPreload!.setItems(widget.videos.cast<VideoInfo>());
-    _aliPlayerPreload!.moveTo(_currentIndex);
+    _tabIndexSubscription = ref.listenManual<int>(currentTabIndexProvider, (
+      previous,
+      next,
+    ) {
+      if (!mounted) return;
+      _isCurrentTabActive = next == 2;
+      if (_isCurrentTabActive && !_isCoveredByFullscreenRoute) {
+        _resumeCurrent();
+      } else {
+        _pauseCurrent();
+      }
+    });
   }
 
   @override
   void dispose() {
     _tabIndexSubscription.close();
     WidgetsBinding.instance.removeObserver(this);
-    _aliPlayerPreload?.destroy();
     _preloadPageController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant ShortVideoListPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 视频列表只在 initState 里生成过一次 key，列表增长后
+    // `_itemKeys[index]` 会越界（itemBuilder 里直接按 index 取）。
+    // 列表缩短时多出来的 key 不会被用到，保留即可，不做裁剪 ——
+    // 裁剪会让仍存活的 item 的 GlobalKey 被回收，反而更容易触发
+    // element 搬家和 "notifyClients 依赖者不在子树里" 类断言。
+    final newLength = widget.videos.length;
+    if (newLength > _itemKeys.length) {
+      _itemKeys = [
+        ..._itemKeys,
+        ...List.generate(
+          newLength - _itemKeys.length,
+          (_) => GlobalKey<ShortVideoItemState>(),
+        ),
+      ];
+    }
+    if (_currentIndex >= newLength) {
+      _currentIndex = 0;
+    }
   }
 
   @override
@@ -199,20 +202,22 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     final newIndex = _preloadPageController.page?.round() ?? 0;
     if (_currentIndex == newIndex) return;
     _currentIndex = newIndex;
-    _aliPlayerPreload?.moveTo(newIndex);
     _pauseAllExceptCurrent(newIndex);
     _prefetchAround(newIndex);
   }
 
   void _prefetchAround(int centerIndex) {
-    final indices = ShortVideoPreloadTuning.pagePlayablePrefetchOffsets
-        .map((offset) => centerIndex + offset)
-        .toSet();
-    for (final index in indices) {
-      if (index < 0 || index >= _itemKeys.length) continue;
-      _itemKeys[index].currentState?.prefetchPlayableUrl(
-        playIfReady: index == centerIndex && _isCurrentTabActive,
-      );
+    final indices = <int>{centerIndex, centerIndex + 1};
+    for (var index = 0; index < _itemKeys.length; index++) {
+      final item = _itemKeys[index].currentState;
+      if (item == null) continue;
+      if (indices.contains(index)) {
+        item.prefetchPlayableUrl(
+          playIfReady: index == centerIndex && _isCurrentTabActive,
+        );
+      } else {
+        item.releasePrefetched();
+      }
     }
   }
 
@@ -234,18 +239,30 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
     _isCoveredByFullscreenRoute = true;
     _pauseAllExceptCurrent(-1);
+    // 全屏页会自己创建一个播放器；必须释放首页的这些播放器，
+    // 否则暂停的 ExoPlayer 仍会继续下载，和全屏播放抢带宽。
+    _releaseAllPlayers();
 
     try {
-      await context.push('/short-video', extra: {
-        'videoId': videoId,
-        'initialIndex': _currentIndex,
-        'seedVideo': current.toJson(),
-      });
+      await context.push(
+        '/short-video',
+        extra: {
+          'videoId': videoId,
+          'initialIndex': _currentIndex,
+          'seedVideo': current.toJson(),
+        },
+      );
     } finally {
       _isCoveredByFullscreenRoute = false;
       if (mounted && _isCurrentTabActive) {
         _resumeCurrent();
       }
+    }
+  }
+
+  void _releaseAllPlayers() {
+    for (final key in _itemKeys) {
+      key.currentState?.releasePlayback();
     }
   }
 
@@ -269,7 +286,6 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     );
     if (!mounted) return;
     _currentIndex = nextIndex;
-    _aliPlayerPreload?.moveTo(nextIndex);
     _pauseAllExceptCurrent(nextIndex);
     _prefetchAround(nextIndex);
   }
@@ -316,15 +332,15 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     final videoId = videoInfo.videoId.toString();
     if (videoId.isEmpty || videoId == '0') return;
 
-    final currentValue = ref.read(videoActionProvider).isLiked(
-          videoId,
-          fallback: videoInfo.isLike == 1,
-        );
-    final currentCount = ref.read(videoActionProvider).likeCount(
-          videoId,
-          fallback: videoInfo.likeNum,
-        );
-    await ref.read(videoActionProvider.notifier).toggleLike(
+    final currentValue = ref
+        .read(videoActionProvider)
+        .isLiked(videoId, fallback: videoInfo.isLike == 1);
+    final currentCount = ref
+        .read(videoActionProvider)
+        .likeCount(videoId, fallback: videoInfo.likeNum);
+    await ref
+        .read(videoActionProvider.notifier)
+        .toggleLike(
           videoId: videoId,
           episodesId: videoInfo.id.toString(),
           currentValue: currentValue,
@@ -336,15 +352,15 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     final videoId = videoInfo.videoId.toString();
     if (videoId.isEmpty || videoId == '0') return;
 
-    final currentValue = ref.read(videoActionProvider).isCollected(
-          videoId,
-          fallback: videoInfo.isCollect == 1,
-        );
-    final currentCount = ref.read(videoActionProvider).collectCount(
-          videoId,
-          fallback: videoInfo.collectNum,
-        );
-    await ref.read(videoActionProvider.notifier).toggleCollect(
+    final currentValue = ref
+        .read(videoActionProvider)
+        .isCollected(videoId, fallback: videoInfo.isCollect == 1);
+    final currentCount = ref
+        .read(videoActionProvider)
+        .collectCount(videoId, fallback: videoInfo.collectNum);
+    await ref
+        .read(videoActionProvider.notifier)
+        .toggleCollect(
           videoId: videoId,
           episodesId: videoInfo.id.toString(),
           currentValue: currentValue,
@@ -394,10 +410,22 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     final videoId = videoInfo.videoId.toString();
     final actionState = ref.watch(videoActionProvider);
 
-    final isLiked = actionState.isLiked(videoId, fallback: videoInfo.isLike == 1);
-    final isCollected = actionState.isCollected(videoId, fallback: videoInfo.isCollect == 1);
-    final likeCount = actionState.likeCount(videoId, fallback: videoInfo.likeNum);
-    final collectCount = actionState.collectCount(videoId, fallback: videoInfo.collectNum);
+    final isLiked = actionState.isLiked(
+      videoId,
+      fallback: videoInfo.isLike == 1,
+    );
+    final isCollected = actionState.isCollected(
+      videoId,
+      fallback: videoInfo.isCollect == 1,
+    );
+    final likeCount = actionState.likeCount(
+      videoId,
+      fallback: videoInfo.likeNum,
+    );
+    final collectCount = actionState.collectCount(
+      videoId,
+      fallback: videoInfo.collectNum,
+    );
 
     return PositionedDirectional(
       end: 12,
@@ -410,7 +438,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
             _buildSideActionButton(
               activeImage: 'assets/images/like_active.png',
               inactiveImage: 'assets/images/like.png',
-              label: _formatActionCount(likeCount),
+              label: _formatActionCount(
+                isLiked && likeCount == 0 ? 1 : likeCount,
+              ),
               onTap: () => _toggleLike(videoInfo),
               isActive: isLiked,
             ),
@@ -418,7 +448,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
             _buildSideActionButton(
               activeImage: 'assets/images/collection_active.png',
               inactiveImage: 'assets/images/collection.png',
-              label: _formatActionCount(collectCount),
+              label: _formatActionCount(
+                isCollected && collectCount == 0 ? 1 : collectCount,
+              ),
               onTap: () => _toggleCollect(videoInfo),
               isActive: isCollected,
             ),
@@ -459,7 +491,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
               : null,
         );
       },
-      preloadPagesCount: 2,
+      preloadPagesCount: 1,
     );
   }
 }

@@ -13,8 +13,12 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/firebase/firebase_service.dart';
 import '../../../core/model/api_endpoints.dart' show PassportType;
 import '../../../core/network/api_service.dart';
+import '../../../core/network/retry_helper.dart';
 import '../../../core/storage/storage_service.dart';
 import '../models/user_model.dart';
+import '../services/tiktok_auth_service.dart'
+    show TiktokAuthService, TiktokLoginResult, TiktokSignInException;
+import '../exceptions/auth_exceptions.dart';
 
 /// [DEBUG] Facebook 登录 Mock 开关。
 ///
@@ -172,11 +176,29 @@ class AuthRepository {
   }
 
   /// 调用后端登录接口，同步 Firebase Token 到后端
-  Future<bool> _syncBackendToken(Future<ApiResponse> Function() apiCall) async {
+  ///
+  /// 【重试】最多 3 次，指数退避（800ms / 1600ms / 3200ms）
+  /// - 重试：网络错误、超时、5xx
+  /// - 不重试：4xx（401/403/400 都是用户/认证问题）
+  Future<bool> _syncBackendToken(
+    Future<ApiResponse> Function() apiCall, {
+    bool retry = true,
+  }) async {
     try {
-      final resp = await apiCall();
-      if (resp.isSuccess && resp.data != null) {
-        final data = resp.data as Map<String, dynamic>;
+      final response = retry
+          ? await RetryHelper.retry(
+              apiCall,
+              maxAttempts: 3,
+              baseDelay: const Duration(milliseconds: 800),
+              onRetry: (attempt, error) {
+                _logger.w(
+                  '[_syncBackendToken] attempt $attempt failed; retrying with error type ${error.runtimeType}',
+                );
+              },
+            )
+          : await apiCall();
+      if (response.isSuccess && response.data != null) {
+        final data = response.data as Map<String, dynamic>;
         final backendToken = data['token'] as String?;
         if (backendToken != null && backendToken.isNotEmpty) {
           await _storage.saveToken(backendToken);
@@ -185,7 +207,9 @@ class AuthRepository {
       }
       return false;
     } catch (e) {
-      _logger.e('[_syncBackendToken] error: $e');
+      _logger.e(
+        '[_syncBackendToken] retries exhausted; error type ${e.runtimeType}',
+      );
       return false;
     }
   }
@@ -680,8 +704,7 @@ class AuthRepository {
       'name': 'Test User',
       'email': 'testuser@example.com',
       'access_token': 'mock_token_${DateTime.now().millisecondsSinceEpoch}',
-      'picture':
-          'https://graph.facebook.com/1234567890/picture?type=large',
+      'picture': 'https://graph.facebook.com/1234567890/picture?type=large',
     };
 
     final accessToken = _firstString(mockData, const [
@@ -689,7 +712,11 @@ class AuthRepository {
       'accessToken',
       'token',
     ])!;
-    final facebookId = _firstString(mockData, const ['id', 'userID', 'userId'])!;
+    final facebookId = _firstString(mockData, const [
+      'id',
+      'userID',
+      'userId',
+    ])!;
     final email = _firstString(mockData, const ['email']);
     final displayName = _firstString(mockData, const ['name', 'nickname']);
     final avatar = _firstString(mockData, const ['icon', 'picture', 'avatar']);
@@ -704,9 +731,7 @@ class AuthRepository {
       ),
     );
     if (!backendSynced) {
-      throw StateError(
-        'Facebook mock sign-in: backend token sync failed.',
-      );
+      throw StateError('Facebook mock sign-in: backend token sync failed.');
     }
 
     final model = UserModel.fromJson({
@@ -722,6 +747,128 @@ class AuthRepository {
     await cacheUser(updatedModel);
     debugPrint('[FacebookLoginMock] ✅ Mock flow complete');
     return updatedModel;
+  }
+
+  /// TikTok 登录（应用内 WebView 方案）
+  ///
+  /// 流程：
+  /// 1. 调 TiktokAuthService.login() 拉起应用内 WebView
+  /// 2. WebView 加载 TikTok authorize URL，用户在 TikTok 页面完成授权
+  /// 3. TikTok 302 到 redirect_uri?code=xxx&state=xxx
+  /// 4. WebView 拦截 URL，提取 authCode，关闭 WebView
+  /// 5. 调后端 /api/user/userAuthorization 用 passportType=tiktok
+  /// 6. 后端用 authCode + redirectUri 换 TikTok access_token，再读取用户信息
+  /// 7. 用后端返回的 token 同步到本地
+  Future<UserModel> signInWithTikTok() async {
+    if (kIsWeb) {
+      throw StateError('TikTok sign-in is only available on mobile platforms.');
+    }
+    if (!TiktokAuthService.isSupported) {
+      throw TiktokSignInException(
+        'tiktok-platform-unsupported',
+        'TikTok sign-in is only available on Android and iOS.',
+      );
+    }
+
+    final stopwatch = Stopwatch()..start();
+    debugPrint('[TikTokLoginFlow] start');
+    _logger.i('[AuthRepo] TikTok sign-in started');
+
+    // 1. 触发 TikTok 授权（应用内 WebView，超时由 service 内部处理：5 分钟）
+    final TiktokLoginResult tiktokResult;
+    try {
+      tiktokResult = await TiktokAuthService.login();
+    } on AuthCancelledException {
+      debugPrint('[TikTokLoginFlow] user cancelled');
+      _logger.i('[AuthRepo] TikTok sign-in cancelled by user');
+      throw const AuthCancelledException();
+    } catch (e, stackTrace) {
+      debugPrint(
+        '[TikTokLoginFlow] TikTok login failed after '
+        '${stopwatch.elapsedMilliseconds}ms (${e.runtimeType})',
+      );
+      _logger.e(
+        '[AuthRepo] TikTok login failed (${e.runtimeType})',
+        stackTrace: stackTrace,
+      );
+      rethrow;
+    }
+    debugPrint(
+      '[TikTokLoginFlow] auth code obtained after ${stopwatch.elapsedMilliseconds}ms '
+      'len=${tiktokResult.authCode.length}',
+    );
+    _logger.i(
+      '[AuthRepo] TikTok auth code obtained in ${stopwatch.elapsedMilliseconds}ms',
+    );
+
+    // 2. 同步后端 token（用 authCode 换 backend token）
+    // TikTok 不返回 openId，passportName 传 authCode
+    // 让后端用 authCode 换 token 后自行读取 openId
+    //
+    // 【必须带上 redirectUri】
+    // TikTok 换 token 时要求 redirect_uri 与「请求 code 时用的」完全一致，
+    // 后端拿不到就无从校验，所以必须原样透传。
+    //
+    // 【codeVerifier】
+    // 只要授权 URL 带了 code_challenge，换 token 就必须带对应的 verifier，
+    // 否则 TikTok 返回 invalid_grant。是否启用 PKCE 由
+    // AppConfig.tiktokUsePkce 决定，这里只负责原样透传。
+    final backendSynced = await _syncBackendToken(
+      () => apiServiceProvider.tiktokLogin(
+        code: tiktokResult.authCode,
+        redirectUri: tiktokResult.redirectUri,
+        codeVerifier: tiktokResult.codeVerifier,
+      ),
+      retry: false,
+    );
+    if (!backendSynced) {
+      throw StateError(
+        'TikTok sign-in succeeded, but backend token sync failed.',
+      );
+    }
+    debugPrint(
+      '[TikTokLoginFlow] backend sync completed in ${stopwatch.elapsedMilliseconds}ms',
+    );
+
+    // 3. 拉取最新用户信息（VIP 状态等）
+    try {
+      final resp = await apiServiceProvider.getUserCenter();
+      if (resp.isSuccess && resp.data != null) {
+        final userData = resp.data as Map<String, dynamic>;
+        final incomingUser = UserModel.fromJson(
+          userData,
+        ).copyWith(isGuest: false);
+        final updatedModel = await _refreshVipStatusFromBackend(incomingUser);
+        await cacheUser(updatedModel);
+        debugPrint(
+          '[TikTokLoginFlow] finished via getUserCenter total=${stopwatch.elapsedMilliseconds}ms',
+        );
+        _logger.i(
+          '[AuthRepo] TikTok sign-in finished via getUserCenter in ${stopwatch.elapsedMilliseconds}ms',
+        );
+        return updatedModel;
+      }
+    } catch (e) {
+      debugPrint(
+        '[TikTokLoginFlow] getUserCenter failed: $e, fallback to local model',
+      );
+      _logger.w(
+        '[AuthRepo] TikTok getUserCenter failed, fallback to local model: $e',
+      );
+    }
+
+    // 4. 兜底：authCode 作为临时 userId（后端登录成功后通常会立刻有 userId）
+    final fallback = UserModel.fromJson({
+      'userId': 'tiktok_${DateTime.now().millisecondsSinceEpoch}',
+      'passportType': PassportType.tiktok,
+      'isGuest': false,
+    });
+    final updatedFallback = await _refreshVipStatusFromBackend(fallback);
+    await cacheUser(updatedFallback);
+    debugPrint(
+      '[TikTokLoginFlow] finished via fallback total=${stopwatch.elapsedMilliseconds}ms',
+    );
+    return updatedFallback;
   }
 
   Future<UserModel> signInWithApple() async {
@@ -819,6 +966,15 @@ class AuthRepository {
       _logger.w('[AuthRepo] Google signOut failed: $e');
     }
 
+    // 清掉 TikTok WebView 残留的 cookies / cache，
+    // 否则下次登录 TikTok 会被自动识别为上次用户（无法切账号）
+    try {
+      await TiktokAuthService.clearWebViewState();
+    } catch (e) {
+      signOutError ??= e;
+      _logger.w('[AuthRepo] TikTok WebView clear failed: $e');
+    }
+
     await clearCache();
     await clearAutoLoginCredentials();
 
@@ -910,11 +1066,6 @@ class AuthRepository {
     }
     return signInWithEmail(email, password);
   }
-}
-
-class AuthCancelledException implements Exception {
-  @override
-  String toString() => 'Sign in cancelled by user';
 }
 
 class GoogleSignInException implements Exception {

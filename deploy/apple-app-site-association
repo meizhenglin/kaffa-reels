@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "C96YS2CU93.com.playlet.qahwatvshorts",
+        "paths": ["/tiktok-callback/*"]
+      },
+      {
+        "appID": "C96YS2CU93.com.playlet.qahwatvshorts",
+        "paths": ["/*"]
+      }
+    ]
+  }
+}

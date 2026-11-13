@@ -118,9 +118,10 @@ class WebNativeExitDialog {
   /// referenced from this file so the import stays conditional-free.
   static void _registerNoop() {
     if (_viewType != null) return;
-    _viewType = 'web-native-exit-dialog-noop';
+    const viewType = 'web-native-exit-dialog-noop';
+    _viewType = viewType;
     ui_web.platformViewRegistry.registerViewFactory(
-      _viewType,
+      viewType,
       (int viewId) => html.DivElement(),
     );
   }

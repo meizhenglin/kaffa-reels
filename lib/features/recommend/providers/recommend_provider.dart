@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers/app_providers.dart';
 import '../../../core/network/api_service.dart';
+import '../../../core/providers/auth_provider.dart' show apiServiceProviderRef;
 import '../data/recommend_repository.dart';
 import '../models/banner.dart';
 import '../models/drama.dart';
@@ -29,10 +30,13 @@ import '../models/video_info.dart';
 enum RecommendStatus {
   /// 初始状态（未加载）
   initial,
+
   /// 加载中
   loading,
+
   /// 加载成功
   success,
+
   /// 加载失败
   error,
 }
@@ -197,8 +201,11 @@ final recommendRepositoryProvider = Provider<RecommendRepository>((ref) {
 /// 推荐状态 Provider
 final recommendProvider =
     StateNotifierProvider<RecommendNotifier, RecommendState>((ref) {
-  return RecommendNotifier(ref.read(recommendRepositoryProvider));
-});
+      return RecommendNotifier(
+        ref.read(recommendRepositoryProvider),
+        ref.read(apiServiceProviderRef),
+      );
+    });
 
 /// ============================================================================
 /// 推荐数据状态管理器
@@ -210,14 +217,25 @@ final recommendProvider =
 /// - 根据 ID 获取短剧详情
 /// ============================================================================
 class RecommendNotifier extends StateNotifier<RecommendState> {
-  RecommendNotifier(this._repository) : super(const RecommendState());
+  RecommendNotifier(this._repository, this._apiService)
+    : super(const RecommendState());
 
   static const int homeSectionPageSize = 10;
 
   final RecommendRepository _repository;
+  final ApiService _apiService;
 
-  Future<({List<Drama> topRecommend, List<Drama> newForThisMonth, List<Drama> vipZone})>
-  _fetchHomeHotSections({int pageNum = 1, int pageSize = homeSectionPageSize}) async {
+  Future<
+    ({
+      List<Drama> topRecommend,
+      List<Drama> newForThisMonth,
+      List<Drama> vipZone,
+    })
+  >
+  _fetchHomeHotSections({
+    int pageNum = 1,
+    int pageSize = homeSectionPageSize,
+  }) async {
     final results = await Future.wait([
       _repository.fetchVideoHotPicks(
         videoHotListType: 2,
@@ -254,7 +272,7 @@ class RecommendNotifier extends StateNotifier<RecommendState> {
     );
 
     try {
-      final bannerResp = await apiServiceProvider.getTheaterBanner();
+      final bannerResp = await _apiService.getTheaterBanner();
       List<BannerItem> banners = [];
       if (bannerResp.isSuccess && bannerResp.data != null) {
         final list = bannerResp.data as List;
@@ -297,10 +315,7 @@ class RecommendNotifier extends StateNotifier<RecommendState> {
 
   /// 加载推荐页数据（包含 recommendIndex + 首页列表）
   Future<void> loadInitial() async {
-    state = state.copyWith(
-      status: RecommendStatus.loading,
-      clearError: true,
-    );
+    state = state.copyWith(status: RecommendStatus.loading, clearError: true);
     try {
       final feed = await _repository.fetchFeed(page: 1);
       final sections = await _fetchHomeHotSections();
@@ -460,19 +475,13 @@ class RecommendNotifier extends StateNotifier<RecommendState> {
       final nextPage = state.page + 1;
       final feed = await _repository.fetchFeed(page: nextPage);
       state = state.copyWith(
-        newEpisodes: [
-          ...state.newEpisodes,
-          ...feed.newEpisodes,
-        ],
+        newEpisodes: [...state.newEpisodes, ...feed.newEpisodes],
         hasMore: feed.hasMore,
         page: nextPage,
         isLoadingMore: false,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoadingMore: false,
-        errorMessage: e.toString(),
-      );
+      state = state.copyWith(isLoadingMore: false, errorMessage: e.toString());
     }
   }
 
@@ -480,8 +489,10 @@ class RecommendNotifier extends StateNotifier<RecommendState> {
   /// 根据 ID 获取短剧详情
   Future<Drama?> getDramaById(String id) async {
     try {
-      final resp = await apiServiceProvider.getVideoListByVideoId(videoId: id);
-      debugPrint('[getDramaById] videoId=$id isSuccess=${resp.isSuccess} data=${resp.data}');
+      final resp = await _apiService.getVideoListByVideoId(videoId: id);
+      debugPrint(
+        '[getDramaById] videoId=$id isSuccess=${resp.isSuccess} data=${resp.data}',
+      );
       if (resp.isSuccess && resp.data != null) {
         final data = resp.data as Map<String, dynamic>;
         debugPrint('[getDramaById] parsed drama: $data');
@@ -497,12 +508,7 @@ class RecommendNotifier extends StateNotifier<RecommendState> {
 /// ==================== 沉浸式视频流 Provider ====================
 
 /// 沉浸式视频流加载状态
-enum VideoFeedStatus {
-  initial,
-  loading,
-  success,
-  error,
-}
+enum VideoFeedStatus { initial, loading, success, error }
 
 /// 沉浸式视频流状态
 class VideoFeedState {
@@ -545,10 +551,7 @@ class VideoFeedNotifier extends StateNotifier<VideoFeedState> {
     state = state.copyWith(status: VideoFeedStatus.loading);
     try {
       final videos = await _repository.fetchRecommendVideos();
-      state = state.copyWith(
-        status: VideoFeedStatus.success,
-        videos: videos,
-      );
+      state = state.copyWith(status: VideoFeedStatus.success, videos: videos);
     } catch (e) {
       state = state.copyWith(
         status: VideoFeedStatus.error,
@@ -561,10 +564,7 @@ class VideoFeedNotifier extends StateNotifier<VideoFeedState> {
     state = state.copyWith(status: VideoFeedStatus.loading);
     try {
       final videos = await _repository.fetchRecommendVideos();
-      state = state.copyWith(
-        status: VideoFeedStatus.success,
-        videos: videos,
-      );
+      state = state.copyWith(status: VideoFeedStatus.success, videos: videos);
     } catch (e) {
       state = state.copyWith(
         status: VideoFeedStatus.error,
@@ -608,7 +608,7 @@ class MembershipDramaState {
 
 class MembershipDramaNotifier extends StateNotifier<MembershipDramaState> {
   MembershipDramaNotifier(this._repository)
-      : super(const MembershipDramaState());
+    : super(const MembershipDramaState());
 
   final RecommendRepository _repository;
 
@@ -630,19 +630,13 @@ class MembershipDramaNotifier extends StateNotifier<MembershipDramaState> {
       ),
     ]);
 
-    return (
-      topRecommend: results[0],
-      vipZone: results[1],
-    );
+    return (topRecommend: results[0], vipZone: results[1]);
   }
 
   Future<void> load() async {
     if (state.isLoading) return;
 
-    state = state.copyWith(
-      status: RecommendStatus.loading,
-      clearError: true,
-    );
+    state = state.copyWith(status: RecommendStatus.loading, clearError: true);
 
     try {
       final sections = await _fetchMembershipSections();
@@ -663,13 +657,13 @@ class MembershipDramaNotifier extends StateNotifier<MembershipDramaState> {
 
 final membershipDramaProvider =
     StateNotifierProvider<MembershipDramaNotifier, MembershipDramaState>((ref) {
-  final repository = ref.read(recommendRepositoryProvider);
-  return MembershipDramaNotifier(repository);
-});
+      final repository = ref.read(recommendRepositoryProvider);
+      return MembershipDramaNotifier(repository);
+    });
 
 /// 沉浸式视频流 Provider
 final videoFeedProvider =
     StateNotifierProvider<VideoFeedNotifier, VideoFeedState>((ref) {
-  final repository = ref.read(recommendRepositoryProvider);
-  return VideoFeedNotifier(repository);
-});
+      final repository = ref.read(recommendRepositoryProvider);
+      return VideoFeedNotifier(repository);
+    });

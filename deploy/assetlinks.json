@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.video.storydrama",
+      "sha256_cert_fingerprints": [
+        "D5:E1:0C:FC:E8:02:22:E6:8A:62:77:C4:49:B6:EC:31:C1:10:1E:32:E5:FA:61:44:51:B8:21:7F:F4:4B:C0:64"
+      ]
+    }
+  }
+]

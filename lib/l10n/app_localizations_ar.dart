@@ -620,6 +620,30 @@ class AppLocalizationsAr extends AppLocalizations {
   String get membershipItemAlreadyOwned => 'أنت تمتلك هذا الاشتراك بالفعل.';
 
   @override
+  String get membershipPlayServiceUnavailable =>
+      'Google Play غير متاح. يرجى تحديث متجر Play، والتأكد من تسجيل الدخول بحساب لديه صلاحية الوصول إلى هذا التطبيق.';
+
+  @override
+  String get membershipPlayStoreUnavailable =>
+      'متجر Google Play غير متاح على هذا الجهاز.';
+
+  @override
+  String get membershipPlayNetworkError =>
+      'خطأ في الشبكة أثناء الاتصال بـ Google Play. يرجى التحقق من اتصالك بالإنترنت.';
+
+  @override
+  String get membershipPlayItemNotAvailable =>
+      'هذا الاشتراك غير متاح في Google Play حاليًا. يرجى المحاولة مرة أخرى لاحقًا.';
+
+  @override
+  String get membershipPlayNotSubscription =>
+      'هذا العنصر غير مُعد كاشتراك في Google Play. يرجى تجربة خطة أخرى.';
+
+  @override
+  String get membershipPlayNoEligibleOffer =>
+      'الخطة موجودة في Google Play، لكنها غير متاحة لحسابك أو لدولتك حاليًا. يرجى المحاولة لاحقًا أو التواصل مع الدعم.';
+
+  @override
   String get watchLockedReminderTitle => 'تذكير';
 
   @override

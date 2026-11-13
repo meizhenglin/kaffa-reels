@@ -20,6 +20,9 @@ class ApiEndpoints {
   static const String googleLogin = '/api/user/userAuthorization';
   static const String googleIdToken = '/api/user/googleIdToken';
   static const String appleLogin = '/api/user/userAuthorization';
+
+  /// TikTok 登录（与 googleLogin 共用同一接口，仅 passportType 不同）
+  static const String tiktokLogin = '/api/user/userAuthorization';
   static const String getSystemConfig = '/api/config/getConfigInfo';
 
   // ==================== 剧场 Tab ====================
@@ -70,7 +73,28 @@ class ApiEndpoints {
   static const String queryCoupon = '/api/coupon/query';
   static const String cancelAccount = '/api/user/cancelAccount';
   static const String payRechange = '/api/pay/userRechange';
-  static const String googleCallBack = '/api/pay/callback/google';
+
+  /// Google 支付结果回调。
+  ///
+  /// ⚠️ 这里**不是** `/api/pay/callback/google`。
+  ///
+  /// 后端 OpenAPI（https://tvapi.qahwatv.com/v3/api-docs）里，
+  /// 支付结果回调都挂在 `pay-result-controller` 下，operationId 就是
+  /// `googleCallBack`，路径是 `/notice/google`：
+  ///
+  /// ```
+  /// /notice/google  (POST, requestBody: application/json, type: string)
+  /// ```
+  ///
+  /// 之前这里写的是 `/api/pay/callback/google`，实测该路径**不存在**：
+  ///
+  /// ```
+  /// POST /api/pay/callback/google  ->  HTTP 404 {"error":"Not Found"}
+  /// ```
+  ///
+  /// 也就是说客户端把购买结果发到了一个 404 地址，后端从来收不到，
+  /// 「付了钱会员不到账」就是这么来的。
+  static const String googleCallBack = '/notice/google';
 
   // 签到
   static const String signConfig = '/api/userSign/getSignConfig';
@@ -131,4 +155,26 @@ class PassportType {
 
   /// Apple 登录
   static const int apple = 6;
+
+  /// TikTok 登录
+  ///
+  /// ⚠️⚠️⚠️ 【待后端确认】⚠️⚠️⚠️
+  ///
+  /// 原本这里写的是 `4`，但 `4` 已经被 [facebook] 占用了（见上面）。
+  /// 两个登录方式用同一个 passportType，后端 `/api/user/userAuthorization`
+  /// 根本没法区分 → TikTok 登录会走错分支（或被当成 Facebook）。
+  ///
+  /// 现在改成 `7`（顺延在 apple=6 之后）。**上线前必须让后端确认**：
+  /// - 如果后端确实约定 TikTok 用别的值，改这里的数字即可
+  /// - 如果后端已经按 4 实现了 TikTok 分支，那要改的是后端
+  ///
+  /// 【passportName】传 auth code（每次登录都不同，满足唯一性）
+  ///
+  /// 早期注释写的是「后端期望值：TikTok access_token」，但 app 只有 code，
+  /// 拿不到 access_token（那是后端用 client_secret 换的）。曾一度硬编码成
+  /// 常量 `'TikTok_access_token'`，会让所有用户共用同一个 passportName，
+  /// 第二个用户就会撞唯一索引。现已改为直接传 code。
+  ///
+  /// 【invitedCode】后端支持邀请码字段（可选）
+  static const int tiktok = 7;
 }

@@ -348,15 +348,24 @@ class SubscriptionProducts {
   SubscriptionProducts._();
 
   // Google Play Console 产品 ID（必须和 Google Play 后台一致）
-  static const _googlePlayBase = 'com.qahwa.vip';
-  static const _appStoreBase = 'com.qahwa.vip';
+  //
+  // 【写法必须是不带点的 `com.qahwa.vip1`】
+  // 后台 rechargeGoodsConfig 下发的 remarks 就是这个写法，而且月卡
+  // （com.qahwa.vip1）在 Play 上能查到、能拉起支付台，证实 Play 里
+  // 用的就是不带点的形式。早期这里写成 `com.qahwa.vip.1`（多点一个点），
+  // 一旦后台没下发商品、走到这个兜底列表，三个套餐会全部查不到。
+  //
+  // 注意：Play Console 里 `com.qahwa.vip1` 和 `com.qahwa.vip.1` 是
+  // **两个不同的商品**，差一个字符就查不到。
+  static const _googlePlayPrefix = 'com.qahwa.vip';
+  static const _appStorePrefix = 'com.qahwa.vip';
 
   static final List<SubscriptionProduct> fallbackProducts = [
     SubscriptionProduct(
       id: 'vip1',
       type: SubscriptionPeriod.monthly,
-      googlePlayId: '$_googlePlayBase.1', // com.qahwa.vip.1
-      appStoreId: '$_appStoreBase.1',
+      googlePlayId: '${_googlePlayPrefix}1', // com.qahwa.vip1
+      appStoreId: '${_appStorePrefix}1',
       price: r'$24.99',
       priceCn: '¥30',
       originalPrice: r'$39.99',
@@ -372,8 +381,8 @@ class SubscriptionProducts {
     SubscriptionProduct(
       id: 'vip2',
       type: SubscriptionPeriod.quarterly,
-      googlePlayId: '$_googlePlayBase.2', // com.qahwa.vip.2
-      appStoreId: '$_appStoreBase.2',
+      googlePlayId: '${_googlePlayPrefix}2', // com.qahwa.vip2
+      appStoreId: '${_appStorePrefix}2',
       price: r'$32.99',
       priceCn: '¥78',
       originalPrice: r'$59.99',
@@ -390,8 +399,8 @@ class SubscriptionProducts {
     SubscriptionProduct(
       id: 'vip3',
       type: SubscriptionPeriod.yearly,
-      googlePlayId: '$_googlePlayBase.3', // com.qahwa.vip.3
-      appStoreId: '$_appStoreBase.3',
+      googlePlayId: '${_googlePlayPrefix}3', // com.qahwa.vip3
+      appStoreId: '${_appStorePrefix}3',
       price: r'$99.99',
       priceCn: '¥258',
       originalPrice: r'$159.99',

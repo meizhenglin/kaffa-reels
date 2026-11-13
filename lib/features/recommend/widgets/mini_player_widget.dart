@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_aliplayer/flutter_aliplayer.dart';
+import 'package:video_player/video_player.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../l10n/app_localizations.dart';
@@ -78,16 +78,9 @@ class _MiniPlayerState extends ConsumerState<MiniPlayerWidget>
               child: SizedBox(
                 width: screenWidth,
                 height: playerHeight,
-                child: AliPlayerView(
-                  onCreated: (viewId) {
-                    controller.setViewId(viewId);
-                  },
-                  x: 0,
-                  y: 0,
-                  width: screenWidth.toDouble(),
-                  height: playerHeight,
-                  aliPlayerViewType: AliPlayerViewTypeForAndroid.surfaceview,
-                ),
+                child: controller.player != null && controller.player!.value.isInitialized
+                    ? VideoPlayer(controller.player!)
+                    : (state.coverUrl != null ? Image.network(state.coverUrl!, fit: BoxFit.cover) : const ColoredBox(color: Colors.black)),
               ),
             ),
 

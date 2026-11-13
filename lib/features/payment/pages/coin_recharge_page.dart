@@ -13,7 +13,7 @@ import '../../../core/config/build_flavor.dart';
 import '../../home/models/home_card_layout.dart';
 import '../models/recharge_product.dart';
 import '../providers/coin_record_provider.dart' as coin_record;
-import '../providers/membership_provider.dart';
+import '../providers/recharge_provider.dart';
 import '../services/unified_payment_handler.dart';
 import '../widgets/payment_channel_selector.dart';
 
@@ -87,7 +87,10 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
         final handler = ref.read(rechargePurchaseHandlerProvider);
         final success = await handler.purchase(product);
         if (!success && mounted) {
-          final reason = handler.lastError ?? l10n.purchaseFailedPleaseRetry;
+          final raw = handler.lastError;
+          final reason = raw == null
+              ? l10n.purchaseFailedPleaseRetry
+              : _localizePlayFailure(raw, l10n);
           AppSnackBar.show(context, message: reason);
         } else if (success && mounted) {
           AppSnackBar.show(context, message: l10n.purchaseSuccessful);
@@ -116,7 +119,10 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
         final handler = ref.read(rechargePurchaseHandlerProvider);
         final success = await handler.purchase(product);
         if (!success && mounted) {
-          final reason = handler.lastError ?? l10n.purchaseFailedPleaseRetry;
+          final raw = handler.lastError;
+          final reason = raw == null
+              ? l10n.purchaseFailedPleaseRetry
+              : _localizePlayFailure(raw, l10n);
           AppSnackBar.show(context, message: reason);
         } else if (success && mounted) {
           AppSnackBar.show(context, message: l10n.purchaseSuccessful);
@@ -159,6 +165,36 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
         await Future<void>.delayed(const Duration(seconds: 2));
       }
       await balanceNotifier.load();
+    }
+  }
+
+  /// 把 Play 侧的稳定失败原因码翻译成给用户看的文案。
+  ///
+  /// 拿不到已知码时原样返回（多半是后端返回的业务错误文案）。
+  ///
+  /// 关键点：`play-no-eligible-offer`（商品在商店里存在，但当前账号 / 国家
+  /// 买不了）和 `play-item-not-found`（商品真的不存在）是两种完全不同的故障，
+  /// 提示必须分开，否则用户会去查错的方向。
+  String _localizePlayFailure(String code, AppLocalizations l10n) {
+    switch (code) {
+      case 'play-service-unavailable':
+      case 'play-service-disconnected':
+        return l10n.membershipPlayServiceUnavailable;
+      case 'play-store-unavailable':
+      case 'play-feature-not-supported':
+        return l10n.membershipPlayStoreUnavailable;
+      case 'play-network-error':
+      case 'play-timeout':
+        return l10n.membershipPlayNetworkError;
+      case 'play-no-eligible-offer':
+        return l10n.membershipPlayNoEligibleOffer;
+      case 'play-item-not-found':
+      case 'play-item-unavailable':
+      case 'play-developer-error':
+      case 'play-not-subscription':
+        return l10n.membershipPlayItemNotAvailable;
+      default:
+        return code;
     }
   }
 

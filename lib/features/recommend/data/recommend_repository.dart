@@ -36,8 +36,8 @@ class RecommendRepository {
   RecommendRepository({
     required DioClient dioClient,
     required StorageService storageService,
-  })  : _dioClient = dioClient,
-        _storageService = storageService;
+  }) : _dioClient = dioClient,
+       _storageService = storageService;
 
   final DioClient _dioClient;
   final StorageService _storageService;
@@ -53,7 +53,10 @@ class RecommendRepository {
       );
       final data = response.data as Map<String, dynamic>;
 
-      if (data['code'] == 0) {
+      if (data['code'] == 0 || data['code'] == 200) {
+        debugPrint(
+          '[RecommendVideos] records=${(data['data']?['records'] as List?)?.length ?? 0}',
+        );
         return _extractVideoListFromRecommend(data);
       }
     } on DioException {
@@ -80,7 +83,9 @@ class RecommendRepository {
     try {
       // 单独请求 /api/banner/list
       final bannerResp = await apiServiceProvider.getTheaterBanner();
-      debugPrint('[Banner] isSuccess=${bannerResp.isSuccess} data=${bannerResp.data}');
+      debugPrint(
+        '[Banner] isSuccess=${bannerResp.isSuccess} data=${bannerResp.data}',
+      );
       if (bannerResp.isSuccess && bannerResp.data != null) {
         final list = bannerResp.data as List;
         banners = list
@@ -115,7 +120,11 @@ class RecommendRepository {
     );
   }
 
-  RecommendFeed _parseRecommendFeed(Map<String, dynamic> data, int page, List<BannerItem> banners) {
+  RecommendFeed _parseRecommendFeed(
+    Map<String, dynamic> data,
+    int page,
+    List<BannerItem> banners,
+  ) {
     final d = data['data'] as Map<String, dynamic>? ?? {};
 
     List<Drama> parseList(dynamic list) {
@@ -162,7 +171,9 @@ class RecommendRepository {
         },
       );
       final data = response.data as Map<String, dynamic>;
-      debugPrint('[VideoHotPicks] type=$videoHotListType code=${data['code']} data=${data['data']}');
+      debugPrint(
+        '[VideoHotPicks] type=$videoHotListType code=${data['code']} data=${data['data']}',
+      );
 
       if (data['code'] == 0 || data['code'] == 200) {
         // API 返回结构：{ code, msg, data: { records: [...] } }
@@ -201,18 +212,37 @@ class RecommendRepository {
       );
       final data = response.data as Map<String, dynamic>;
 
-      if (data['code'] == 0) {
-        final episodeData = data['data'] as Map<String, dynamic>;
+      debugPrint(
+        '[EpisodeUrl] videoId=$videoId episodesId=$episodesId '
+        'http=${response.statusCode} code=${data['code']}',
+      );
+      final code = data['code'];
+      if (code == 0 || code == 200) {
+        final rawEpisodeData = data['data'];
+        if (rawEpisodeData is! Map) {
+          debugPrint(
+            '[EpisodeUrl] invalid data type=${rawEpisodeData.runtimeType}',
+          );
+          return null;
+        }
+        final episodeData = Map<String, dynamic>.from(rawEpisodeData);
         final cache = EpisodeUrlCache(
-          videoUrl: episodeData['episodesUrl'] as String? ?? '',
-          videoUrlOne: episodeData['vipEpisodesUrl1080'] as String?,
-          videoUrlTwo: episodeData['vipEpisodesUrl1440'] as String?,
-          isCanPlay: episodeData['isCanPlay'] as int? ?? 1,
-          isVip: episodeData['isVip'] as int? ?? 0,
+          videoUrl: episodeData['episodesUrl']?.toString() ?? '',
+          videoUrlOne: episodeData['vipEpisodesUrl1080']?.toString(),
+          videoUrlTwo: episodeData['vipEpisodesUrl1440']?.toString(),
+          isCanPlay: int.tryParse('${episodeData['isCanPlay'] ?? 1}') ?? 1,
+          isVip: int.tryParse('${episodeData['isVip'] ?? 0}') ?? 0,
+        );
+        debugPrint(
+          '[EpisodeUrl] urls base=${cache.videoUrl.isNotEmpty} '
+          '720=${cache.videoUrlOne?.isNotEmpty == true} '
+          '1080=${cache.videoUrlTwo?.isNotEmpty == true} '
+          'isCanPlay=${cache.isCanPlay}',
         );
         _episodeUrlCache[cacheKey] = cache;
         return cache;
       }
+      debugPrint('[EpisodeUrl] rejected response code=$code');
     } on DioException {
       // ignore
     }

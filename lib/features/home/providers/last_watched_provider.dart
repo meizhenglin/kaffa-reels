@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_service.dart';
+import '../../../core/providers/auth_provider.dart' show apiServiceProviderRef;
 
 /// 最近一次观看记录的数据模型
 class LastWatchedInfo {
@@ -23,9 +24,7 @@ class LastWatchedInfo {
   String get episodeLabel => 'EP.$watchedEpNum / $totalEpisodes';
 
   bool get hasDisplayableContent =>
-      videoId.isNotEmpty &&
-      videoName.trim().isNotEmpty &&
-      episodesId > 0;
+      videoId.isNotEmpty && videoName.trim().isNotEmpty && episodesId > 0;
 
   factory LastWatchedInfo.fromJson(Map<String, dynamic> json) {
     return LastWatchedInfo(
@@ -34,11 +33,10 @@ class LastWatchedInfo {
           ? json['episodesId']
           : int.tryParse((json['episodesId'] ?? '0').toString()) ?? 0,
       videoName: json['videoName'] ?? json['title'] ?? '',
-      coverUrl: json['coverUrl'] ??
-          json['videoPicture'] ??
-          json['videoUrl'] ??
-          '',
-      watchedEpNum: json['watchedEpNum'] ??
+      coverUrl:
+          json['coverUrl'] ?? json['videoPicture'] ?? json['videoUrl'] ?? '',
+      watchedEpNum:
+          json['watchedEpNum'] ??
           json['episodesNum'] ??
           (json['episodesId'] is int ? json['episodesId'] : 1),
       totalEpisodes: json['totalEpisodes'] ?? json['videoEpisodes'] ?? 1,
@@ -46,13 +44,13 @@ class LastWatchedInfo {
   }
 
   Map<String, dynamic> toJson() => {
-        'videoId': videoId,
-        'episodesId': episodesId,
-        'videoName': videoName,
-        'coverUrl': coverUrl,
-        'watchedEpNum': watchedEpNum,
-        'totalEpisodes': totalEpisodes,
-      };
+    'videoId': videoId,
+    'episodesId': episodesId,
+    'videoName': videoName,
+    'coverUrl': coverUrl,
+    'watchedEpNum': watchedEpNum,
+    'totalEpisodes': totalEpisodes,
+  };
 }
 
 class LastWatchedState {
@@ -66,26 +64,28 @@ class LastWatchedState {
     LastWatchedInfo? info,
     bool? isLoading,
     String? error,
-  }) =>
-      LastWatchedState(
-        info: info ?? this.info,
-        isLoading: isLoading ?? this.isLoading,
-        error: error,
-      );
+  }) => LastWatchedState(
+    info: info ?? this.info,
+    isLoading: isLoading ?? this.isLoading,
+    error: error,
+  );
 }
 
 class LastWatchedNotifier extends StateNotifier<LastWatchedState> {
-  LastWatchedNotifier() : super(const LastWatchedState());
+  LastWatchedNotifier(this._apiService) : super(const LastWatchedState());
+
+  final ApiService _apiService;
 
   Future<void> load() async {
     if (state.isLoading) return;
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final resp = await apiServiceProvider.getLastUserViewHistoryOne();
+      final resp = await _apiService.getLastUserViewHistoryOne();
       if (resp.isSuccess && resp.data != null) {
         final info = LastWatchedInfo.fromJson(
-            resp.data as Map<String, dynamic>);
+          resp.data as Map<String, dynamic>,
+        );
         if (info.hasDisplayableContent) {
           state = LastWatchedState(info: info, isLoading: false);
         } else {
@@ -106,5 +106,5 @@ class LastWatchedNotifier extends StateNotifier<LastWatchedState> {
 
 final lastWatchedProvider =
     StateNotifierProvider<LastWatchedNotifier, LastWatchedState>(
-  (ref) => LastWatchedNotifier(),
-);
+      (ref) => LastWatchedNotifier(ref.read(apiServiceProviderRef)),
+    );

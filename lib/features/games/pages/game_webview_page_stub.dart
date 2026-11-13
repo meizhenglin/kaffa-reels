@@ -1,4 +1,6 @@
 /// Stub for native platform - games use native WebView
+import 'package:flutter/widgets.dart';
+
 class GameWebViewPage {
   static Future<void> show(
     BuildContext context, {

@@ -16,6 +16,17 @@ import '../../../core/config/build_flavor.dart';
 /// 临时关闭：保持按钮代码存在，只是不渲染。改回 `true` 即可恢复。
 const bool kShowFacebookLogin = false;
 
+/// 设置为 `true` 显示 TikTok 登录按钮，设置为 `false` 隐藏后再打包。
+const bool kShowTikTokLogin = true;
+
+/// Google Play 版不上 TikTok 登录（审核与渠道要求），只在自建平台版显示。
+bool get _canShowTikTokLogin =>
+    kShowTikTokLogin &&
+    BuildFlavor.isPlatform &&
+    !kIsWeb &&
+    (defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS);
+
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key, this.redirect, this.backTarget = '/'});
 
@@ -448,7 +459,9 @@ class _LoginPageState extends ConsumerState<LoginPage>
                                   isLoading: isLoading,
                                   onTap: () async {
                                     if (!_appIsInForeground) return;
-                                    ref.read(authProvider.notifier).clearError();
+                                    ref
+                                        .read(authProvider.notifier)
+                                        .clearError();
                                     final success = await ref
                                         .read(authProvider.notifier)
                                         .signInWithFacebook();
@@ -470,6 +483,235 @@ class _LoginPageState extends ConsumerState<LoginPage>
                                       }
                                       context.go(widget.backTarget);
                                     }
+                                  },
+                                );
+                              },
+                            ),
+                          ],
+                          if (_canShowTikTokLogin) ...[
+                            const SizedBox(height: 16),
+                            Consumer(
+                              builder: (_, ref, __) {
+                                final isLoading = ref
+                                    .watch(authProvider)
+                                    .isLoading;
+                                return _PlatformButton(
+                                  label: 'Continue with TikTok',
+                                  icon: Icons.music_note,
+                                  iconPath: 'assets/images/tiktok_icon.png',
+                                  isLoading: isLoading,
+                                  onTap: () async {
+                                    if (!_appIsInForeground) return;
+
+                                    // Loading dialog
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      barrierColor: Colors.black54,
+                                      builder: (context) => WillPopScope(
+                                        onWillPop: () async => false,
+                                        child: Center(
+                                          child: ConstrainedBox(
+                                            constraints: const BoxConstraints(
+                                              minWidth: 120,
+                                              maxWidth: 150,
+                                              minHeight: 100,
+                                              maxHeight: 100,
+                                            ),
+                                            child: Container(
+                                              height: 100,
+                                              alignment: Alignment.center,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 24,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const SizedBox(
+                                                    width: 28,
+                                                    height: 28,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                        ),
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  const Text(
+                                                    'Signing in...',
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+
+                                    ref
+                                        .read(authProvider.notifier)
+                                        .clearError();
+                                    await Future<void>.delayed(Duration.zero);
+                                    final success = await ref
+                                        .read(authProvider.notifier)
+                                        .signInWithTikTok();
+
+                                    if (!mounted) return;
+
+                                    if (success) {
+                                      // Close loading dialog
+                                      Navigator.of(
+                                        context,
+                                        rootNavigator: true,
+                                      ).pop();
+                                      // Show success dialog
+                                      showDialog(
+                                        context: context,
+                                        barrierDismissible: false,
+                                        builder: (dialogContext) => AlertDialog(
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          content: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                width: 36,
+                                                height: 36,
+                                                decoration: const BoxDecoration(
+                                                  color: Color(0xFF4CAF50),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.check,
+                                                  color: Colors.white,
+                                                  size: 20,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 10),
+                                              const Text(
+                                                'Login Successful!',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                      Future.delayed(
+                                        const Duration(seconds: 1),
+                                        () {
+                                          if (!mounted) return;
+                                          Navigator.of(context).pop();
+                                          if (widget.redirect != null &&
+                                              widget.redirect!.contains(
+                                                '/short-video',
+                                              )) {
+                                            Future.delayed(Duration.zero, () {
+                                              ref
+                                                  .read(
+                                                    loginReturnProvider
+                                                        .notifier,
+                                                  )
+                                                  .state++;
+                                            });
+                                          }
+                                          final rootNav = Navigator.of(
+                                            context,
+                                            rootNavigator: true,
+                                          );
+                                          Future.delayed(
+                                            const Duration(milliseconds: 100),
+                                            () {
+                                              rootNav.pop();
+                                            },
+                                          ).then((_) {
+                                            return Future.delayed(
+                                              Duration.zero,
+                                              () {
+                                                if (Navigator.canPop(context)) {
+                                                  rootNav.pop();
+                                                }
+                                              },
+                                            );
+                                          });
+                                        },
+                                      );
+                                      return;
+                                    }
+
+                                    // Close loading dialog
+                                    Navigator.of(
+                                      context,
+                                      rootNavigator: true,
+                                    ).pop();
+
+                                    final errorMsg =
+                                        ref.read(authProvider).errorMessage ??
+                                        'Login failed. Please try again.';
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      builder: (dialogContext) => AlertDialog(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: 36,
+                                              height: 36,
+                                              decoration: const BoxDecoration(
+                                                color: Color(0xFFE53935),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.close,
+                                                color: Colors.white,
+                                                size: 20,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 10),
+                                            Text(
+                                              errorMsg,
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                    Future.delayed(
+                                      const Duration(seconds: 2),
+                                      () {
+                                        if (mounted &&
+                                            Navigator.canPop(context)) {
+                                          Navigator.of(
+                                            context,
+                                            rootNavigator: true,
+                                          ).pop();
+                                        }
+                                      },
+                                    );
                                   },
                                 );
                               },

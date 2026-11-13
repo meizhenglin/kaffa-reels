@@ -84,7 +84,23 @@ flutter {
 }
 
 dependencies {
-    implementation "com.android.billingclient:billing:6.2.0"
+    // 【Play Billing Library 版本】
+    //
+    // 这里写的版本必须和 in_app_purchase_android 实际依赖的一致，否则是**无效声明**：
+    // Gradle 的依赖冲突默认取「最高版本」，插件 0.5.2 内部依赖 billing:8.0.0，
+    // 所以之前写的 6.2.0 从未生效过，打包进去的一直是 8.0.0。
+    //
+    // 不能降级的原因：
+    //   从 2026-08-31 起（Play Console 口径为 2026-11-01），Google 要求
+    //   新应用和更新必须使用 Billing Library 8 或更高，降到 6.2.0 / 7.1.1
+    //   会导致无法上传 Google Play。
+    //
+    // 想真正降级必须同时降插件版本：
+    //   billing 8.0.0 → in_app_purchase_android 0.5.x
+    //   billing 7.1.1 → in_app_purchase_android 0.4.0+11
+    //   billing 6.2.0 → in_app_purchase_android 0.3.6+13
+    // （0.4.x 没有 unfetchedProductList，play_billing_probe.dart 需要适配）
+    implementation "com.android.billingclient:billing:8.0.0"
     // Meta Facebook Login SDK
     implementation 'com.facebook.android:facebook-login:17.0.2'
     implementation 'com.facebook.android:audience-network-sdk:6.17.0'

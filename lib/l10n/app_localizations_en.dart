@@ -618,6 +618,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get membershipItemAlreadyOwned => 'You already own this subscription.';
 
   @override
+  String get membershipPlayServiceUnavailable =>
+      'Google Play is unavailable. Please update the Play Store, and make sure you are signed in with an account that has access to this app.';
+
+  @override
+  String get membershipPlayStoreUnavailable =>
+      'Google Play Store is not available on this device.';
+
+  @override
+  String get membershipPlayNetworkError =>
+      'Network error while contacting Google Play. Please check your connection.';
+
+  @override
+  String get membershipPlayItemNotAvailable =>
+      'This subscription is not available in Google Play right now. Please try again later.';
+
+  @override
+  String get membershipPlayNotSubscription =>
+      'This item is not configured as a subscription in Google Play. Please try another plan.';
+
+  @override
+  String get membershipPlayNoEligibleOffer =>
+      'This plan exists in Google Play, but it is not available for your account or country yet. Please try again later or contact support.';
+
+  @override
   String get watchLockedReminderTitle => 'Reminder';
 
   @override

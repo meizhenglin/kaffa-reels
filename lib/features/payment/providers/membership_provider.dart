@@ -22,6 +22,7 @@ class MemberState {
     this.pendingOrderId,
     this.pendingProductId,
     this.pendingSubscriptionType,
+    this.pendingGoodsId,
   });
 
   final String? purchaseToken;
@@ -31,6 +32,12 @@ class MemberState {
   final String? pendingProductId;
   final String? pendingSubscriptionType;
 
+  /// 待支付订单对应的后台商品 ID（rechargeGoodsConfig 的 id）。
+  ///
+  /// 后端回调体里要带 `goodsId`（会员对应的是 `payConfigType=0`），
+  /// 没有它后端只能靠 orderNo 反查。
+  final int? pendingGoodsId;
+
   MemberState copyWith({
     String? purchaseToken,
     bool? isLoading,
@@ -38,18 +45,36 @@ class MemberState {
     String? pendingOrderId,
     String? pendingProductId,
     String? pendingSubscriptionType,
+    int? pendingGoodsId,
     bool clearPendingOrder = false,
     bool clearError = false,
+    bool clearPurchaseToken = false,
   }) {
     return MemberState(
-      purchaseToken: clearPendingOrder ? null : (purchaseToken ?? this.purchaseToken),
+      // 【重要】clearPendingOrder 只清「待支付订单」，
+      // **不能**顺带把 purchaseToken 清成 null。
+      //
+      // 之前 purchaseToken 复用了 clearPendingOrder 这个开关，
+      // 于是任何一次 purchase() 失败 / 购买结束都会把「已购买」的标记抹掉，
+      // canAccess() / _hasActiveSubscription() 立刻变成 false。
+      // 要清 token 请用 clearPurchaseToken。
+      purchaseToken: clearPurchaseToken
+          ? null
+          : (purchaseToken ?? this.purchaseToken),
       isLoading: isLoading ?? this.isLoading,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
-      pendingOrderId: clearPendingOrder ? null : (pendingOrderId ?? this.pendingOrderId),
-      pendingProductId: clearPendingOrder ? null : (pendingProductId ?? this.pendingProductId),
+      pendingOrderId: clearPendingOrder
+          ? null
+          : (pendingOrderId ?? this.pendingOrderId),
+      pendingProductId: clearPendingOrder
+          ? null
+          : (pendingProductId ?? this.pendingProductId),
       pendingSubscriptionType: clearPendingOrder
           ? null
           : (pendingSubscriptionType ?? this.pendingSubscriptionType),
+      pendingGoodsId: clearPendingOrder
+          ? null
+          : (pendingGoodsId ?? this.pendingGoodsId),
     );
   }
 }
@@ -86,29 +111,37 @@ class MembershipProductsState {
 /// Member state provider
 final memberStateProvider =
     StateNotifierProvider<MemberStateNotifier, MemberState>((ref) {
-  final notifier = MemberStateNotifier(ref);
-  Future.microtask(notifier.initialize);
-  ref.onDispose(notifier.dispose);
-  return notifier;
-});
+      final notifier = MemberStateNotifier(ref);
+      Future.microtask(notifier.initialize);
+      ref.onDispose(notifier.dispose);
+      return notifier;
+    });
 
-final membershipProductsProvider = StateNotifierProvider<MembershipProductsNotifier,
-    MembershipProductsState>((ref) {
-  return MembershipProductsNotifier(ref.read(dioClientProvider), ref.read(storageServiceProvider));
-});
+final membershipProductsProvider =
+    StateNotifierProvider<MembershipProductsNotifier, MembershipProductsState>((
+      ref,
+    ) {
+      return MembershipProductsNotifier(
+        ref.read(dioClientProvider),
+        ref.read(storageServiceProvider),
+      );
+    });
 
 /// Recharge products provider for K-Coin recharge (type 1)
-final rechargeProductsProvider = StateNotifierProvider<RechargeProductsNotifier, RechargeProductsState>((ref) {
-  final apiService = ApiService(
-    dioClient: ref.read(dioClientProvider),
-    storage: ref.read(storageServiceProvider),
-  );
-  return RechargeProductsNotifier(apiService);
-});
+final rechargeProductsProvider =
+    StateNotifierProvider<RechargeProductsNotifier, RechargeProductsState>((
+      ref,
+    ) {
+      final apiService = ApiService(
+        dioClient: ref.read(dioClientProvider),
+        storage: ref.read(storageServiceProvider),
+      );
+      return RechargeProductsNotifier(apiService);
+    });
 
 class RechargeProductsNotifier extends StateNotifier<RechargeProductsState> {
   RechargeProductsNotifier(this._apiService)
-      : super(const RechargeProductsState());
+    : super(const RechargeProductsState());
 
   final ApiService _apiService;
 
@@ -118,7 +151,9 @@ class RechargeProductsNotifier extends StateNotifier<RechargeProductsState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
 
     try {
-      final response = await _apiService.getRechargeGoodsConfig(rechargeGoodsType: 1);
+      final response = await _apiService.getRechargeGoodsConfig(
+        rechargeGoodsType: 1,
+      );
 
       if (response.isSuccess) {
         final data = response.data;
@@ -132,11 +167,12 @@ class RechargeProductsNotifier extends StateNotifier<RechargeProductsState> {
               .toList();
         }
 
-        final products = items
-            .where((item) => item.isEnable && item.goodsGoogleId.isNotEmpty)
-            .map((item) => RechargeProduct.fromGoodsConfig(item))
-            .toList()
-          ..sort((a, b) => a.sort.compareTo(b.sort));
+        final products =
+            items
+                .where((item) => item.isEnable && item.goodsGoogleId.isNotEmpty)
+                .map((item) => RechargeProduct.fromGoodsConfig(item))
+                .toList()
+              ..sort((a, b) => a.sort.compareTo(b.sort));
 
         state = state.copyWith(
           products: products,
@@ -160,102 +196,15 @@ class RechargeProductsNotifier extends StateNotifier<RechargeProductsState> {
   }
 }
 
-/// Recharge purchase handler for consumables
-class RechargePurchaseHandler {
-  RechargePurchaseHandler(this._ref);
-
-  final Ref _ref;
-
-  /// Last error message from purchase attempt
-  String? lastError;
-
-  /// Pending recharge product (set before purchase, cleared after)
-  RechargeProduct? pendingProduct;
-
-  /// Purchase a recharge product
-  Future<bool> purchase(RechargeProduct product) async {
-    lastError = null;
-    pendingProduct = product;
-
-    final paymentService = PaymentService.instance;
-
-    // Get product details from store
-    final products = await paymentService.getProducts(
-      productIds: [product.googlePlayId],
-    );
-
-    if (products.isEmpty) {
-      lastError = 'Product not available in Google Play. Please check your network and try again.';
-      pendingProduct = null;
-      return false;
-    }
-
-    // Start consumable purchase
-    final success = await paymentService.purchaseConsumable(
-      product: products.first,
-    );
-
-    if (!success) {
-      lastError = 'Google Play purchase failed. Please try again.';
-      pendingProduct = null;
-    }
-
-    return success;
-  }
-
-  /// Handle successful consumable purchase
-  Future<bool> handlePurchaseSuccess(PurchaseDetails purchase) async {
-    if (pendingProduct == null) {
-      return false;
-    }
-
-    final product = pendingProduct!;
-    pendingProduct = null;
-
-    final paymentService = PaymentService.instance;
-
-    // Consume the purchase
-    final consumed = await paymentService.handleConsumablePurchase(purchase);
-    if (!consumed) {
-      return false;
-    }
-
-    // Call backend API for recharge callback (payConfigType=1)
-    final apiService = ApiService(dioClient: DioClient(), storage: StorageService());
-
-    try {
-      final callbackPayload = {
-        'orderId': purchase.purchaseID ?? '',
-        'productId': purchase.productID,
-        'purchaseToken': purchase.verificationData.serverVerificationData,
-        'purchaseData': purchase.verificationData.serverVerificationData,
-        'payConfigType': 1, // Recharge/consumable
-        'goodsId': product.goodsId,
-      };
-
-      final response = await apiService.request(
-        'api/pay/callback/google',
-        data: callbackPayload,
-      );
-
-      if (response.isSuccess) {
-        // Update coin balance
-        final coinNotifier = _ref.read(coinBalanceProvider.notifier);
-        await coinNotifier.addCoins(product.totalAmount);
-        return true;
-      }
-    } catch (e) {
-      debugPrint('[RechargePurchaseHandler] Callback failed: $e');
-    }
-
-    return false;
-  }
-}
+// 一次性商品（K币充值）的购买处理在 recharge_provider.dart 里，
+// 这里不再保留第二份实现 —— 之前两个文件各有一份 RechargePurchaseHandler，
+// 两个页面分别 import 了不同的那份，很容易改错一边。
 
 /// Coin balance provider
-final coinBalanceProvider = StateNotifierProvider<CoinBalanceNotifier, CoinBalanceState>((ref) {
-  return CoinBalanceNotifier(ref.read(storageServiceProvider));
-});
+final coinBalanceProvider =
+    StateNotifierProvider<CoinBalanceNotifier, CoinBalanceState>((ref) {
+      return CoinBalanceNotifier(ref.read(storageServiceProvider));
+    });
 
 class CoinBalanceNotifier extends StateNotifier<CoinBalanceState> {
   CoinBalanceNotifier(this._storage) : super(const CoinBalanceState()) {
@@ -281,10 +230,6 @@ class CoinBalanceNotifier extends StateNotifier<CoinBalanceState> {
   }
 }
 
-final rechargePurchaseHandlerProvider = Provider<RechargePurchaseHandler>((ref) {
-  return RechargePurchaseHandler(ref);
-});
-
 class MemberStateNotifier extends StateNotifier<MemberState> {
   MemberStateNotifier(this._ref) : super(const MemberState());
 
@@ -300,7 +245,12 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     _receiptService.initialize(baseUrl: 'https://api.your-domain.com');
 
     // Set user ID for purchase association
-    final userId = _storage.getString('user_id');
+    //
+    // 这个值会作为 applicationUserName 传给 Google Play，
+    // Play 会把它当 obfuscatedExternalAccountId 上报，
+    // 后端凭它把这笔支付对应到用户并开通会员。
+    // 之前读的是 'user_id' 这个**从来没被写过**的键，恒为 null。
+    final userId = await _storage.getUserIdAsync();
     _paymentService.setUserId(userId);
 
     await _paymentService.initialize(
@@ -327,85 +277,69 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     state = state.copyWith(clearPendingOrder: true, clearError: true);
   }
 
+  /// 登记一笔待支付的订单。
+  ///
+  /// 会员订阅的 Google Play 结果是走全局的 purchaseStream 回调处理的，
+  /// 那条回调需要 orderId 才知道要把这笔支付对到哪个订单上。
+  /// 会员页自己的购买流程会在 purchase() 里登记；
+  /// 解锁面板那条入口不在这个 provider 里，必须手动登记，
+  /// 否则后端回调会因为拿不到 orderId 而失败。
+  void setPendingOrder({
+    required String orderId,
+    required String productId,
+    String? subscriptionType,
+    int? goodsId,
+  }) {
+    state = state.copyWith(
+      pendingOrderId: orderId,
+      pendingProductId: productId,
+      pendingSubscriptionType: subscriptionType,
+      pendingGoodsId: goodsId,
+      clearError: true,
+    );
+  }
+
   Future<void> _handlePurchaseComplete(PurchaseDetails purchase) async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    // 支付成功后的主流程（建单 + 直发 /notice/google）由 [purchase] 里
+    // `_paymentService.purchase` 的返回值驱动，这里只做两件事：
+    //
+    //   1. 把 Play 返回的购买凭据（purchaseToken 等）暂存到
+    //      [_lastCompletedPurchase]，供 [purchase] 的 Step 4 组装回调参数。
+    //      purchaseStream 的事件总是先于 purchase() 返回到达，
+    //      所以 Step 4 执行时这里一定已经存好了。
+    //   2. 兜底刷新会员状态（App 重启后恢复购买等没有进行中 purchase()
+    //      调用的场景，靠这里刷新 UI）。
+    debugPrint(
+      '[Membership] purchase completed: ${purchase.productID} '
+      '(${purchase.status.name})',
+    );
 
-    try {
-      final purchaseToken = purchase.verificationData.serverVerificationData;
-      final orderId = state.pendingOrderId;
-      final productId = state.pendingProductId ?? purchase.productID;
-
-      if (orderId == null || orderId.isEmpty) {
-        throw StateError('Missing pending order id for purchase callback');
-      }
-      if (purchaseToken.isEmpty) {
-        throw StateError('Missing Google purchase token');
-      }
-
-      final callbackPayload = <String, dynamic>{
-        'orderId': orderId,
-        'productId': productId,
+    if (purchase.status == PurchaseStatus.purchased ||
+        purchase.status == PurchaseStatus.restored) {
+      _lastCompletedPurchase = {
+        'productId': purchase.productID,
         'purchaseId': purchase.purchaseID,
         'transactionDate': purchase.transactionDate,
-        'status': purchase.status.name,
-        'pendingCompletePurchase': purchase.pendingCompletePurchase,
+        // Android 上 serverVerificationData 就是 purchaseToken，
+        // 后端 /notice/google 靠它去 Google 验证购买。
+        'purchaseToken': purchase.verificationData.serverVerificationData,
         'verificationData': {
-          'localVerificationData': purchase.verificationData.localVerificationData,
-          'serverVerificationData': purchase.verificationData.serverVerificationData,
+          'localVerificationData':
+              purchase.verificationData.localVerificationData,
+          'serverVerificationData':
+              purchase.verificationData.serverVerificationData,
           'source': purchase.verificationData.source,
         },
-        'error': purchase.error == null
-            ? null
-            : {
-                'source': purchase.error!.source,
-                'code': purchase.error!.code,
-                'message': purchase.error!.message,
-                'details': purchase.error!.details?.toString(),
-              },
       };
-
-      // 重试逻辑：最多重试3次，指数退避
-      bool confirmed = false;
-      int retryCount = 0;
-      const maxRetries = 3;
-
-      while (retryCount < maxRetries && !confirmed) {
-        if (retryCount > 0) {
-          // 指数退避: 2s, 4s, 8s
-          final delay = Duration(seconds: (2 << (retryCount - 1)));
-          await Future.delayed(delay);
-        }
-
-        try {
-          confirmed = await _payService.confirmGooglePurchase(
-            params: callbackPayload,
-          );
-        } catch (e) {
-          if (retryCount == maxRetries - 1) {
-            // 最后一次重试也失败了，保存到本地待处理
-            await _savePendingPayment(callbackPayload);
-          }
-        }
-        retryCount++;
-      }
-
-      if (confirmed) {
-        await _updateVipStatus(purchaseToken: purchaseToken);
-        // Invalidate isVipProvider to force refresh
-        _ref.invalidate(isVipProvider);
-        state = state.copyWith(clearPendingOrder: true);
-      } else {
-        state = state.copyWith(
-          isLoading: false,
-          errorMessage: 'Purchase verification failed',
-        );
-      }
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Failed to process purchase',
-      );
     }
+
+    try {
+      await _ref.read(authProvider.notifier).refreshUserInfo();
+      _ref.invalidate(isVipProvider);
+    } catch (e) {
+      debugPrint('[Membership] refresh after purchase failed: $e');
+    }
+    state = state.copyWith(isLoading: false, clearPendingOrder: true);
   }
 
   /// 保存待处理的支付回调到本地
@@ -413,13 +347,42 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     await _storage.savePendingPayment(paymentData);
   }
 
-  /// 检查并重试所有待处理的支付回调
-  Future<void> checkAndRetryPendingPayments() async {
+  /// 最近一次 Play 购买成功的凭据（productId / purchaseToken 等）。
+  ///
+  /// 由 [_handlePurchaseComplete] 在 purchaseStream 回调时写入，
+  /// 由 [purchase] 的 Step 4 消费（组装 /notice/google 的请求参数）。
+  Map<String, dynamic>? _lastCompletedPurchase;
+
+  /// 检查并重试所有待处理的支付回调。
+  ///
+  /// 返回**成功补发的条数**。调用方（App 启动钩子）据此决定是否需要
+  /// 刷新 K币余额：K币余额接口复用的也是 `/api/user/userPersonalCenter`，
+  /// 队列为空时无条件刷新会在每次启动多打一次用户中心接口。
+  /// 正在进行中的补单任务。
+  ///
+  /// 三个入口会触发补单：App 启动钩子（登录态恢复后）、
+  /// 会员页 initState、refreshStatus。它们可能几乎同时触发，
+  /// 而补单是"读队列 → 逐条补发 → 逐条出队"的非原子流程：
+  /// 并发执行会让同一条待补订单被发送两次（重复建单 / 重复开通）。
+  Future<int>? _pendingRetryInFlight;
+
+  Future<int> checkAndRetryPendingPayments() {
+    final inFlight = _pendingRetryInFlight;
+    if (inFlight != null) return inFlight;
+
+    final future = _doCheckAndRetryPendingPayments();
+    _pendingRetryInFlight = future;
+    return future.whenComplete(() {
+      _pendingRetryInFlight = null;
+    });
+  }
+
+  Future<int> _doCheckAndRetryPendingPayments() async {
     // 检查是否已登录
     final authState = _ref.read(authProvider);
     if (!authState.isAuthenticated || (authState.user?.isTourist ?? true)) {
       state = state.copyWith(isLoading: false);
-      return;
+      return 0;
     }
 
     state = state.copyWith(isLoading: true);
@@ -428,7 +391,7 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
       final pendingPayments = await _storage.getPendingPayments();
       if (pendingPayments.isEmpty) {
         state = state.copyWith(isLoading: false);
-        return;
+        return 0;
       }
 
       final successfulOrderIds = <String>[];
@@ -442,7 +405,19 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         // 重试3次，指数退避
         for (int attempt = 1; attempt <= 3; attempt++) {
           try {
-            success = await _payService.confirmGooglePurchase(params: payment);
+            if (payment['purchaseToken'] != null) {
+              // 旧版本客户端遗留下的「客户端直发 /notice/google」待重试数据，
+              // 继续按老接口补发，成功后本地清掉。
+              success = await _payService.confirmGooglePurchase(params: payment);
+            } else {
+              // 新流程：支付成功但 userRechange 没发出去 → 补建订单。
+              final goodsId = (payment['goodsId'] as num?)?.toInt();
+              if (goodsId == null) break;
+              final order = await _payService.createOrder(
+                payConfigId: goodsId,
+              );
+              success = order != null;
+            }
             if (success) {
               successfulOrderIds.add(orderId);
               break;
@@ -464,11 +439,21 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
       // 如果有支付成功了，刷新VIP状态
       if (successfulOrderIds.isNotEmpty) {
         await _refreshVipStatus();
+        // [_refreshVipStatus] 只是重读本地的 purchase_token，不会从后端拿 VIP。
+        // 补单成功后必须再拉一次用户信息，否则会员到期时间/会员态还是旧值，
+        // 用户会看到"订单补发成功但会员没开通"。
+        try {
+          await _ref.read(authProvider.notifier).refreshUserInfo();
+        } catch (e) {
+          debugPrint('[Membership] refresh user info after retry failed: $e');
+        }
       } else {
         state = state.copyWith(isLoading: false);
       }
+      return successfulOrderIds.length;
     } catch (e) {
       state = state.copyWith(isLoading: false);
+      return 0;
     }
   }
 
@@ -477,10 +462,7 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     state = state.copyWith(isLoading: true);
     try {
       final purchaseToken = _storage.getString('purchase_token');
-      state = state.copyWith(
-        purchaseToken: purchaseToken,
-        isLoading: false,
-      );
+      state = state.copyWith(purchaseToken: purchaseToken, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false);
     }
@@ -506,31 +488,8 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
       );
       return;
     }
-    
-    state = state.copyWith(
-      isLoading: false,
-      errorMessage: error,
-    );
-  }
 
-  Future<void> _updateVipStatus({
-    required String purchaseToken,
-  }) async {
-    state = state.copyWith(
-      purchaseToken: purchaseToken,
-      isLoading: false,
-      errorMessage: null,
-    );
-
-    // Only persist the purchase token (needed for backend verification)
-    await _storage.setString('purchase_token', purchaseToken);
-
-    // Refresh auth user info so profile page shows updated VIP expiry date
-    try {
-      await _ref.read(authProvider.notifier).refreshUserInfo();
-    } catch (e) {
-      // Silently handle refresh errors
-    }
+    state = state.copyWith(isLoading: false, errorMessage: error);
   }
 
   String? getPurchaseToken() {
@@ -613,7 +572,9 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     return false;
   }
 
-  Future<List<ProductDetails>> getProducts(List<SubscriptionProduct> products) async {
+  Future<List<ProductDetails>> getProducts(
+    List<SubscriptionProduct> products,
+  ) async {
     final productIds = products
         .map((p) => p.getProductId(_paymentService.currentPlatform).trim())
         .where((id) => id.isNotEmpty)
@@ -625,42 +586,52 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     );
   }
 
-  Future<bool> purchase({
-    required SubscriptionProduct selectedProduct,
-  }) async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+  Future<bool> purchase({required SubscriptionProduct selectedProduct}) async {
+    // 用 clearError 而不是 errorMessage: null —— copyWith 里 null 表示「不修改」，
+    // 不清空的话上一次失败的文案会一直留在 state 里，
+    // 下次同样的错误再发生时 listener 会认为「文案没变」而不弹提示。
+    state = state.copyWith(isLoading: true, clearError: true);
 
     try {
-      debugPrint('[Purchase] Step 1: Creating order with goodsId=${selectedProduct.goodsId}');
-      final order = await _payService.createOrder(payConfigId: selectedProduct.goodsId!);
-      final orderId = order?.orderId;
-      debugPrint('[Purchase] Step 1: Order created, orderId=$orderId');
-      if (orderId == null || orderId.isEmpty) {
-        state = state.copyWith(
-          isLoading: false,
-          errorMessage: 'Failed to create order',
-          clearPendingOrder: true,
-        );
-        return false;
-      }
+      final platformProductId = selectedProduct
+          .getProductId(_paymentService.currentPlatform)
+          .trim();
 
-      debugPrint('[Purchase] Step 2: Querying Google Play products');
+      // Step 1: 用户点击购买时，才和 Google Play 匹配商品。
+      // 页面展示的套餐来自后端；能不能买、以商店里有没有这个商品为准。
+      debugPrint(
+        '[Purchase] Step 1: Querying Google Play products for "$platformProductId"',
+      );
       final products = await getProducts([selectedProduct]);
-      debugPrint('[Purchase] Step 2: Found ${products.length} products');
+      debugPrint('[Purchase] Step 1: Found ${products.length} products');
       if (products.isNotEmpty) {
-        debugPrint('[Purchase] Products: ${products.map((p) => '${p.id} (${p.title})').join(', ')}');
+        debugPrint(
+          '[Purchase] Products: ${products.map((p) => '${p.id} (${p.title})').join(', ')}',
+        );
       } else {
-        final expectedId = selectedProduct.getProductId(_paymentService.currentPlatform);
         debugPrint('[Purchase] WARNING: No products found from Google Play!');
-        debugPrint('[Purchase] This means the product ID "$expectedId" is not configured in Google Play Console');
+        // 【不要在这里断言是商品 ID 的问题】
+        //
+        // Play 返回空列表有两种完全不同的原因：
+        //   1) code=0 且 unfetched 含该 ID → Play 受理了请求但说「没这个 ID」
+        //      （这时才是商品 ID / 类型 / 状态问题）
+        //   2) code=2 (SERVICE_UNAVAILABLE) → Play 根本没受理请求
+        //      （账号授权 / license tester / Play 商店问题，与 ID 无关）
+        //
+        // 真正的响应码由 PaymentService 的诊断探针打印，见
+        // [PaymentService] ── Google Play 原始响应 ── 这一段。
+        debugPrint('[Purchase] Play 未返回该商品，具体原因见下方「Google Play 原始响应」');
+        _warnAboutProductIdMismatch(selectedProduct, platformProductId);
       }
-      final platformProductId = selectedProduct.getProductId(_paymentService.currentPlatform).trim();
-      debugPrint('[Purchase] Looking for product ID: "$platformProductId"');
 
       if (products.isEmpty) {
         state = state.copyWith(
           isLoading: false,
-          errorMessage: 'Subscription product is unavailable. Please check Google Play Console configuration.',
+          // 用 Play 返回的**真实原因**决定提示，而不是笼统地说
+          // 「商品未配置」。Play 根本没受理请求时（code=2 SERVICE_UNAVAILABLE），
+          // 让用户去查 Play Console 商品配置是完全指错方向的。
+          errorMessage:
+              _paymentService.lastPlayFailureCode ?? 'play-item-not-found',
           clearPendingOrder: true,
         );
         return false;
@@ -671,38 +642,164 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         productDetails = products.firstWhere((p) => p.id == platformProductId);
       } catch (_) {
         try {
-          productDetails = products.firstWhere((p) => p.id.contains(selectedProduct.id));
+          productDetails = products.firstWhere(
+            (p) => p.id.contains(selectedProduct.id),
+          );
         } catch (_) {
           state = state.copyWith(
             isLoading: false,
-            errorMessage: 'Product not available in Google Play: $platformProductId',
+            // 用 Play 的真实原因：`play-no-eligible-offer` 表示商品在商店里
+            // 存在但当前账号/国家买不了，`play-item-not-found` 才是真的没有。
+            errorMessage: _paymentService.lastPlayFailureCode ??
+                'Product not available in Google Play: $platformProductId',
             clearPendingOrder: true,
           );
           return false;
         }
       }
 
-      debugPrint('[Purchase] Step 3: Starting Google Play purchase flow');
-      state = state.copyWith(
-        pendingOrderId: orderId,
-        pendingProductId: productDetails.id,
-        pendingSubscriptionType: selectedProduct.id,
-      );
-
-      // 订阅购买
-      final success = await _paymentService.purchase(
-        product: productDetails,
-        applicationUserName: _resolveUserId(),
-      );
-      debugPrint('[Purchase] Step 3: Purchase flow returned success=$success');
-
-      if (!success) {
+      final goodsId = selectedProduct.goodsId;
+      if (goodsId == null) {
         state = state.copyWith(
           isLoading: false,
+          errorMessage: 'Failed to create order',
           clearPendingOrder: true,
         );
+        return false;
       }
-      return success;
+
+      // Step 2: 匹配成功，直接拉起 Google Play 支付。
+      // 【不要】在拉起支付之前调 userRechange 建订单：
+      // 商品查不到时留一个永远不会被支付的「孤儿订单」，而且用户要等
+      // 订单接口往返之后才知道商品买不了。订单等支付确认后再建。
+      debugPrint('[Purchase] Step 2: Launching Google Play payment flow');
+      state = state.copyWith(
+        pendingProductId: productDetails.id,
+        pendingSubscriptionType: selectedProduct.id,
+        pendingGoodsId: goodsId,
+      );
+
+      final paid = await _paymentService.purchase(
+        product: productDetails,
+        applicationUserName: await _resolveUserId(),
+      );
+      debugPrint('[Purchase] Step 2: Payment flow returned paid=$paid');
+
+      if (!paid) {
+        // 之前这里只清了 isLoading，没有设置 errorMessage，
+        // 结果是用户点完购买干等两分钟，屏幕上什么提示都没有。
+        final detail = _paymentService.lastError;
+
+        // 用户主动取消不是错误：不弹任何提示，状态复位，
+        // 再点购买会重新走 Step 1 / Step 2（重新拉起 Play 支付台）。
+        final canceled = detail != null && detail.contains('cancel');
+
+        state = state.copyWith(
+          isLoading: false,
+          clearError: canceled,
+          errorMessage: canceled
+              ? null
+              : ((detail != null && detail.isNotEmpty)
+                    ? detail
+                    : 'Purchase failed. Please try again.'),
+          clearPendingOrder: true,
+        );
+        return false;
+      }
+
+      // Step 3: 支付已在 Play 侧确认 → 通知后端建单（POST /api/pay/userRechange）。
+      debugPrint('[Purchase] Step 3: Payment confirmed, notifying backend');
+      String? orderNo;
+      try {
+        final order = await _payService.createOrder(payConfigId: goodsId);
+        orderNo = order?.orderId;
+      } catch (e) {
+        debugPrint('[Purchase] Step 3: userRechange threw: $e');
+      }
+
+      if (orderNo == null || orderNo.isEmpty) {
+        // 钱已经付了，不能再当「购买失败」处理。
+        // 把 goodsId 存进本地待重试队列，下次启动/进入会员页时补发 userRechange
+        //（见 [checkAndRetryPendingPayments]）。
+        await _savePendingPayment({
+          'orderId': 'goods-$goodsId',
+          'type': 'createOrder',
+          'goodsId': goodsId,
+        });
+        debugPrint('[Purchase] Step 3: userRechange failed — queued for retry');
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: null,
+          clearPendingOrder: true,
+        );
+        return true;
+      }
+
+      // Step 4: 直发 /notice/google（后端 OpenAPI: pay-result-controller /
+      // googleCallBack）。后端只有拿到 orderNo + purchaseToken 才能去 Google
+      // 验证这笔购买、acknowledge 并开通会员——不发这个接口，后端永远不知道
+      // 这笔 Play 支付对应哪个订单。
+      // 参数结构与 K币链路（recharge_provider._handlePurchaseSuccess）保持一致，
+      // payConfigType=0 表示会员订阅。
+      final credentials = _lastCompletedPurchase;
+      final purchaseToken = credentials?['purchaseToken'] as String?;
+      if (credentials == null || purchaseToken == null || purchaseToken.isEmpty) {
+        debugPrint(
+          '[Purchase] Step 4: WARNING no purchaseToken available, skip callback',
+        );
+      } else {
+        final callbackPayload = <String, dynamic>{
+          // 后端订单字段名是 orderNo，两个都带上，兼容后端两种读法。
+          'orderNo': orderNo,
+          'orderId': orderNo,
+          'productId': credentials['productId'],
+          'purchaseId': credentials['purchaseId'],
+          'transactionDate': credentials['transactionDate'],
+          'status': 'purchased',
+          'payConfigType': 0, // 0 = 会员订阅
+          'goodsId': goodsId,
+          'purchaseToken': purchaseToken,
+          'verificationData': credentials['verificationData'],
+        };
+
+        // 【先存后发】发送前先把回调参数落盘（同 orderId 去重）。
+        // 这样 App 在发送过程中被杀、断网、崩溃，下次启动/进会员页
+        // checkAndRetryPendingPayments 都会看到这条记录并补发；
+        // 发送成功后再出队。反过来（失败才存）的话，进程一死
+        // 这笔已付款的订单就永远丢了。
+        await _savePendingPayment(callbackPayload);
+
+        var confirmed = false;
+        for (int attempt = 1; attempt <= 3 && !confirmed; attempt++) {
+          if (attempt > 1) {
+            await Future<void>.delayed(Duration(seconds: 2 << (attempt - 2)));
+          }
+          try {
+            confirmed = await _payService.confirmGooglePurchase(
+              params: callbackPayload,
+            );
+          } catch (e) {
+            debugPrint(
+              '[Purchase] Step 4: /notice/google attempt $attempt failed: $e',
+            );
+          }
+        }
+
+        if (!confirmed) {
+          debugPrint(
+            '[Purchase] Step 4: /notice/google failed — kept in pending queue',
+          );
+        } else {
+          // 后端已确认，出队。
+          await _storage.removePendingPayment(orderNo);
+          debugPrint('[Purchase] Step 4: /notice/google confirmed');
+        }
+      }
+
+      await _ref.read(authProvider.notifier).refreshUserInfo();
+      _ref.invalidate(isVipProvider);
+      state = state.copyWith(isLoading: false, clearPendingOrder: true);
+      return true;
     } catch (e, stack) {
       debugPrint('[Purchase] Error: $e\n$stack');
       state = state.copyWith(
@@ -714,8 +811,38 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     }
   }
 
-  String? _resolveUserId() {
-    return _storage.getString('user_id');
+  /// 后台下发的商品 ID 和代码里的兜底 ID 可能对不上
+  /// （例如后台给的是 `com.qahwa.vip2`，兜底列表写的是 `com.qahwa.vip.2`）。
+  /// 这种情况下 Play 里其实是有的，只是我们查的是另一个 ID。
+  /// 查不到商品时把两边都打出来，省掉一轮来回排查。
+  ///
+  /// 注意：这里**只是提示 ID 存在两种写法**，不代表当前失败就是 ID 造成的。
+  /// 当前失败的真正原因看 PaymentService 打印的 Play 原始响应码。
+  void _warnAboutProductIdMismatch(
+    SubscriptionProduct selectedProduct,
+    String platformProductId,
+  ) {
+    final knownIds = SubscriptionProducts.fallbackProducts
+        .map((p) => p.googlePlayId)
+        .where((id) => id.isNotEmpty)
+        .toList();
+    if (knownIds.isEmpty) return;
+    if (knownIds.contains(platformProductId)) return;
+
+    debugPrint('[Purchase] ────────────────────────────────────────────');
+    debugPrint('[Purchase] 商品 ID 与代码兜底列表不一致，请确认 Play 后台用的是哪个：');
+    debugPrint('[Purchase]   后台下发的 ID : "$platformProductId"');
+    debugPrint('[Purchase]   代码兜底 ID   : ${knownIds.join(", ")}');
+    debugPrint(
+      '[Purchase]   当前商品        : ${selectedProduct.id} (goodsId=${selectedProduct.goodsId})',
+    );
+    debugPrint('[Purchase]   两者逐字符必须完全一致（含点号 / 下划线 / 大小写）');
+    debugPrint('[Purchase] ────────────────────────────────────────────');
+  }
+
+  Future<String?> _resolveUserId() async {
+    // 后端真实 userId（不是 'user_id' 那个不存在的键）
+    return _storage.getUserIdAsync();
   }
 
   @override
@@ -725,14 +852,13 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
   }
 }
 
-class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> {
+class MembershipProductsNotifier
+    extends StateNotifier<MembershipProductsState> {
   MembershipProductsNotifier(DioClient dioClient, StorageService storage)
-      : _apiService = ApiService(dioClient: dioClient, storage: storage),
-        _paymentService = PaymentService.instance,
-        super(const MembershipProductsState());
+    : _apiService = ApiService(dioClient: dioClient, storage: storage),
+      super(const MembershipProductsState());
 
   final ApiService _apiService;
-  final PaymentService _paymentService;
 
   Future<void> loadVipProducts() async {
     if (state.isLoading) return;
@@ -740,7 +866,9 @@ class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> 
     state = state.copyWith(isLoading: true, hasLoaded: true, clearError: true);
 
     try {
-      final response = await _apiService.getRechargeGoodsConfig(rechargeGoodsType: 0);
+      final response = await _apiService.getRechargeGoodsConfig(
+        rechargeGoodsType: 0,
+      );
       if (!response.isSuccess) {
         state = state.copyWith(
           isLoading: false,
@@ -760,8 +888,10 @@ class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> 
         clearError: true,
       );
 
-      // 在后台注册Google Play商品ID（用于购买，不影响UI）
-      _syncStorePricesInBackground(products);
+      // 只展示后台返回的套餐。
+      // 【不要】在这里查 Google Play，也不要隐藏「Play 上取不到」的套餐：
+      // 与商店的匹配推迟到用户点击购买时再做（见 [MemberStateNotifier.purchase]），
+      // 页面第一屏永远以后端配置为准。
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -784,46 +914,13 @@ class MembershipProductsNotifier extends StateNotifier<MembershipProductsState> 
 
     return rawList
         .whereType<Map>()
-        .map((item) => RechargeGoodsConfigItem.fromJson(Map<String, dynamic>.from(item)))
+        .map(
+          (item) =>
+              RechargeGoodsConfigItem.fromJson(Map<String, dynamic>.from(item)),
+        )
         .toList();
   }
 
-  Future<void> _syncStorePricesInBackground(List<SubscriptionProduct> baseProducts) async {
-    try {
-      final rawIds = baseProducts
-          .map((product) => product.getProductId(_paymentService.currentPlatform))
-          .where((id) => id.isNotEmpty)
-          .toList();
-
-      final sanitizedIds = rawIds.map((id) => id.trim()).toList();
-
-      final storeProducts = await _paymentService.getProducts(
-        productIds: sanitizedIds,
-        requireSubscriptionOnAndroid: defaultTargetPlatform == TargetPlatform.android,
-      ).timeout(
-        const Duration(seconds: 5),
-        onTimeout: () => <ProductDetails>[],
-      );
-
-      if (storeProducts.isEmpty) return;
-
-      final storeProductMap = {
-        for (final product in storeProducts) product.id: product,
-      };
-
-      for (final product in baseProducts) {
-        final storeProduct = storeProductMap[product.getProductId(_paymentService.currentPlatform)];
-        if (storeProduct != null && product.id.isNotEmpty) {
-          _paymentService.registerSubscriptionProduct(
-            product.id,
-            storeProduct.id,
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('[MembershipProductsNotifier] _syncStorePrices error: $e');
-    }
-  }
 }
 
 /// Features that require membership
@@ -868,7 +965,9 @@ final isVipProvider = Provider<bool>((ref) {
   final auth = ref.watch(authProvider);
   final user = auth.user;
   if (user == null || user.isGuest) return false;
-  return user.isVip && (user.vipExpireDate == null || user.vipExpireDate!.isAfter(DateTime.now()));
+  return user.isVip &&
+      (user.vipExpireDate == null ||
+          user.vipExpireDate!.isAfter(DateTime.now()));
 });
 
 /// Provider that checks if the user has an active VIP subscription (including expired = false).

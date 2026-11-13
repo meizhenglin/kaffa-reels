@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show Locale, PlatformDispatcher;
 
 import 'package:dio/dio.dart';
 import 'package:logger/logger.dart';
@@ -13,6 +12,8 @@ import '../constants/api_error_code.dart';
 import '../constants/app_constants.dart';
 import '../model/api_endpoints.dart';
 import '../storage/storage_service.dart';
+import 'session_expired_bus.dart';
+import 'x_client_header.dart';
 
 /// ============================================================================
 /// HTTP 网络客户端配置
@@ -25,24 +26,29 @@ import '../storage/storage_service.dart';
 /// - 自动注入 X-Client 平台标识头
 ///
 /// 【自动 Guest 登录机制】
-/// 两种场景触发 guest 登录：
-/// 1. 发起请求时 token 为空 → 先 guest 登录，拿到 token 后再发请求
-/// 2. 请求返回 code=23（token 过期） → guest 登录后重试该请求
+/// 仅在一种场景下触发 guest 登录：
+/// - 发起请求时 token 完全没有（用户从未登录过 / 已登出） → guest 登录拿 token 后再发
 ///
-/// guest 登录为同步阻塞调用，并发多个请求时只执行一次，登录完成后统一重试。
+/// 【会话失效（code=23）处理】
+/// 当业务 code=23（token 过期）时，**不再降级为游客**！
+/// - 原因：降级会让"真实登录用户"变成"游客"，VIP/数据全丢，体验极差
+/// - 处理：清掉本地 token + 通过 [SessionExpiredBus] 通知 App 跳登录页
+/// - 后端应实现 refresh_token 机制，客户端可改为：调 refresh 接口换新 token 后重试
 /// ============================================================================
 class DioClient {
   DioClient({Dio? dio, Logger? logger, StorageService? storage})
-      : _logger = logger ?? Logger(),
-        _dio = dio ?? Dio(),
-        _storage = storage ?? StorageService() {
+    : _logger = logger ?? Logger(),
+      _dio = dio ?? Dio(),
+      _storage = storage ?? StorageService() {
     _dio
       ..options = BaseOptions(
         baseUrl: AppConfig.apiBaseUrl,
-        connectTimeout:
-            const Duration(milliseconds: AppConstants.connectTimeout),
-        receiveTimeout:
-            const Duration(milliseconds: AppConstants.receiveTimeout),
+        connectTimeout: const Duration(
+          milliseconds: AppConstants.connectTimeout,
+        ),
+        receiveTimeout: const Duration(
+          milliseconds: AppConstants.receiveTimeout,
+        ),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -53,7 +59,7 @@ class DioClient {
         InterceptorsWrapper(
           onRequest: (options, handler) async {
             // 每次请求动态构建 X-Client header（语言取自 Storage）
-            options.headers['X-Client'] = _buildXClientHeader();
+            options.headers['X-Client'] = await _buildXClientHeader();
 
             final isGuestAuthRequest = options.path == ApiEndpoints.guestLogin;
             if (!isGuestAuthRequest) {
@@ -68,7 +74,8 @@ class DioClient {
                 }
               }
             }
-            final clientParams = _storage.getString(AppConstants.clientParamsKey) ?? '';
+            final clientParams =
+                _storage.getString(AppConstants.clientParamsKey) ?? '';
             if (clientParams.isNotEmpty) {
               options.headers['client_params'] = clientParams;
               options.headers['clientparams'] = clientParams;
@@ -76,20 +83,28 @@ class DioClient {
 
             if (kDebugMode) {
               _logger.d('');
-              _logger.d('【REQUEST】${options.method} ${options.uri}');
+              _logger.d(
+                '【REQUEST】${options.method} ${_redactUri(options.uri)}',
+              );
               _logger.d('【HEADERS】');
               options.headers.forEach((key, value) {
-                if (key.toLowerCase() == 'token') {
-                  _logger.d('  $key: ****（已隐藏）');
+                final normalizedKey = key.toString().toLowerCase().replaceAll(
+                  '-',
+                  '_',
+                );
+                if (_sensitiveLogKeys.contains(normalizedKey)) {
+                  _logger.d('  $key: ***');
                 } else {
                   _logger.d('  $key: $value');
                 }
               });
               final requestData = options.data;
               if (requestData is Map) {
-                _logger.d('【BODY】$requestData');
+                _logger.d('【BODY】${_redactSensitiveData(requestData)}');
               } else if (requestData is FormData) {
-                _logger.d('【BODY】FormData(${requestData.fields.length} fields)');
+                _logger.d(
+                  '【BODY】FormData(${requestData.fields.length} fields)',
+                );
               } else if (requestData != null) {
                 _logger.d('【BODY】$requestData');
               }
@@ -108,10 +123,12 @@ class DioClient {
                 msg = data['msg'] as String?;
               }
               _logger.d('');
-              _logger.d('【RESPONSE】${response.statusCode} ${response.requestOptions.uri}');
+              _logger.d(
+                '【RESPONSE】${response.statusCode} ${_redactUri(response.requestOptions.uri)}',
+              );
               _logger.d('【CODE】$code  【MSG】$msg');
               if (data != null) {
-                _logger.d('【DATA】$data');
+                _logger.d('【DATA】${_redactSensitiveData(data)}');
               }
               _logger.d('');
             }
@@ -132,26 +149,42 @@ class DioClient {
               _logger.e('');
               _logger.e('【ERROR】${error.type}');
               _logger.e('【HTTP STATUS】$statusCode');
-              _logger.e('【URL】${error.requestOptions.uri}');
+              _logger.e('【URL】${_redactUri(error.requestOptions.uri)}');
               _logger.e('【CODE】$code  【MSG】$msg');
               if (data != null) {
-                _logger.e('【RESPONSE DATA】$data');
+                _logger.e('【RESPONSE DATA】${_redactSensitiveData(data)}');
               }
               _logger.e('【ERROR MESSAGE】${error.message}');
+              _logger.e('【UNDERLYING ERROR】${error.error}');
+              _logger.e('【ERROR STACK】${error.stackTrace}');
               _logger.e('');
             }
 
-            // 场景1：HTTP 401 → guest 登录后重试
+            // 场景1：HTTP 401 → 视为会话失效（不降级为游客）
             if (statusCode == ApiErrorCode.unauthorized) {
-              _logger.w('【401】HTTP 401 detected, attempting guest login');
-              await _handleGuestLoginAndRetry(error, handler);
+              _logger.w('【401】HTTP 401 detected, notifying session expired');
+              await _handleSessionExpired(
+                error,
+                handler,
+                reason: 'http-401',
+                message: 'HTTP 401 Unauthorized',
+                httpStatus: statusCode,
+                serverCode: code,
+              );
               return;
             }
 
-            // 场景2：业务 code=23（token 过期） → guest 登录后重试
+            // 场景2：业务 code=23（token 过期） → 视为会话失效（不降级为游客）
             if (code == ApiErrorCode.tokenExpired) {
-              _logger.w('【CODE 23】Token expired, attempting guest login');
-              await _handleGuestLoginAndRetry(error, handler);
+              _logger.w('【CODE 23】Token expired, notifying session expired');
+              await _handleSessionExpired(
+                error,
+                handler,
+                reason: 'code-23',
+                message: msg ?? 'Token expired',
+                httpStatus: statusCode,
+                serverCode: code,
+              );
               return;
             }
 
@@ -159,6 +192,52 @@ class DioClient {
           },
         ),
       );
+  }
+
+  static const Set<String> _sensitiveLogKeys = {
+    'access_token',
+    'accesstoken',
+    'authcode',
+    'authorization',
+    'client_secret',
+    'clientsecret',
+    'code',
+    'code_verifier',
+    'codeverifier',
+    'id_token',
+    'idtoken',
+    'password',
+    'refresh_token',
+    'refreshtoken',
+    'state',
+    'token',
+  };
+
+  Uri _redactUri(Uri uri) {
+    final redactedQuery = <String, List<String>>{};
+    uri.queryParametersAll.forEach((key, values) {
+      final normalizedKey = key.toLowerCase().replaceAll('-', '_');
+      redactedQuery[key] = _sensitiveLogKeys.contains(normalizedKey)
+          ? const ['***']
+          : values;
+    });
+    return uri.replace(queryParameters: redactedQuery);
+  }
+
+  Object? _redactSensitiveData(Object? value) {
+    if (value is Map) {
+      return value.map((key, nestedValue) {
+        final normalizedKey = key.toString().toLowerCase().replaceAll('-', '_');
+        if (_sensitiveLogKeys.contains(normalizedKey)) {
+          return MapEntry(key, '***');
+        }
+        return MapEntry(key, _redactSensitiveData(nestedValue));
+      });
+    }
+    if (value is List) {
+      return value.map(_redactSensitiveData).toList();
+    }
+    return value;
   }
 
   final Dio _dio;
@@ -234,74 +313,73 @@ class DioClient {
     }
   }
 
-  /// Guest 登录完成后，重试原请求（供 onError 调用）
-  Future<void> _handleGuestLoginAndRetry(
-      DioException error, ErrorInterceptorHandler handler) async {
-    final newToken = await _doGuestLogin();
+  /// ============================================================
+  /// 会话失效处理
+  /// ============================================================
 
-    if (newToken != null) {
-      _retryWithNewToken(error, newToken, handler);
-    } else {
-      handler.next(error);
+  /// 防止多个 401/23 并发触发多次事件
+  bool _sessionExpiredNotified = false;
+
+  /// 处理会话失效（HTTP 401 / code=23）
+  ///
+  /// 1. 清掉本地 token
+  /// 2. 通过 [SessionExpiredBus] 通知 App
+  /// 3. 拒绝原请求（让 UI 显示错误或跳转登录）
+  Future<void> _handleSessionExpired(
+    DioException error,
+    ErrorInterceptorHandler handler, {
+    required String reason,
+    required String message,
+    int? httpStatus,
+    int? serverCode,
+  }) async {
+    // 清掉本地 token（让 onRequest 知道没有 token 了）
+    try {
+      await _storage.removeToken();
+      _dio.options.headers.remove('token');
+    } catch (e) {
+      _logger.w('【SESSION EXPIRED】failed to clear token: $e');
     }
-  }
 
-  void _retryWithNewToken(
-      DioException error, String newToken, ErrorInterceptorHandler handler) {
-    final opts = error.requestOptions;
-    opts.headers['token'] = newToken;
-    _dio.fetch(opts).then(
-      (response) => handler.resolve(response),
-      onError: (e) => handler.reject(e as DioException),
-    );
+    // 只通知一次（避免多个并发 401 触发多次跳登录）
+    if (!_sessionExpiredNotified) {
+      _sessionExpiredNotified = true;
+      SessionExpiredBus().notifySessionExpired(
+        SessionExpiredReason(
+          source: reason,
+          message: message,
+          httpStatus: httpStatus,
+          serverCode: serverCode,
+        ),
+      );
+      // 5 秒后允许再次通知（避免永久锁住）
+      Timer(const Duration(seconds: 5), () {
+        _sessionExpiredNotified = false;
+      });
+    }
+
+    // 拒绝原请求
+    handler.next(error);
   }
 
   // ============================================================
   // 其他方法
   // ============================================================
 
-  String _buildXClientHeader() {
+  /// 构造 `X-Client` 请求头。
+  ///
+  /// 格式和取值逻辑统一放在 [XClientHeader] 里 —— 之前这里和
+  /// `api_service.dart` 各写了一份，而且内容不一样（这份少了
+  /// `channel` 和 `build`）。因为 Dio 是「先合并 Options.headers、
+  /// 再跑拦截器」，而这里是最后写 `X-Client` 的那个，所以实际发出去的
+  /// 一直是这份少了两个字段的版本。
+  Future<String> _buildXClientHeader() async {
     final savedLang = _storage.getString(AppConstants.deviceLangKey);
-    final lang = _normalizeLang(savedLang);
-    final xClient = AppConfig.currentXClient;
-    final version = AppConfig.appVersion;
-    final osName = AppConfig.platformType;
-    final header = '$xClient;version=$version;osName=$osName;x-lang=$lang';
-    debugPrint('[DioClient] X-Client built from deviceLang=$savedLang => $header');
+    final header = await XClientHeader.build(savedLang: savedLang);
+    debugPrint(
+      '[DioClient] X-Client built from deviceLang=$savedLang => $header',
+    );
     return header;
-  }
-
-  String _normalizeLang(String? value) {
-    final normalized = value?.trim();
-    if (normalized == 'ar-SA') {
-      return 'ar-SA';
-    }
-    if (normalized == 'en-US') {
-      return 'en-US';
-    }
-    if (normalized == 'ar') {
-      return 'ar-SA';
-    }
-    if (normalized == 'en') {
-      return 'en-US';
-    }
-    return _defaultLang;
-  }
-
-  static String get _defaultLang {
-    try {
-      return _normalizeLocale(PlatformDispatcher.instance.locale);
-    } catch (_) {
-      return 'en-US';
-    }
-  }
-
-  static String _normalizeLocale(Locale locale) {
-    final languageCode = locale.languageCode.toLowerCase();
-    if (languageCode == 'ar') {
-      return 'ar-SA';
-    }
-    return 'en-US';
   }
 
   void setAuthToken(String? token) {

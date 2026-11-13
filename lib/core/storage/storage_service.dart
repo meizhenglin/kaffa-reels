@@ -75,6 +75,82 @@ class StorageService {
     return _prefs?.getString(key);
   }
 
+  /// 读取当前登录用户的 **后端 userId**（例如 "288"）。
+  ///
+  /// 【为什么必须有这个方法】
+  /// 支付链路要用这个 id 告诉 Google Play「这笔支付属于哪个用户」：
+  /// 它会作为 `PurchaseParam.applicationUserName` 传上去，
+  /// Play 会把它作为 `obfuscatedExternalAccountId` 一起上报，
+  /// 后端收到实时通知（RTDN）后据此把这笔支付对应到用户并开通会员。
+  ///
+  /// 【之前的 bug】
+  /// 支付代码读的是 `_storage.getString('user_id')`，
+  /// 而全项目**从来没有写过** `'user_id'` 这个 SharedPreferences 键
+  /// （用户信息存在 `user_data`（安全存储）和 `cached_user`（普通存储）里），
+  /// 所以这个值**恒为 null** —— 后端拿不到任何能把支付对应到用户的线索，
+  /// 表现就是「钱付了、会员不到账」。
+  ///
+  /// 这里从 `cached_user` 里取 `userId`（登录成功后由
+  /// `AuthRepository.cacheUser` 写入），取不到再退回安全存储的 `user_data`。
+  String? getUserId() {
+    final cached = getString(AppConstants.userCacheKey);
+    final fromCache = _extractUserId(cached);
+    if (fromCache != null) return fromCache;
+
+    final secure = _prefs?.getString(_userDataKey);
+    final fromPrefs = _extractUserId(secure);
+    if (fromPrefs != null) return fromPrefs;
+
+    return null;
+  }
+
+  /// 异步取 userId：本地用户信息没有时，退回解析后端 token 里的 `aud`。
+  ///
+  /// 后端签发的 JWT 里 `aud` 就是 userId（游客登录也一样），
+  /// 例如 `{"aud":"288","exp":...}`。
+  /// 用户信息还没拉下来（刚启动、游客登录）时，只有这条路能拿到 id。
+  Future<String?> getUserIdAsync() async {
+    final local = getUserId();
+    if (local != null) return local;
+
+    final token = await getToken();
+    if (token == null || token.isEmpty) return null;
+    return _userIdFromToken(token);
+  }
+
+  /// 从 JWT 的 payload 里取 `aud`（= 后端 userId）。
+  String? _userIdFromToken(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length < 2) return null;
+      final payload = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+      );
+      if (payload is! Map) return null;
+      final raw = payload['aud'] ?? payload['userId'] ?? payload['sub'];
+      final value = raw?.toString().trim();
+      if (value == null || value.isEmpty) return null;
+      return value;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 从用户信息 JSON 里取出 userId。
+  String? _extractUserId(String? json) {
+    if (json == null || json.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(json);
+      if (decoded is! Map) return null;
+      final raw = decoded['userId'] ?? decoded['id'];
+      final value = raw?.toString().trim();
+      if (value == null || value.isEmpty) return null;
+      return value;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// 保存整数到本地存储
   Future<void> setInt(String key, int value) async {
     await _prefs?.setInt(key, value);
@@ -553,6 +629,12 @@ class StorageService {
     dataWithTimestamp['savedAt'] = DateTime.now().millisecondsSinceEpoch;
 
     final pendingList = await getPendingPayments();
+    // 同一个订单只保留一条（重试失败会被反复保存，不去重的话
+    // 同一个订单会在本地堆好几份，重试时重复打后端）。
+    final orderId = paymentData['orderId'];
+    if (orderId != null) {
+      pendingList.removeWhere((p) => p['orderId'] == orderId);
+    }
     pendingList.add(dataWithTimestamp);
     await _prefs?.setString(_pendingPaymentsKey, jsonEncode(pendingList));
     debugPrint('Saved pending payment: orderId=${paymentData['orderId']}, total pending: ${pendingList.length}');

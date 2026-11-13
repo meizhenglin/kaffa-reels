@@ -146,6 +146,10 @@ class UnifiedPaymentHandler {
         lastError = 'Product not available in Google Play';
         return false;
       }
+      // 注意：这里只负责把购买流程跑完，**不会**给后端发 pay/callback/google。
+      // Google Play 的 K币 充值请走 recharge_provider.dart 的
+      // RechargePurchaseHandler —— 它负责建订单、发回调、刷新服务端余额。
+      // 当前 UI 里的 Google Play 充值走的正是那条路径，这里只是兜底。
       final success =
           await _paymentService.purchaseConsumable(product: products.first);
       return success;
@@ -192,7 +196,7 @@ class UnifiedPaymentHandler {
         lastError = 'Product not available in Google Play';
         return false;
       }
-      final userId = _storage.getString('user_id');
+      final userId = await _storage.getUserIdAsync();
       final success = await _paymentService.purchase(
         product: products.first,
         applicationUserName: userId,

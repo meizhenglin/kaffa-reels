@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Web 构建产物：由 `dart tool/build.dart web` 按 pubspec 版本生成
+# （package_info_plus 在 Web 上读这个文件拿到版本号）
+web/version.json

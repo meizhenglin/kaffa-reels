@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TikTok Login Callback</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      background: #fafafa;
+      color: #111;
+    }
+    .card {
+      background: #fff;
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0 0 12px;
+      font-weight: 600;
+    }
+    .status {
+      font-size: 14px;
+      color: #666;
+      margin: 8px 0 16px;
+    }
+    .status.success { color: #00875a; }
+    .status.error { color: #d72c0d; }
+    pre {
+      text-align: left;
+      background: #f4f4f5;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      overflow-x: auto;
+      word-break: break-all;
+      white-space: pre-wrap;
+      margin: 0;
+    }
+    .footer {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <div class="callback-status">
+    <h1>TikTok Login</h1>
+    <p class="status" id="status">Processing authorization response...</p>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const params = new URLSearchParams(window.location.search);
+      const statusEl = document.getElementById('status');
+      const error = params.get('error');
+      const code = params.get('code');
+
+      // Authorization values must not remain in browser history or the address bar.
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      if (error) {
+        statusEl.textContent = 'Login failed. Return to the app and try again.';
+        statusEl.className = 'status error';
+      } else if (code) {
+        statusEl.textContent = 'Login response received. Return to the app to continue.';
+        statusEl.className = 'status success';
+      } else {
+        statusEl.textContent = 'No authorization response was received.';
+        statusEl.className = 'status error';
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -27,6 +27,8 @@ class MainActivity : FlutterFragmentActivity() {
     private val TAG = "AppRestart"
     private val META_AD_TAG = "MetaAdManager"
     private val FACEBOOK_LOGIN_CHANNEL = "com.video.storydrama/facebook_login"
+    private val BILLING_PROBE_CHANNEL = "com.video.storydrama/billing_probe"
+
     private lateinit var facebookCallbackManager: CallbackManager
     private var facebookLoginResult: MethodChannel.Result? = null
 
@@ -97,9 +99,57 @@ class MainActivity : FlutterFragmentActivity() {
         facebookCallbackManager.onActivityResult(requestCode, resultCode, data)
     }
 
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
+        // Register each platform channel against the active Flutter engine.
+        configureFacebookChannel(flutterEngine)
+        configureAdChannels(flutterEngine)
+        configureRestartChannel(flutterEngine)
+        configureBillingProbeChannel(flutterEngine)
+    }
+
+    /**
+     * Play 商品诊断探针 channel
+     *
+     * 插件把 `UnfetchedProduct.getStatusCode()` 丢掉了，App 侧无法区分
+     * 「商品不存在」和「商品存在但当前账号没有可购买的 offer」。
+     * 这个 channel 直接向 Play 查询，并把每个商品的状态码原样带回。
+     */
+    private fun configureBillingProbeChannel(flutterEngine: FlutterEngine) {
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, BILLING_PROBE_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "probe" -> {
+                        val ids = call.argument<List<String>>("productIds") ?: emptyList()
+                        try {
+                            BillingProbe(this).probe(ids, object : BillingProbe.Callback {
+                                override fun onResult(data: MutableMap<String, Any?>) {
+                                    // Billing 的回调不保证在主线程，MethodChannel 的
+                                    // result.success 必须在主线程调用。
+                                    runOnUiThread {
+                                        result.success(HashMap<String, Any?>(data))
+                                    }
+                                }
+                            })
+                        } catch (e: Exception) {
+                            result.error("PROBE_FAILED", e.message, null)
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    /**
+     * Facebook Login channel
+     */
+    private fun configureFacebookChannel(flutterEngine: FlutterEngine) {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FACEBOOK_LOGIN_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -129,8 +179,12 @@ class MainActivity : FlutterFragmentActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
 
-        // Existing app restart channel
+    /**
+     * App restart channel
+     */
+    private fun configureRestartChannel(flutterEngine: FlutterEngine) {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->
                 if (call.method == "restart") {
@@ -140,7 +194,12 @@ class MainActivity : FlutterFragmentActivity() {
                     result.notImplemented()
                 }
             }
+    }
 
+    /**
+     * Meta Ads channels
+     */
+    private fun configureAdChannels(flutterEngine: FlutterEngine) {
         // Meta Ads channel
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, META_AD_CHANNEL)
         methodChannel?.setMethodCallHandler { call, result ->

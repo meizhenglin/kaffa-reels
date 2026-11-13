@@ -184,6 +184,12 @@
   "dailySigninRewardHint": "احصل على يوم VIP واحد بعد تسجيل الدخول لمدة 7 أيام متتالية",
   "gotIt": "حسنًا",
   "membershipItemAlreadyOwned": "أنت تمتلك هذا الاشتراك بالفعل.",
+  "membershipPlayServiceUnavailable": "Google Play غير متاح. يرجى تحديث متجر Play، والتأكد من تسجيل الدخول بحساب لديه صلاحية الوصول إلى هذا التطبيق.",
+  "membershipPlayStoreUnavailable": "متجر Google Play غير متاح على هذا الجهاز.",
+  "membershipPlayNetworkError": "خطأ في الشبكة أثناء الاتصال بـ Google Play. يرجى التحقق من اتصالك بالإنترنت.",
+  "membershipPlayItemNotAvailable": "هذا الاشتراك غير متاح في Google Play حاليًا. يرجى المحاولة مرة أخرى لاحقًا.",
+  "membershipPlayNotSubscription": "هذا العنصر غير مُعد كاشتراك في Google Play. يرجى تجربة خطة أخرى.",
+  "membershipPlayNoEligibleOffer": "الخطة موجودة في Google Play، لكنها غير متاحة لحسابك أو لدولتك حاليًا. يرجى المحاولة لاحقًا أو التواصل مع الدعم.",
 
   "confirmPurchase": "تأكيد الشراء",
   "purchaseStarted": "بدأ الشراء، يرجى الانتظار...",

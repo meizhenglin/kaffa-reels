@@ -10,9 +10,12 @@ import '../../../core/providers/auth_provider.dart'
         apiServiceProviderRef;
 import '../../../core/constants/app_constants.dart';
 import '../../../core/network/api_service.dart';
+import '../../../core/network/session_expired_bus.dart';
 import '../../payment/providers/membership_provider.dart';
 import '../models/user_model.dart';
 import '../repositories/auth_repository.dart';
+import '../services/tiktok_auth_service.dart' show TiktokSignInException;
+import '../exceptions/auth_exceptions.dart';
 
 export '../../../core/providers/auth_provider.dart'
     show AuthService, RegisterResult, CheckCodeResult, authServiceProvider;
@@ -102,10 +105,12 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>(
 class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier(this._ref) : super(const AuthState()) {
     _configureGuestLoginCallback();
+    _subscribeSessionExpired();
     _startInit();
   }
   final Ref _ref;
   StreamSubscription<dynamic>? _authSubscription;
+  StreamSubscription<SessionExpiredReason>? _sessionExpiredSubscription;
   AuthRepository get _repository => _ref.read(authRepositoryProvider);
 
   void _configureGuestLoginCallback() {
@@ -119,6 +124,51 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       return token;
     });
+  }
+
+  /// 订阅全局"会话失效"事件
+  ///
+  /// dio_client 在收到 code=23 / HTTP 401 时会触发该事件；
+  /// AuthNotifier 收到后清空本地状态 + 触发 App 跳登录页。
+  void _subscribeSessionExpired() {
+    _sessionExpiredSubscription?.cancel();
+    _sessionExpiredSubscription = SessionExpiredBus().onSessionExpired.listen(
+      _handleSessionExpired,
+    );
+    debugPrint('[AuthNotifier] subscribed to SessionExpiredBus');
+  }
+
+  /// 处理会话失效：清空 token + 状态，让 UI 走匿名/重新登录路径
+  Future<void> _handleSessionExpired(SessionExpiredReason reason) async {
+    debugPrint('[AuthNotifier] _handleSessionExpired: $reason');
+    // 已经是 unauthenticated 就不重复处理
+    if (state.status == AuthStatus.unauthenticated) {
+      debugPrint('[AuthNotifier] already unauthenticated, skip');
+      return;
+    }
+
+    try {
+      // 清掉本地 token / userData
+      await _ref.read(storageServiceProvider).removeToken();
+      await _ref.read(storageServiceProvider).removeUserData();
+      // 通知后端登出（如有需要），但不阻塞
+      unawaited(
+        _repository.signOut().catchError((e) {
+          debugPrint('[AuthNotifier] signOut on session expired error: $e');
+        }),
+      );
+    } catch (e) {
+      debugPrint('[AuthNotifier] _handleSessionExpired error: $e');
+    }
+
+    // 更新状态为 unauthenticated + 显示友好提示
+    state = state.copyWith(
+      status: AuthStatus.unauthenticated,
+      isLoading: false,
+      clearUser: true,
+      errorMessage: 'Your session has expired. Please log in again.',
+      clearError: false,
+    );
   }
 
   /// 启动初始化（不阻塞 Provider 创建）
@@ -158,6 +208,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         isLoading: true,
         clearError: true,
       );
+      // 后端是否**明确拒绝**了这张 token（401 / token 过期）。
+      // 只有"明确拒绝"才可以登出；超时、断网、5xx 都是临时故障。
+      var tokenRejected = false;
       try {
         final resp = await apiServiceProvider.getUserCenter();
         if (resp.isSuccess && resp.data != null) {
@@ -167,8 +220,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
           );
           return;
         }
+        tokenRejected = resp.isExpired || resp.code == 401;
+        if (tokenRejected) {
+          debugPrint(
+            '[AuthNotifier] token rejected by backend '
+            'code=${resp.code} expired=${resp.isExpired}',
+          );
+        }
       } catch (e) {
         debugPrint('[AuthNotifier] failed to fetch user info from backend: $e');
+      }
+
+      // token 被明确拒绝：没有任何"缓存兜底"的余地，清数据进游客态。
+      if (tokenRejected) {
+        await _clearAllAuthData();
+        await _enterGuestMode();
+        return;
       }
 
       // API 调用失败时，不要直接清除数据
@@ -206,12 +273,74 @@ class AuthNotifier extends StateNotifier<AuthState> {
         }
       }
 
-      // Firebase 也没有用户，清除所有数据进入游客态
+      // 【兜底】Firebase 也没有用户时，仍然不能把"请求失败"当成"未登录"：
+      // 只要本地有正式账号的缓存资料，就用它恢复登录态（数据可能略旧），
+      // token 保留不动，网络恢复后由 refreshUserInfo / ProfileTab 自动校正。
+      if (await _restoreStoredUserData(storedUserData)) return;
+
+      // 确实没有任何可恢复的身份 → 清除所有数据进入游客态
       await _clearAllAuthData();
     }
 
     // 无 token，进入游客模式
     await _enterGuestMode();
+  }
+
+  /// 用本地缓存的用户资料恢复登录态（网络/服务端临时故障时的兜底）。
+  ///
+  /// 只在缓存里是**正式账号**时生效：游客缓存没有恢复价值，反而会把
+  /// 已登录用户降级成游客。
+  /// 故意不清 token —— token 本身可能仍然有效，只是这一次请求失败了。
+  Future<bool> _restoreStoredUserData(
+    Map<String, dynamic>? storedUserData,
+  ) async {
+    if (storedUserData == null) return false;
+    try {
+      // 401 / code=23 时 dio 拦截器会先清掉本地 token 并广播"会话失效"。
+      // token 已经不存在，说明这次失败是身份失效而不是断网——
+      // 此时绝不能再用缓存把用户"恢复"成已登录。
+      final token = await _ref.read(storageServiceProvider).getToken();
+      if (token == null || token.isEmpty) {
+        debugPrint(
+          '[AuthNotifier] token already cleared (session expired), '
+          'skip offline restore',
+        );
+        return false;
+      }
+
+      final cachedUser = UserModel.fromJson(storedUserData);
+      if (cachedUser.id.isEmpty || cachedUser.isTourist) {
+        debugPrint(
+          '[AuthNotifier] cached user data is tourist/empty, '
+          'skip offline restore',
+        );
+        return false;
+      }
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        user: cachedUser,
+        isLoading: false,
+        clearError: true,
+      );
+      debugPrint(
+        '[AuthNotifier] restored login from cached user data '
+        '(network unavailable) id=${cachedUser.id}',
+      );
+      unawaited(_retryRefreshAfterOfflineRestore());
+      return true;
+    } catch (e) {
+      debugPrint('[AuthNotifier] offline restore from cache failed: $e');
+      return false;
+    }
+  }
+
+  /// 离线兜底恢复后，延迟重试一次后端刷新，把可能过期的数据校正回来。
+  ///
+  /// 失败无副作用（refreshUserInfo 内部已吞掉异常，保留当前状态）。
+  Future<void> _retryRefreshAfterOfflineRestore() async {
+    await Future<void>.delayed(const Duration(seconds: 5));
+    if (!state.isAuthenticated) return;
+    await refreshUserInfo();
   }
 
   Future<void> _clearAllAuthData() async {
@@ -495,6 +624,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return true;
   }
 
+  /// TikTok 登录
+  Future<bool> signInWithTikTok() async {
+    final success = await _runAuth(_repository.signInWithTikTok);
+    if (!success) return false;
+
+    state = state.copyWith(clearRegistrationSession: true);
+
+    try {
+      final resp = await apiServiceProvider.getUserCenter();
+      if (resp.isSuccess && resp.data != null) {
+        await updateUserFromData(resp.data as Map<String, dynamic>);
+      }
+    } catch (e) {
+      debugPrint(
+        '[AuthNotifier] signInWithTikTok post-login profile refresh failed: $e',
+      );
+    }
+
+    return true;
+  }
+
   /// Apple 登录
   Future<bool> signInWithApple() async {
     final success = await _runAuth(_repository.signInWithApple);
@@ -623,8 +773,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
   }
 
+  /// 正在进行中的 refreshUserInfo。并发调用共享同一次请求。
+  Future<void>? _refreshUserInfoInFlight;
+
   /// 从后端刷新用户信息（用于订阅购买后更新 VIP 到期时间）
-  Future<void> refreshUserInfo() async {
+  ///
+  /// 【并发去重】购买成功后 `purchase()` 末尾和 purchaseStream 回调
+  /// （`_handlePurchaseComplete`）会几乎同时触发刷新，
+  /// 会员页的购买回调也会再触发一次。以前这些调用各自打一遍
+  /// `/api/user/userPersonalCenter`；现在同一时刻的调用共享同一个请求。
+  Future<void> refreshUserInfo() {
+    final inFlight = _refreshUserInfoInFlight;
+    if (inFlight != null) return inFlight;
+
+    final future = _doRefreshUserInfo();
+    _refreshUserInfoInFlight = future;
+    return future.whenComplete(() {
+      _refreshUserInfoInFlight = null;
+    });
+  }
+
+  Future<void> _doRefreshUserInfo() async {
     if (state.user == null || state.user!.isTourist) return;
 
     try {
@@ -722,7 +891,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       return false;
     } catch (e, stackTrace) {
-      debugPrint('[AuthNotifier] auth action failed: $e');
+      debugPrint('[AuthNotifier] auth action failed (${e.runtimeType})');
       debugPrint('$stackTrace');
       state = state.copyWith(
         status: AuthStatus.error,
@@ -734,6 +903,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   void clearError() => state = state.copyWith(clearError: true);
+
+  /// 从 TikTok 错误详情里抽出 `logid=...`，拼到用户可见的提示后面。
+  ///
+  /// 【为什么要把 logid 给用户看】
+  /// logid 是 TikTok 支持团队定位服务端日志的**唯一**凭据。
+  /// 之前它只写在 debugPrint 里，release 包看不到、用户也没法复制，
+  /// 导致每次失败都只能靠猜。放到弹窗文案里，用户截图即可拿到。
+  String _tiktokLogIdSuffix(String detail) {
+    final match = RegExp(r'logid=([A-Za-z0-9]+)').firstMatch(detail);
+    if (match == null) return '';
+    return ' (logid: ${match.group(1)})';
+  }
 
   /// 错误码映射
   String _mapError(Object error) {
@@ -750,6 +931,45 @@ class AuthNotifier extends StateNotifier<AuthState> {
           return 'Google sign-in configuration is invalid for this build. Please verify Firebase/Google sign-in setup.';
       }
       return _normalizeErrorMessage(error.message);
+    }
+    if (error is TiktokSignInException) {
+      switch (error.code) {
+        case 'tiktok-platform-unsupported':
+          return 'TikTok sign-in is not supported on this device.';
+        case 'tiktok-authorize-code-refused':
+          return 'TikTok accepted your login but refused to authorize this app. The redirect URI is most likely not registered in Login Kit → Web (or the change was not submitted as a new revision) — please contact support.${_tiktokLogIdSuffix(error.message)}';
+        case 'tiktok-app-product-not-enabled':
+          return 'TikTok rejected the request before validating the redirect URI. This usually means Login Kit → Web is not enabled or not yet approved for this app, or the signed-in account is not a Sandbox Target User.${_tiktokLogIdSuffix(error.message)}';
+        case 'tiktok-invalid-client-key':
+          return 'TikTok rejected the Client Key. Please verify it in TikTok Developer Portal → Login Kit.${_tiktokLogIdSuffix(error.message)}';
+        case 'tiktok-invalid-scope':
+          return 'TikTok rejected the requested scope. Please verify the scopes enabled for Login Kit.${_tiktokLogIdSuffix(error.message)}';
+        case 'tiktok-redirect-uri-mismatch':
+          return 'TikTok redirect URI is not registered. Please add it in TikTok Developer Portal → Login Kit → Web → Redirect URI.${_tiktokLogIdSuffix(error.message)}';
+        case 'tiktok-missing-auth-code':
+          return 'TikTok did not return an authorization code. Please verify Login Kit is enabled and Client Key is correct.${_tiktokLogIdSuffix(error.message)}';
+        case 'tiktok-access-denied':
+          return 'Authorization was denied. Please try again.${_tiktokLogIdSuffix(error.message)}';
+        case 'tiktok-server-error':
+          return 'TikTok is temporarily unavailable. Please try again later.${_tiktokLogIdSuffix(error.message)}';
+        case 'tiktok-network-error':
+          return 'TikTok sign-in could not reach TikTok services. Please try again on a stable network.';
+        case 'tiktok-config-error':
+          return 'TikTok Client Key is invalid. Please verify the configuration in TikTok Developer Portal.';
+        case 'tiktok-authorize-rejected':
+          return 'TikTok rejected the login request. Please try again, or contact support with the log ID if the problem persists.${_tiktokLogIdSuffix(error.message)}';
+        case 'tiktok-not-configured':
+          return 'TikTok Login Kit is not yet approved. Please check back later.';
+        case 'tiktok-state-mismatch':
+          return 'TikTok authorization state mismatch (CSRF detected). Please try again.';
+        case 'tiktok-timeout':
+          return 'TikTok login timed out. Please try again.';
+        case 'tiktok-no-navigator':
+          return 'TikTok login page failed to open. Please restart the app.';
+        case 'tiktok-unknown-error':
+        default:
+          return _normalizeErrorMessage(error.message);
+      }
     }
 
     final errorString = _normalizeErrorMessage(error.toString());
@@ -809,6 +1029,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   @override
   void dispose() {
     _authSubscription?.cancel();
+    _sessionExpiredSubscription?.cancel();
     super.dispose();
   }
 }

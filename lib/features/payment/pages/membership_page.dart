@@ -37,6 +37,11 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   bool _isBootstrappingProducts = true;
   bool _hasActiveSubscription = false;
 
+  /// 最近一次已经展示过的错误文案。
+  /// memberStateProvider 的 listener 和购买回调都会弹 SnackBar，
+  /// 用它去重，避免同一个错误弹两次。
+  String? _lastShownError;
+
   @override
   void initState() {
     super.initState();
@@ -46,11 +51,14 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
           message.isNotEmpty &&
           message != previous?.errorMessage &&
           mounted) {
+        final l10n = AppLocalizations.of(context);
         String displayMessage = message;
         if (message == 'itemAlreadyOwned') {
-          final l10n = AppLocalizations.of(context);
           displayMessage = l10n.membershipItemAlreadyOwned;
+        } else {
+          displayMessage = _localizePlayFailure(message, l10n) ?? message;
         }
+        _lastShownError = displayMessage;
         AppSnackBar.show(context, message: displayMessage);
       }
     });
@@ -69,23 +77,71 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       }
 
       // 在后台检查待处理支付
-      await ref.read(memberStateProvider.notifier).checkAndRetryPendingPayments();
+      await ref
+          .read(memberStateProvider.notifier)
+          .checkAndRetryPendingPayments();
     });
 
     // 检查VIP状态
-    Future.microtask(() async {
-      await Future.delayed(Duration(milliseconds: 100));
+    //
+    // 【必须响应式，不能只在进页面时读一次】
+    // 之前这里是一个 100ms 后的一次性 setState：购买成功后
+    // purchase() 内部会 refreshUserInfo（authProvider 更新），
+    // 但 _hasActiveSubscription 没有任何代码跟着更新，
+    // 导致底部按钮 / 套餐卡片停留在旧状态，要退出重进才刷新。
+    // 现在监听 authProvider 的变化，会员状态一变就同步。
+    void syncActiveSubscription() {
       if (!mounted) return;
-
       final authState = ref.read(authProvider);
       final isVip = authState.user?.isVip ?? false;
       final vipExpireDate = authState.user?.vipExpireDate;
-      final hasActive = isVip && (vipExpireDate == null || vipExpireDate.isAfter(DateTime.now()));
+      final hasActive =
+          isVip &&
+          (vipExpireDate == null || vipExpireDate.isAfter(DateTime.now()));
+      if (hasActive != _hasActiveSubscription) {
+        setState(() {
+          _hasActiveSubscription = hasActive;
+        });
+      }
+    }
 
-      setState(() {
-        _hasActiveSubscription = hasActive;
-      });
+    ref.listenManual(authProvider, (_, _) => syncActiveSubscription());
+    Future.microtask(() async {
+      await Future.delayed(Duration(milliseconds: 100));
+      if (!mounted) return;
+      syncActiveSubscription();
     });
+  }
+
+  /// 把 Play 侧的稳定失败原因码映射成多语言提示。
+  ///
+  /// 返回 null 表示这个字符串不是已知的 Play 失败码，调用方应原样展示。
+  ///
+  /// 关键点：Play **没有受理请求**（SERVICE_UNAVAILABLE / 商店缺失 / 网络不通）
+  /// 和「商品没配好」是两类完全不同的故障，提示必须分开，
+  /// 否则用户会去查错的方向。
+  String? _localizePlayFailure(String code, AppLocalizations l10n) {
+    switch (code) {
+      case 'play-service-unavailable':
+      case 'play-service-disconnected':
+        return l10n.membershipPlayServiceUnavailable;
+      case 'play-store-unavailable':
+      case 'play-feature-not-supported':
+        return l10n.membershipPlayStoreUnavailable;
+      case 'play-network-error':
+      case 'play-timeout':
+        return l10n.membershipPlayNetworkError;
+      case 'play-item-not-found':
+      case 'play-item-unavailable':
+      case 'play-developer-error':
+        return l10n.membershipPlayItemNotAvailable;
+      case 'play-no-eligible-offer':
+        return l10n.membershipPlayNoEligibleOffer;
+      case 'play-not-subscription':
+        return l10n.membershipPlayNotSubscription;
+      default:
+        return null;
+    }
   }
 
   void _handleBack() {
@@ -117,7 +173,8 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     // VIP?含?
     final isVip = authState.user?.isVip ?? false;
     final vipExpireDate = authState.user?.vipExpireDate;
-    final hasActiveSubscription = isVip && 
+    final hasActiveSubscription =
+        isVip &&
         (vipExpireDate == null || vipExpireDate.isAfter(DateTime.now()));
 
     // ?印
@@ -157,9 +214,9 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
             Text(
               product.price,
               style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFFFFD700),
-                  ),
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFFFFD700),
+              ),
             ),
             const SizedBox(height: 16),
             Text(
@@ -201,7 +258,10 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       _isPurchasing = false;
       if (mounted) {
         setState(() {});
-        AppSnackBar.show(context, message: l10n.membershipWebPurchaseUnsupported);
+        AppSnackBar.show(
+          context,
+          message: l10n.membershipWebPurchaseUnsupported,
+        );
       }
       return;
     }
@@ -243,6 +303,11 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       if (!success) {
         final memberState = ref.read(memberStateProvider);
         errorMessage = memberState.errorMessage;
+        // 错误可能是 Play 的稳定原因码，映射成多语言提示。
+        if (errorMessage != null) {
+          errorMessage =
+              _localizePlayFailure(errorMessage, l10n) ?? errorMessage;
+        }
       } else {
         // Google Play 购买成功后刷新状态
         ref.read(authProvider.notifier).refreshUserInfo();
@@ -272,7 +337,8 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     if (success && mounted) {
       final messenger = ScaffoldMessenger.of(context);
       final activatedLabel = switch (product.type) {
-        SubscriptionPeriod.monthly => l10n.membershipSubscriptionActivatedMonthly,
+        SubscriptionPeriod.monthly =>
+          l10n.membershipSubscriptionActivatedMonthly,
         SubscriptionPeriod.quarterly =>
           l10n.membershipSubscriptionActivatedQuarterly,
         SubscriptionPeriod.yearly => l10n.membershipSubscriptionActivatedYearly,
@@ -294,12 +360,12 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         ),
       );
     } else if (!success && mounted) {
-      if (errorMessage != null && errorMessage.isNotEmpty) {
+      if (errorMessage != null &&
+          errorMessage.isNotEmpty &&
+          errorMessage != _lastShownError) {
+        _lastShownError = errorMessage;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage!),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
         );
       }
       // WebView 内部已有提示，关闭时不需要额外显示
@@ -319,8 +385,10 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     final products = hasProducts
         ? membershipProductsState.products
         : const <SubscriptionProduct>[];
-    final isInitialProductsLoading = _isBootstrappingProducts ||
-        (membershipProductsState.isLoading && !membershipProductsState.hasLoaded);
+    final isInitialProductsLoading =
+        _isBootstrappingProducts ||
+        (membershipProductsState.isLoading &&
+            !membershipProductsState.hasLoaded);
 
     if (_selectedIndex >= products.length && products.isNotEmpty) {
       _selectedIndex = 0;
@@ -339,8 +407,9 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     // 非VIP用户 - 立即显示页面内容
     return GradientScaffold(
       bottomBackgroundColor: _membershipBottomColor,
-      bottomNavigationBar:
-          isInitialProductsLoading ? null : _buildBottomPayButton(l10n, memberState, products),
+      bottomNavigationBar: isInitialProductsLoading
+          ? null
+          : _buildBottomPayButton(l10n, memberState, products),
       body: Stack(
         children: [
           const Positioned.fill(
@@ -355,7 +424,12 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
                   if (isInitialProductsLoading)
                     _buildProductsLoadingState(context)
                   else
-                    _buildVipOptions(l10n, products, false, hasActiveSubscription: _hasActiveSubscription),
+                    _buildVipOptions(
+                      l10n,
+                      products,
+                      false,
+                      hasActiveSubscription: _hasActiveSubscription,
+                    ),
                   _buildDramaSection(recommendState),
                   _buildBenefitsSection(l10n, products),
                   // TODO: ?启 K 币??
@@ -368,10 +442,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
           PositionedDirectional(
             top: MediaQuery.of(context).padding.top + 8,
             start: 8,
-            child: RtlBackButton(
-              onPressed: _handleBack,
-              color: Colors.white,
-            ),
+            child: RtlBackButton(onPressed: _handleBack, color: Colors.white),
           ),
         ],
       ),
@@ -539,7 +610,9 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       padding: const EdgeInsets.symmetric(horizontal: 15),
       child: Row(
         children: List.generate(3, (index) {
-          final drama = index < displayDramas.length ? displayDramas[index] : null;
+          final drama = index < displayDramas.length
+              ? displayDramas[index]
+              : null;
           return Expanded(
             child: Padding(
               padding: EdgeInsetsDirectional.only(end: index == 2 ? 0 : 12),
@@ -562,17 +635,17 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
   }
 
   /// 4. Member Benefits 绍
-  Widget _buildBenefitsSection(AppLocalizations l10n, List<SubscriptionProduct> products) {
+  Widget _buildBenefitsSection(
+    AppLocalizations l10n,
+    List<SubscriptionProduct> products,
+  ) {
     final benefits = [
       l10n.membership_benefits_unlockEpisodes,
       l10n.membership_benefits_watchHd,
       l10n.membership_benefits_singleDevice,
     ];
     final planNotes = _planNoteEntries(l10n).toList();
-    final items = [
-      ...benefits,
-      ...planNotes,
-    ];
+    final items = [...benefits, ...planNotes];
 
     return Container(
       color: const Color(0xFF121212),
@@ -639,7 +712,9 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
           const SizedBox(height: 10),
           ...List.generate(items.length, (index) {
             return Padding(
-              padding: EdgeInsets.only(bottom: index == items.length - 1 ? 0 : 8),
+              padding: EdgeInsets.only(
+                bottom: index == items.length - 1 ? 0 : 8,
+              ),
               child: Text(
                 '${index + 1}. ${items[index]}',
                 style: const TextStyle(
@@ -718,7 +793,11 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.monetization_on, color: Colors.amber, size: 32),
+                  const Icon(
+                    Icons.monetization_on,
+                    color: Colors.amber,
+                    size: 32,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -735,12 +814,19 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
                         const SizedBox(height: 4),
                         Text(
                           l10n.watchPremiumContent,
-                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const Icon(Icons.arrow_forward_ios, color: Colors.amber, size: 16),
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.amber,
+                    size: 16,
+                  ),
                 ],
               ),
             ),
@@ -756,7 +842,9 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     MemberState memberState,
     List<SubscriptionProduct> products,
   ) {
-    final product = _selectedIndex < products.length ? products[_selectedIndex] : null;
+    final product = _selectedIndex < products.length
+        ? products[_selectedIndex]
+        : null;
     final isDisabled = _hasActiveSubscription || product == null;
     final buttonLabel = _hasActiveSubscription
         ? l10n.alreadySubscribed
@@ -795,7 +883,9 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
                   disabledBackgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
                   foregroundColor: const Color(0xFF753900),
-                  disabledForegroundColor: const Color(0xFF753900).withAlpha(153),
+                  disabledForegroundColor: const Color(
+                    0xFF753900,
+                  ).withAlpha(153),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(21),
                   ),
@@ -827,7 +917,9 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     final recommendState = ref.watch(membershipDramaProvider);
     return GradientScaffold(
       bottomBackgroundColor: _membershipBottomColor,
-      bottomNavigationBar: isInitialProductsLoading ? null : _buildBottomPayButton(l10n, memberState, products),
+      bottomNavigationBar: isInitialProductsLoading
+          ? null
+          : _buildBottomPayButton(l10n, memberState, products),
       body: Stack(
         children: [
           const Positioned.fill(
@@ -841,7 +933,12 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
                   if (isInitialProductsLoading)
                     _buildProductsLoadingState(context)
                   else
-                    _buildVipOptions(l10n, products, false, hasActiveSubscription: _hasActiveSubscription),
+                    _buildVipOptions(
+                      l10n,
+                      products,
+                      false,
+                      hasActiveSubscription: _hasActiveSubscription,
+                    ),
                   _buildDramaSection(recommendState),
                   _buildBenefitsSection(l10n, products),
                   _buildBottomSpacer(context),
@@ -852,10 +949,7 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
           PositionedDirectional(
             top: MediaQuery.of(context).padding.top + 8,
             start: 8,
-            child: RtlBackButton(
-              onPressed: _handleBack,
-              color: Colors.white,
-            ),
+            child: RtlBackButton(onPressed: _handleBack, color: Colors.white),
           ),
         ],
       ),
@@ -917,14 +1011,19 @@ class _VipOptionItem extends StatelessWidget {
   );
 
   ({String symbol, String amount}) _parsePriceParts(String price) {
-    final cleaned = price.replaceAll(RegExp(r'[\u0000-\u001F\u007F\u200E\u200F\u202A-\u202E]'), '');
+    final cleaned = price.replaceAll(
+      RegExp(r'[\u0000-\u001F\u007F\u200E\u200F\u202A-\u202E]'),
+      '',
+    );
     final trimmed = cleaned.trim();
     if (trimmed.isEmpty) {
       return (symbol: '', amount: '');
     }
 
     final compact = trimmed.replaceAll(RegExp(r'\s+'), '');
-    final match = RegExp(r'([^\d.,]*)([\d][\d.,]*)([^\d.,]*)').firstMatch(compact);
+    final match = RegExp(
+      r'([^\d.,]*)([\d][\d.,]*)([^\d.,]*)',
+    ).firstMatch(compact);
     if (match == null) {
       return (symbol: '', amount: trimmed);
     }
@@ -967,8 +1066,8 @@ class _VipOptionItem extends StatelessWidget {
                   isSubscribed
                       ? 'assets/images/vip_selected.png'
                       : (isSelected
-                          ? 'assets/images/vip_selected.png'
-                          : 'assets/images/vip_notselected.png'),
+                            ? 'assets/images/vip_selected.png'
+                            : 'assets/images/vip_notselected.png'),
                   width: 20,
                   height: 20,
                 ),
@@ -1090,16 +1189,16 @@ class _DramaCard extends StatelessWidget {
                 fit: BoxFit.cover,
                 borderRadius: BorderRadius.circular(10),
               ),
-            if (drama.videoAccessType == 1)
-              PositionedDirectional(
-                top: 0,
-                start: 0,
-                child: Image.asset(
-                  localizedHomeVipBadgeAsset(context),
-                  width: 42,
-                  height: 18,
+              if (drama.videoAccessType == 1)
+                PositionedDirectional(
+                  top: 0,
+                  start: 0,
+                  child: Image.asset(
+                    localizedHomeVipBadgeAsset(context),
+                    width: 42,
+                    height: 18,
+                  ),
                 ),
-              ),
             ],
           );
         },

@@ -6,6 +6,8 @@ import '../../../app/router/router_config.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../app/widgets/gradient_scaffold.dart';
 import '../../../components/rtl_back_button.dart';
+import '../../../core/config/build_flavor.dart';
+import '../../../core/config/build_info.dart';
 import '../../../core/utils/app_restart.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -24,9 +26,23 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   late final Future<String> _appVersionFuture = _loadAppVersion();
 
+  /// 设置页显示的版本号，格式 `1.0.6-p · Platform`。
+  ///
+  /// 优先用构建脚本注入的 dart-define —— 它和打包产物严格一致。
+  /// 没有 define（在 Android Studio 里直接 Run）时回退到原生 versionName：
+  /// Android/iOS 上 Gradle 已经加了 `-g` / `-p` 后缀，Web 上读的是站点
+  /// 根目录的 `version.json`（由 `tool/build.dart` 生成）。
   Future<String> _loadAppVersion() async {
-    final packageInfo = await PackageInfo.fromPlatform();
-    return packageInfo.version;
+    var version = BuildInfo.hasVersion ? BuildInfo.displayVersion : '';
+    if (version.isEmpty) {
+      try {
+        version = (await PackageInfo.fromPlatform()).version.trim();
+      } catch (_) {
+        version = '';
+      }
+    }
+    if (version.isEmpty) version = BuildInfo.baseVersion;
+    return '$version · ${BuildFlavor.label}';
   }
 
   Future<void> _handleLogout() async {

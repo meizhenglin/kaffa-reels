@@ -218,6 +218,14 @@ class VideoInfo {
     return 0;
   }
 
+  static int? _readNullableInt(Map<String, dynamic> json, List<String> keys) {
+    for (final key in keys) {
+      if (!json.containsKey(key) || json[key] == null) continue;
+      return _readInt(json, [key]);
+    }
+    return null;
+  }
+
   factory VideoInfo.fromJson(Map<String, dynamic> json) {
     final rawCollectNum = _readInt(json, const [
       'collectNum',
@@ -237,34 +245,26 @@ class VideoInfo {
     final isLike = _readInt(json, const ['isLike']);
 
     return VideoInfo(
-      id: (json['id'] as int?) ?? (json['episodesId'] as int?) ?? 0,
-      videoId: (json['videoId'] as int?) ?? 0,
+      id: _readInt(json, const ['id', 'episodesId']),
+      videoId: _readInt(json, const ['videoId']),
       videoUrl:
-          (json['videoUrl'] as String?) ??
-          (json['url'] as String?) ??
-          (json['episodesUrl'] as String?) ??
+          (json['videoUrl'] ?? json['url'] ?? json['episodesUrl'])
+              ?.toString() ??
           '',
-      coverUrl:
-          (json['coverUrl'] as String?) ?? (json['videoPicture'] as String?),
-      videoUrlOne:
-          (json['videoUrlOne'] as String?) ??
-          (json['vipEpisodesUrl1080'] as String?),
-      videoUrlTwo:
-          (json['videoUrlTwo'] as String?) ??
-          (json['vipEpisodesUrl1440'] as String?),
-      serialNum:
-          (json['serialNum'] as int?) ?? (json['episodesNum'] as int?) ?? 0,
-      longTime: (json['longTime'] as int?) ?? 0,
+      coverUrl: (json['coverUrl'] ?? json['videoPicture'])?.toString(),
+      videoUrlOne: (json['videoUrlOne'] ?? json['vipEpisodesUrl1080'])
+          ?.toString(),
+      videoUrlTwo: (json['videoUrlTwo'] ?? json['vipEpisodesUrl1440'])
+          ?.toString(),
+      serialNum: _readInt(json, const ['serialNum', 'episodesNum']),
+      longTime: _readInt(json, const ['longTime']),
       collectNum: rawCollectNum,
       likeNum: rawLikeNum,
       shareNum: _readInt(json, const ['shareNum']),
       isCollect: isCollect,
       isLike: isLike,
-      totalEpisodes:
-          (json['totalEpisodes'] as int?) ??
-          (json['videoEpisodes'] as int?) ??
-          0,
-      title: (json['title'] as String?) ?? (json['videoName'] as String?) ?? '',
+      totalEpisodes: _readInt(json, const ['totalEpisodes', 'videoEpisodes']),
+      title: (json['title'] ?? json['videoName'])?.toString() ?? '',
       content:
           (json['content'] as String?) ??
           (json['description'] as String?) ??
@@ -274,12 +274,17 @@ class VideoInfo {
           (json['introduction'] as String?) ??
           (json['brief'] as String?) ??
           '',
-      isCanPlay: (json['isCanPlay'] as int?) ?? 1,
-      unlockPrice: json['unlockPrice'] as int? ?? json['unlockNum'] as int?,
-      dramaUnlockPrice:
-          json['dramaUnlockPrice'] as int? ?? json['allPrice'] as int?,
-      episodeGoodsId: json['episodeGoodsId'] as int? ?? json['goodsId'] as int?,
-      dramaGoodsId: json['dramaGoodsId'] as int?,
+      isCanPlay: _readNullableInt(json, const ['isCanPlay']) ?? 1,
+      unlockPrice: _readNullableInt(json, const ['unlockPrice', 'unlockNum']),
+      dramaUnlockPrice: _readNullableInt(json, const [
+        'dramaUnlockPrice',
+        'allPrice',
+      ]),
+      episodeGoodsId: _readNullableInt(json, const [
+        'episodeGoodsId',
+        'goodsId',
+      ]),
+      dramaGoodsId: _readNullableInt(json, const ['dramaGoodsId']),
     );
   }
 

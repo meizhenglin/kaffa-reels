@@ -1,5 +1,7 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:preload_page_view/preload_page_view.dart';
@@ -22,8 +24,6 @@ import '../payment/widgets/unlock_bottom_sheet.dart';
 import '../payment/models/unlock_product.dart';
 import '../../app/providers/app_providers.dart';
 import '../../core/widgets/share_button.dart';
-import 'ali_player_preload.dart'
-    if (dart.library.html) 'ali_player_preload_web.dart';
 import 'watch_short_video_item.dart'
     if (dart.library.html) 'watch_short_video_item_web.dart';
 
@@ -220,7 +220,6 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   }
 
   late List<VideoInfo> videoInfoList;
-  AliPlayerPreload? _aliPlayerPreload;
   late PageController _pageController;
   late PreloadPageController _preloadPageController;
   final ShortVideoListController _listController = ShortVideoListController();
@@ -342,7 +341,6 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   void dispose() {
     _tabIndexSubscription?.close();
     WidgetsBinding.instance.removeObserver(this);
-    _aliPlayerPreload?.destroy();
     if (_usePreloadMode) {
       _preloadPageController.removeListener(_handlePreloadPageChanged);
       _preloadPageController.dispose();
@@ -416,7 +414,18 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
                 final episode = VideoInfo.fromJson(
                   Map<String, dynamic>.from(item).cast<String, dynamic>(),
                 );
+                final fallbackUrl =
+                    [episode.videoUrl, episode.videoUrlOne, episode.videoUrlTwo]
+                        .map((value) => value?.trim() ?? '')
+                        .firstWhere(
+                          (value) => value.isNotEmpty,
+                          orElse: () => '',
+                        );
                 return episode.copyWith(
+                  videoUrl: fallbackUrl,
+                  videoId: episode.videoId > 0
+                      ? episode.videoId
+                      : (int.tryParse(widget.videoId) ?? 0),
                   content: episode.content.isEmpty && videoIntroduce.isNotEmpty
                       ? videoIntroduce
                       : episode.content,
@@ -505,16 +514,6 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         );
       }
 
-      _aliPlayerPreload?.destroy();
-      _aliPlayerPreload = AliPlayerPreload(
-        context: context,
-        enableCoverUrlStrategy: true,
-        usePrioritizedVideoPreload: true,
-        enableVideoPreload: true,
-      );
-      _aliPlayerPreload!.setItems(videoInfoList);
-      _aliPlayerPreload!.moveTo(_currentIndex);
-
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -532,10 +531,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         } else {
           _pageController.jumpToPage(_currentIndex);
         }
-        _aliPlayerPreload?.moveTo(_currentIndex);
-        _reportViewHistory(_currentIndex);
-        _prefetchAround(_currentIndex);
         _resumeCurrent();
+        _prefetchAround(_currentIndex);
 
         // 如果是登录后刷新，检查是否需要显示解锁弹窗
         if (ref.read(isRefreshingAfterLoginProvider)) {
@@ -686,23 +683,37 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
     _pauseAtIndex(_currentIndex);
     _currentIndex = newPageIndex;
-    _aliPlayerPreload?.moveTo(_currentIndex);
-    _prefetchAround(_currentIndex);
-    _resumeCurrent();
     if (mounted) {
       setState(() {});
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _currentIndex != newPageIndex) return;
+        final currentItem = _itemKeys[newPageIndex].currentState;
+        if (_isCurrentTabActive) {
+          unawaited(currentItem?.activateForPlayback());
+        }
+        _prefetchAround(newPageIndex);
+      });
     }
   }
 
   void _prefetchAround(int centerIndex) {
-    final preload = _aliPlayerPreload;
-    if (preload == null) return;
-    preload.moveTo(centerIndex);
+    final indices = <int>{centerIndex, centerIndex + 1};
+    for (var index = 0; index < _itemKeys.length; index++) {
+      final item = _itemKeys[index].currentState;
+      if (item == null) continue;
+      if (indices.contains(index)) {
+        item.prefetchPlayableUrl(
+          playIfReady: index == centerIndex && _isCurrentTabActive,
+        );
+      } else {
+        item.releasePrefetched();
+      }
+    }
   }
 
   void _pauseAtIndex(int index) {
     if (index < 0 || index >= _itemKeys.length) return;
-    _itemKeys[index].currentState?.pause();
+    _itemKeys[index].currentState?.pause(reason: 'episode changed to $index');
   }
 
   void _resumeAtIndex(int index) {
@@ -1015,7 +1026,6 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     _pauseNearbyItems(sourceIndex);
     if (_currentIndex != index) {
       _currentIndex = index;
-      _aliPlayerPreload?.moveTo(_currentIndex);
       _prefetchAround(_currentIndex);
     }
     _pauseNearbyItems(index);
@@ -1637,7 +1647,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
             _buildSideImageButton(
               activeImage: 'assets/images/like_active.png',
               inactiveImage: 'assets/images/like.png',
-              label: _formatActionCount(likeCount),
+              label: _formatActionCount(
+                isLiked && likeCount == 0 ? 1 : likeCount,
+              ),
               onTap: () => _toggleLike(videoInfo),
               isActive: isLiked,
             ),
@@ -1645,7 +1657,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
             _buildSideImageButton(
               activeImage: 'assets/images/collection_active.png',
               inactiveImage: 'assets/images/collection.png',
-              label: _formatActionCount(collectCount),
+              label: _formatActionCount(
+                isCollected && collectCount == 0 ? 1 : collectCount,
+              ),
               onTap: () => _toggleCollect(videoInfo),
               isActive: isCollected,
             ),

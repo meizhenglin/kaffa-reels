@@ -1274,6 +1274,42 @@ abstract class AppLocalizations {
   /// **'You already own this subscription.'**
   String get membershipItemAlreadyOwned;
 
+  /// No description provided for @membershipPlayServiceUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Play is unavailable. Please update the Play Store, and make sure you are signed in with an account that has access to this app.'**
+  String get membershipPlayServiceUnavailable;
+
+  /// No description provided for @membershipPlayStoreUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Play Store is not available on this device.'**
+  String get membershipPlayStoreUnavailable;
+
+  /// No description provided for @membershipPlayNetworkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Network error while contacting Google Play. Please check your connection.'**
+  String get membershipPlayNetworkError;
+
+  /// No description provided for @membershipPlayItemNotAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This subscription is not available in Google Play right now. Please try again later.'**
+  String get membershipPlayItemNotAvailable;
+
+  /// No description provided for @membershipPlayNotSubscription.
+  ///
+  /// In en, this message translates to:
+  /// **'This item is not configured as a subscription in Google Play. Please try another plan.'**
+  String get membershipPlayNotSubscription;
+
+  /// No description provided for @membershipPlayNoEligibleOffer.
+  ///
+  /// In en, this message translates to:
+  /// **'This plan exists in Google Play, but it is not available for your account or country yet. Please try again later or contact support.'**
+  String get membershipPlayNoEligibleOffer;
+
   /// No description provided for @watchLockedReminderTitle.
   ///
   /// In en, this message translates to:

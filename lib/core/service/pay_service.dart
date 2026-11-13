@@ -1,5 +1,4 @@
-import 'dart:convert';
-
+import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
 import '../config/app_config.dart';
@@ -105,13 +104,22 @@ class PayService {
   }
 
   /// Google Play 购买（Flutter 原生通道）
-  /// [params] Google 返回的购买回调完整信息，序列化后透传给服务端
+  ///
+  /// [params] Google 返回的购买回调完整信息，原样透传给服务端。
+  ///
+  /// 【注意】这里传的是 **Map**，不要再手动 `jsonEncode`。
+  /// 后端 `/notice/google` 的 requestBody 是 `@RequestBody String`，
+  /// 由后端自己解析 JSON；客户端多包一层字符串反而会让后端拿不到字段。
+  /// 序列化细节见 [ApiService.googleCallBack]。
   Future<bool> confirmGooglePurchase({
     required Map<String, dynamic> params,
   }) async {
-    final resp = await _apiService.googleCallBack(
-      params: jsonEncode(params),
-    );
+    final resp = await _apiService.googleCallBack(params: params);
+    if (!resp.isSuccess) {
+      debugPrint(
+        '[PayService] Google 回调失败: code=${resp.code} error=${resp.error}',
+      );
+    }
     return resp.isSuccess;
   }
 

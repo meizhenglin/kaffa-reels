@@ -74,7 +74,10 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
     final RenderBox filterBarBox = _filterBarKey.currentContext!.findRenderObject() as RenderBox;
     final Offset filterBarOffset = filterBarBox.localToGlobal(Offset.zero);
     final double filterBarWidth = filterBarBox.size.width;
-    final double dropdownWidth = filterBarWidth - horizontalInset * 2;
+    // clamp：视口被压到极窄时 filterBarWidth 可能小于左右内边距之和，
+    // 算出负宽度传给 SizedBox 会直接炸掉元素树（BoxConstraints 断言）。
+    final double dropdownWidth =
+        (filterBarWidth - horizontalInset * 2).clamp(0.0, double.infinity);
     final double dropdownLeft = filterBarOffset.dx + horizontalInset;
     final double dropdownTop = moreButtonOffset.dy + moreButtonBox.size.height + HomeCardLayout.scaled(context, 2);
 

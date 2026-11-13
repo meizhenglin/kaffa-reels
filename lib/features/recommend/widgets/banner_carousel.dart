@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,8 +9,6 @@ import '../../../components/preload_network_image.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../home/models/home_card_layout.dart';
 import '../../home/providers/last_watched_provider.dart';
-import '../../../l10n/app_localizations.dart';
-import '../../../core/widgets/app_snack_bar.dart';
 import '../models/banner.dart';
 import '../utils/drama_navigation.dart';
 
@@ -46,6 +46,92 @@ class BannerCarousel extends ConsumerStatefulWidget {
 class _BannerCarouselState extends ConsumerState<BannerCarousel> {
   int _currentIndex = 0;
 
+  /// 自己控制轮播，不用 carousel_slider 的 autoPlay。
+  ///
+  /// 【为什么必须自己管】carousel_slider 5.1.2 的自动轮播 timer 里是这么写的
+  /// （carousel_slider.dart:129-140）：
+  ///
+  ///     Timer.periodic(..., (_) {
+  ///       if (!mounted) { clearTimer(); return; }
+  ///       final route = ModalRoute.of(context);   // ← 问题在这
+  ///       ...
+  ///     });
+  ///
+  /// `mounted` 对「已 deactivate 但还没 unmount」的元素仍然为 true，
+  /// 而 deactivate 之后调用 `ModalRoute.of(context)` 会触发框架断言
+  /// （framework.dart:5049 "Looking up a deactivated widget's ancestor is
+  /// unsafe"），紧接着把元素树搞成不一致状态，连锁抛出
+  /// framework.dart:6417 / 6268 的断言 —— 也就是线上那块红屏。
+  /// 触发场景：切 tab / MediaQuery 尺寸变化（DevTools 设备工具栏）时
+  /// banner 被移出树，而 timer 恰好在这时 tick。
+  ///
+  /// 现在：包自带 autoPlay 关闭，由 [_autoPlayTimer] 驱动，
+  /// 并在 deactivate() 里第一时间取消 —— 元素一离开树就没有 timer 了。
+  final CarouselSliderController _carouselController = CarouselSliderController();
+  Timer? _autoPlayTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startAutoPlay();
+  }
+
+  @override
+  void didUpdateWidget(covariant BannerCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.banners.length != widget.banners.length ||
+        oldWidget.autoPlayInterval != widget.autoPlayInterval) {
+      if (_currentIndex >= widget.banners.length) {
+        _currentIndex = 0;
+      }
+      _startAutoPlay();
+    }
+  }
+
+  @override
+  void deactivate() {
+    // 关键：元素一旦离开树就先停表，避免在 deactivate 状态下操作控制器。
+    _stopAutoPlay();
+    super.deactivate();
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    _startAutoPlay();
+  }
+
+  @override
+  void dispose() {
+    _stopAutoPlay();
+    super.dispose();
+  }
+
+  void _startAutoPlay() {
+    _stopAutoPlay();
+    if (widget.banners.length <= 1) return;
+    _autoPlayTimer = Timer.periodic(widget.autoPlayInterval, (_) => _goNext());
+  }
+
+  void _stopAutoPlay() {
+    _autoPlayTimer?.cancel();
+    _autoPlayTimer = null;
+  }
+
+  Future<void> _goNext() async {
+    if (!mounted) return;
+    if (!_carouselController.ready) return;
+    try {
+      await _carouselController.nextPage(
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    } catch (_) {
+      // 动画途中元素被移除（切 tab / 路由变化）时忽略；
+      // 下一次 activate 会重新启动定时器。
+    }
+  }
+
   /// 跳转到播放器，只需传 videoId，播放器自己请求数据
   Future<void> _onPlayTap(BannerItem banner) async {
     final videoId = banner.videoId ?? banner.dramaId;
@@ -69,6 +155,7 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
       child: Stack(
         children: [
           CarouselSlider.builder(
+            carouselController: _carouselController,
             itemCount: widget.banners.length,
             itemBuilder: (context, index, realIndex) {
               final banner = widget.banners[index];
@@ -132,11 +219,14 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
             options: CarouselOptions(
               height: widget.height,
               viewportFraction: 1,
-              autoPlay: widget.banners.length > 1,
+              // 必须 false：包内的自动轮播会在 deactivate 后调用
+              // ModalRoute.of(context)，引发红屏断言。改由 _autoPlayTimer 驱动。
+              autoPlay: false,
               autoPlayInterval: widget.autoPlayInterval,
               autoPlayAnimationDuration: const Duration(milliseconds: 400),
               autoPlayCurve: Curves.easeInOut,
               onPageChanged: (index, reason) {
+                if (!mounted) return;
                 setState(() => _currentIndex = index);
               },
             ),
@@ -169,8 +259,11 @@ class _BannerCarouselState extends ConsumerState<BannerCarousel> {
               behavior: HitTestBehavior.translucent,
               onTap: () {
                 // 点击 logo 也跳转到播放器
-
-                _onPlayTap(widget.banners[_currentIndex]);
+                if (widget.banners.isEmpty) return;
+                final index = _currentIndex < widget.banners.length
+                    ? _currentIndex
+                    : widget.banners.length - 1;
+                _onPlayTap(widget.banners[index]);
               },
               child: Image.asset(
                 'assets/images/logo_new.png', // 这里才是真正显示图片的地方

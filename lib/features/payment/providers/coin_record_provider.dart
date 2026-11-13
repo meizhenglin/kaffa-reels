@@ -28,12 +28,27 @@ class CoinBalanceNotifier extends StateNotifier<CoinBalance> {
   CoinBalanceNotifier(this._apiService) : super(const CoinBalance());
 
   final ApiService _apiService;
-  bool _isLoading = false;
+
+  /// 正在进行中的请求。
+  ///
+  /// 并发调用共享同一个请求，而不是直接 return —— 原来的 `_isLoading`
+  /// 早退会让第二个调用方 `await load()` 立刻返回却读到**旧余额**
+  /// （解锁页轮询余额判断充值是否到账，依赖 await 之后状态已更新）。
+  Future<void>? _inFlight;
 
   /// Load coin balance from API
-  Future<void> load() async {
-    if (_isLoading) return;
-    _isLoading = true;
+  Future<void> load() {
+    final inFlight = _inFlight;
+    if (inFlight != null) return inFlight;
+
+    final future = _loadFromApi();
+    _inFlight = future;
+    return future.whenComplete(() {
+      _inFlight = null;
+    });
+  }
+
+  Future<void> _loadFromApi() async {
     try {
       final resp = await _apiService.getUserCenter();
       if (resp.isSuccess && resp.data != null) {
@@ -42,8 +57,6 @@ class CoinBalanceNotifier extends StateNotifier<CoinBalance> {
       }
     } catch (e) {
       // Handle error silently, keep current balance
-    } finally {
-      _isLoading = false;
     }
   }
 

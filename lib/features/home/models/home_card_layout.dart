@@ -31,11 +31,24 @@ class HomeCardLayout {
   static double screenHeight(BuildContext context) =>
       MediaQuery.of(context).size.height;
 
+  /// 把算出来的尺寸收敛到 `>= 0`。
+  ///
+  /// 【为什么需要】浏览器窗口 / iframe 被拖拽缩放时，`MediaQuery.size.width`
+  /// 会短暂接近 0（DevTools 设备工具栏、拖动窗口边缘、页面被隐藏都会）。
+  /// 此时 `(width - padding*2 - gap*2) / 3` 这类减法会算出负数，
+  /// 传给 `SizedBox(width:)` 就变成 `BoxConstraints(w=-17.7)`，
+  /// 触发 "BoxConstraints has a negative minimum width." 并直接炸掉整棵元素树
+  /// （后面跟着的 "Each child must be laid out exactly once." 都是它的连锁反应）。
+  static double _nonNegative(double value) =>
+      value.isFinite && value > 0 ? value : 0;
+
   static double smallCardWidth(BuildContext context) {
     final effectiveWidth = _effectiveWidth(context);
     final horizontalPadding = gridPadding(context);
     final totalGap = cardGap(context) * 2;
-    return (effectiveWidth - horizontalPadding * 2 - totalGap) / 3;
+    return _nonNegative(
+      (effectiveWidth - horizontalPadding * 2 - totalGap) / 3,
+    );
   }
 
   static double smallCardHeight(BuildContext context) =>
@@ -55,7 +68,7 @@ class HomeCardLayout {
     final effectiveWidth = _effectiveWidth(context);
     final horizontalPadding = sectionHorizontalPadding(context);
     final gap = cardGap(context);
-    return (effectiveWidth - horizontalPadding * 2 - gap) / 2;
+    return _nonNegative((effectiveWidth - horizontalPadding * 2 - gap) / 2);
   }
 
   static double largeCardHeight(BuildContext context) {

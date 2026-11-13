@@ -1,23 +1,15 @@
 ﻿import 'dart:async';
-import 'dart:io' show Platform;
 
-import 'package:aliplayer_widget/aliplayer_widget_lib.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobcommonlib/mobcommonlib.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:qahwa_tv/l10n/app_localizations.dart';
 
-import '_aliplayer_log_stub.dart'
-    if (dart.library.io) '_aliplayer_log_native.dart'
-    as aliplayer_impl;
 import 'app/router/url_strategy_stub.dart'
     if (dart.library.html) 'app/router/url_strategy_web.dart'
     as url_strategy;
-import 'core/platform/platform_info_stub.dart'
-    if (dart.library.io) 'core/platform/platform_info_io.dart';
 
 import 'app/providers/app_providers.dart';
 import 'app/router/router_config.dart' show routerProvider;
@@ -26,8 +18,14 @@ import 'core/ads/ad_manager.dart';
 import 'core/ads/ad_mediator.dart';
 import 'core/constants/app_constants.dart';
 import 'core/config/build_flavor.dart';
+import 'core/config/build_info.dart';
+import 'core/widgets/mouse_drag_scroll.dart';
 import 'core/firebase/firebase_service.dart';
 import 'features/auth/providers/auth_provider.dart';
+import 'features/payment/providers/coin_record_provider.dart' as coin_record;
+import 'features/payment/providers/membership_provider.dart'
+    show memberStateProvider;
+import 'features/payment/services/play_billing_native_probe.dart';
 import 'core/storage/storage_service.dart';
 import 'services/share_service.dart';
 
@@ -37,54 +35,15 @@ Future<void> _withTimeout(Future<void> future, Duration timeout) async {
   } catch (_) {}
 }
 
-Future<void> _initializeAliPlayerWidgetGlobalSettings() async {
-  if (kIsWeb) {
-    debugPrint('[MAIN] Skip AliPlayerWidget global settings on Web');
-    return;
-  }
-
-  try {
-    await AliPlayerWidgetGlobalSetting.setupConfig();
-
-    String? cachePath;
-    String? filesPath;
-
-    if (isAndroidPlatform) {
-      final externalCacheDirs = await getExternalCacheDirectories();
-      cachePath = externalCacheDirs?.isNotEmpty == true
-          ? externalCacheDirs!.first.path
-          : null;
-
-      final externalStorageDir = await getExternalStorageDirectory();
-      filesPath = externalStorageDir?.path;
-
-      if (cachePath == null || filesPath == null) {
-        final internalCache = await getApplicationCacheDirectory();
-        final internalDocs = await getApplicationDocumentsDirectory();
-        cachePath ??= internalCache.path;
-        filesPath ??= internalDocs.path;
-      }
-    } else {
-      final cacheDir = await getApplicationCacheDirectory();
-      final docsDir = await getApplicationDocumentsDirectory();
-      cachePath = cacheDir.path;
-      filesPath = docsDir.path;
-    }
-
-    AliPlayerWidgetGlobalSetting.setStoragePaths(
-      cachePath: cachePath,
-      filesPath: filesPath,
-    );
-
-    debugPrint('[MAIN] AliPlayerWidget global settings initialized');
-  } catch (e) {
-    debugPrint('[MAIN] AliPlayerWidget global settings init failed: `$e`');
-  }
-}
-
 Future<void> main() async {
   debugPrint('[MAIN] === main() started ===');
   debugPrint('[MAIN] BuildFlavor.current = ${BuildFlavor.current}');
+  // 打印完整构建标识：线上捞日志时能直接看出用户装的是哪个渠道、哪个版本。
+  // 形如 `1.0.6+15.p`（platform）/ `1.0.6+15.g`（google）/ `1.0.6+15.w`（web）
+  debugPrint(
+    '[MAIN] BuildInfo.fullVersion = ${BuildInfo.fullVersion} '
+    '(display ${BuildInfo.displayVersion})',
+  );
   WidgetsFlutterBinding.ensureInitialized();
   debugPrint('[MAIN] WidgetsFlutterBinding ready');
 
@@ -94,9 +53,6 @@ Future<void> main() async {
   final storage = StorageService();
   await storage.init();
   debugPrint('[MAIN] StorageService initialized');
-
-  await aliplayer_impl.AliPlayerLog.init();
-  await _initializeAliPlayerWidgetGlobalSettings();
 
   if (!kIsWeb) {
     await _withTimeout(
@@ -111,12 +67,16 @@ Future<void> main() async {
 
   runApp(
     ProviderScope(
-      overrides: [
-        storageServiceProvider.overrideWithValue(storage),
-      ],
+      overrides: [storageServiceProvider.overrideWithValue(storage)],
       child: const QahwaTVApp(),
     ),
   );
+
+  // 诊断开关：`--dart-define=PLAY_PROBE_IDS=com.qahwa.vip1,com.qahwa.vip2`
+  // 打开后启动就会把每个商品的 Play 状态码打到 logcat。
+  if (!kIsWeb) {
+    unawaited(PlayNativeBillingProbe.runStartupProbe());
+  }
 
   if (kIsWeb) {
     _initFirebaseInBackground();
@@ -126,11 +86,13 @@ Future<void> main() async {
 void _initFirebaseInBackground() {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     debugPrint('[MAIN] Web: scheduling background Firebase init');
-    FirebaseService.initialize().then((_) {
-      debugPrint('[MAIN] Web: Firebase initialized in background');
-    }).catchError((e) {
-      debugPrint('[MAIN] Web: Firebase background init failed: `$e`');
-    });
+    FirebaseService.initialize()
+        .then((_) {
+          debugPrint('[MAIN] Web: Firebase initialized in background');
+        })
+        .catchError((e) {
+          debugPrint('[MAIN] Web: Firebase background init failed: `$e`');
+        });
   });
 }
 
@@ -142,14 +104,56 @@ class QahwaTVApp extends ConsumerStatefulWidget {
 }
 
 class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
+  /// 本次进程内是否已经跑过「启动补单」。
+  ///
+  /// auth 状态在启动过程中会变化多次（未登录 → 恢复会话 → 已登录），
+  /// 用这个标记保证补单只跑一次，不随 auth 每次变化重跑。
+  bool _startupPaymentRetryDone = false;
+
   @override
   void initState() {
     super.initState();
-    Future.microtask(() async {
-      await Future.delayed(const Duration(milliseconds: 100));
-      ref.read(authProvider);
+    ref.read(authProvider);
+    Future.microtask(() {
       ref.read(themeModeProvider.notifier).load();
       ref.read(localeProvider.notifier).load();
+    });
+    // 【启动补单】补单必须等登录态恢复完成才能跑
+    //（checkAndRetryPendingPayments 里未登录会直接 return），
+    // 所以这里监听 authProvider：一旦变成「已登录的非游客」就执行。
+    // K币和会员共用同一个本地待补队列，一次补单两条链路都覆盖。
+    ref.listenManual(authProvider, (_, _) => _retryPendingPaymentsWhenReady());
+    _retryPendingPaymentsWhenReady();
+  }
+
+  /// 登录态就绪后补发未完成的支付回调（会员开通 / K币到账）。
+  void _retryPendingPaymentsWhenReady() {
+    if (_startupPaymentRetryDone) return;
+    final authState = ref.read(authProvider);
+    if (!authState.isAuthenticated || (authState.user?.isTourist ?? true)) {
+      // 会话还没恢复完，等 auth 下一次变化再试。
+      return;
+    }
+    _startupPaymentRetryDone = true;
+
+    Future.microtask(() async {
+      int retried = 0;
+      try {
+        retried = await ref
+            .read(memberStateProvider.notifier)
+            .checkAndRetryPendingPayments();
+      } catch (e) {
+        debugPrint('[MAIN] startup pending-payment retry failed: $e');
+      }
+      // 只有在**真的补发过**订单时才刷新 K币余额：
+      // K币余额接口复用的也是 /api/user/userPersonalCenter，
+      // 无条件刷新会让每次启动都多打一次用户中心接口。
+      if (retried == 0) return;
+      try {
+        await ref.read(coin_record.coinBalanceInfoProvider.notifier).load();
+      } catch (e) {
+        debugPrint('[MAIN] startup coin balance refresh failed: $e');
+      }
     });
   }
 
@@ -174,6 +178,9 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       routerConfig: router,
+      // Web/桌面默认把鼠标排除在拖拽设备之外，导致所有列表只能用滚轮。
+      // 统一在这里开启，全站页面都能像手机一样按住拖动。
+      scrollBehavior: const MouseDragScrollBehavior(),
       builder: (context, child) => child ?? const SizedBox.shrink(),
     );
 

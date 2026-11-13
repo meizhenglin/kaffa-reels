@@ -12,6 +12,11 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   errors:
     avoid_web_libraries_in_flutter: ignore
+  exclude:
+    # 构建产物与临时脚本，不属于业务代码
+    - build/**
+    - check_apk.dart
+    - tool/vm_eval.dart
 
 linter:
   # The lint rules applied to this project can be customized in the

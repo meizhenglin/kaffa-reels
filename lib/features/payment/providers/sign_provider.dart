@@ -61,7 +61,6 @@ class SignStateNotifier extends StateNotifier<SignState> {
       final resp = await _apiService.setUserSign(signGoodsId: todayGoodsId);
 
       if (resp.isSuccess) {
-        final previousBalance = _ref.read(coinBalanceInfoProvider).balance;
         final configResp = await _apiService.getSignConfig();
         SignConfig? config;
         int todayRewardCoins = 0;
@@ -76,8 +75,20 @@ class SignStateNotifier extends StateNotifier<SignState> {
         }
         state = state.copyWith(config: config, isLoading: false, todayRewardCoins: todayRewardCoins);
 
-        await _ref.read(coinBalanceInfoProvider.notifier).load();
-        await _refreshUserCenterIfCoinBalanceChanged(previousBalance);
+        // 【合并请求】签到后余额和用户信息都变了，但两者在同一个
+        // /api/user/userPersonalCenter 响应里：只请求一次，同时喂给
+        // coinBalanceInfo 和 authProvider（以前是 load() + refreshUserInfo()
+        // 连打两次同一个接口）。
+        try {
+          final userCenter = await _apiService.getUserCenter();
+          if (userCenter.isSuccess && userCenter.data != null) {
+            final data = userCenter.data as Map<String, dynamic>;
+            _ref.read(coinBalanceInfoProvider.notifier).updateFromData(data);
+            await _ref.read(authProvider.notifier).updateUserFromData(data);
+          }
+        } catch (_) {
+          // 刷新失败不影响签到结果：余额/用户信息下次进页面会重新加载。
+        }
         return true;
       } else {
         state = state.copyWith(
@@ -125,14 +136,5 @@ class SignStateNotifier extends StateNotifier<SignState> {
     final dayIndex = config.isTodaySigned ? config.continueDay : config.continueDay + 1;
     if (dayIndex <= 0 || dayIndex > config.rewards.length) return 0;
     return config.rewards[dayIndex - 1].signGoodsId;
-  }
-
-  Future<void> _refreshUserCenterIfCoinBalanceChanged(int previousBalance) async {
-    final currentBalance = _ref.read(coinBalanceInfoProvider).balance;
-    if (currentBalance != previousBalance) {
-      try {
-        await _ref.read(authProvider.notifier).refreshUserInfo();
-      } catch (_) {}
-    }
   }
 }

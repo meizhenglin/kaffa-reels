@@ -1112,20 +1112,20 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     final l10n = AppLocalizations.of(context);
 
     try {
-      final payService = payServiceProvider;
-      try {
-        await payService.createOrder(payConfigId: product.goodsId);
-      } catch (e) {
-        debugPrint('[Unlock] Create VIP order failed: $e');
-      }
-
       final paymentService = PaymentService.instance;
+
+      // 先查 Play 商品，再建订单。
+      // 商品根本不存在的时候没必要建订单，否则会留下一条永远不会被支付的订单。
       final products = await paymentService.getProducts(
         productIds: [product.googlePlayId ?? ''],
         requireSubscriptionOnAndroid: true,
       );
 
       if (products.isEmpty) {
+        debugPrint(
+          '[Unlock] No Google Play product for "${product.googlePlayId}" '
+          '(goodsId=${product.goodsId}) — skipping order creation',
+        );
         if (mounted) {
           _setProcessing(product.goodsId, false);
           AppSnackBar.show(context, message: l10n.vipProductUnavailable);
@@ -1133,17 +1133,42 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         return;
       }
 
+      final payService = payServiceProvider;
+      final userId = await ref.read(storageServiceProvider).getUserIdAsync();
+
+      // 与会员页一致的流程：匹配成功直接拉起支付，
+      // 订单等支付确认后再建（POST /api/pay/userRechange），
+      // 之后验证 / acknowledge / 开通会员全部由后端完成。
+      // 【不要】在拉起支付之前建订单 —— 商品买不了会留下孤儿订单。
       final success = await paymentService.purchase(
         product: products.first,
-        applicationUserName: ref
-            .read(storageServiceProvider)
-            .getString('user_id'),
+        applicationUserName: userId,
       );
 
       if (!mounted) return;
       _setProcessing(product.goodsId, false);
 
       if (success) {
+        // 支付已确认 → 通知后端建单核销
+        bool orderCreated = false;
+        try {
+          final order = await payService.createOrder(
+            payConfigId: product.goodsId,
+          );
+          orderCreated = order != null;
+        } catch (e) {
+          debugPrint('[Unlock] Create VIP order after payment failed: $e');
+        }
+
+        if (!orderCreated) {
+          // 钱已付，不能当失败处理；存入待重试队列，下次启动/进会员页补发
+          await ref.read(storageServiceProvider).savePendingPayment({
+            'orderId': 'goods-${product.goodsId}',
+            'type': 'createOrder',
+            'goodsId': product.goodsId,
+          });
+        }
+
         final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
         await coinNotifier.load();
 
