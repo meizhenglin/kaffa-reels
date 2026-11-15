@@ -760,10 +760,8 @@ class AuthRepository {
   /// 6. 后端用 authCode + redirectUri 换 TikTok access_token，再读取用户信息
   /// 7. 用后端返回的 token 同步到本地
   Future<UserModel> signInWithTikTok() async {
-    if (kIsWeb) {
-      throw StateError('TikTok sign-in is only available on mobile platforms.');
-    }
-    if (!TiktokAuthService.isSupported) {
+    // Web 端走浏览器弹窗 OAuth（Login Kit Web 流）；原生端走应用内 WebView。
+    if (!kIsWeb && !TiktokAuthService.isSupported) {
       throw TiktokSignInException(
         'tiktok-platform-unsupported',
         'TikTok sign-in is only available on Android and iOS.',
@@ -774,10 +772,13 @@ class AuthRepository {
     debugPrint('[TikTokLoginFlow] start');
     _logger.i('[AuthRepo] TikTok sign-in started');
 
-    // 1. 触发 TikTok 授权（应用内 WebView，超时由 service 内部处理：5 分钟）
+    // 1. 触发 TikTok 授权（原生：应用内 WebView；Web：浏览器弹窗。
+    //    超时由 service 内部处理：5 分钟）
     final TiktokLoginResult tiktokResult;
     try {
-      tiktokResult = await TiktokAuthService.login();
+      tiktokResult = kIsWeb
+          ? await TiktokAuthService.loginOnWeb()
+          : await TiktokAuthService.login();
     } on AuthCancelledException {
       debugPrint('[TikTokLoginFlow] user cancelled');
       _logger.i('[AuthRepo] TikTok sign-in cancelled by user');

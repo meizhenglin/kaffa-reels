@@ -268,8 +268,12 @@ class _ExplorePageState extends ConsumerState<ExplorePage> {
               onTap: () => openDramaPlayerWithVipCheck(
                 context: context,
                 drama: drama,
-                authState: ref.watch(authProvider),
-                memberState: ref.watch(memberStateProvider),
+                // 【ref.read 而非 ref.watch】这两个值只在点击瞬间需要。
+                // 之前每个 item 都 watch 整个 auth/member 状态，用户信息
+                // 一刷新（购买后、切 tab、回前台）整页网格全部重建。
+                // 在 onTap 回调里 read，语义完全等价但 build 零订阅。
+                authState: ref.read(authProvider),
+                memberState: ref.read(memberStateProvider),
               ),
             );
           },

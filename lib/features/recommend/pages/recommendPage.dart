@@ -118,6 +118,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   late List<GlobalKey<ShortVideoItemState>> _itemKeys;
   int _currentIndex = 0;
   bool _isCurrentTabActive = false;
+  DateTime _lastDragPrefetchAt = DateTime.fromMillisecondsSinceEpoch(0);
   bool _isCoveredByFullscreenRoute = false;
   late final ProviderSubscription<int> _tabIndexSubscription;
 
@@ -143,6 +144,10 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       _isCurrentTabActive = next == 2;
       if (_isCurrentTabActive && !_isCoveredByFullscreenRoute) {
         _resumeCurrent();
+        // 【切回本 tab 必须补一次预取】在别的 tab 期间没有任何播放器在跑，
+        // PlaybackBufferGuard 会认为「无人占用带宽」而拒绝预取；不补这一下，
+        // 用户切回来第一次上滑碰到的就是没预热的下一集（冷启动 + loading 圈）。
+        _prefetchAround(_currentIndex);
       } else {
         _pauseCurrent();
       }
@@ -199,7 +204,24 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   }
 
   void _onPageChanged() {
-    final newIndex = _preloadPageController.page?.round() ?? 0;
+    final rawPage = _preloadPageController.page;
+    final newIndex = rawPage?.round() ?? 0;
+
+    // 【拖拽就开预取】手指一动（页面偏移但还没过半）就说明用户要往下看，
+    // 此刻给下一集推一把预取，比等到 page 过半再开始平均早 200~400ms。
+    // prefetchPlayableUrl 内部有去重，这里按 500ms 节流即可。
+    if (rawPage != null && rawPage - rawPage.roundToDouble() != 0) {
+      final now = DateTime.now();
+      if (now.difference(_lastDragPrefetchAt) >
+          const Duration(milliseconds: 500)) {
+        _lastDragPrefetchAt = now;
+        final target = _currentIndex + 1;
+        if (target < _itemKeys.length) {
+          _itemKeys[target].currentState?.prefetchPlayableUrl();
+        }
+      }
+    }
+
     if (_currentIndex == newIndex) return;
     _currentIndex = newIndex;
     _pauseAllExceptCurrent(newIndex);
@@ -256,6 +278,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       _isCoveredByFullscreenRoute = false;
       if (mounted && _isCurrentTabActive) {
         _resumeCurrent();
+        // 全屏页把首页播放器全释放了，回来后同样需要重新预热下一集。
+        _prefetchAround(_currentIndex);
       }
     }
   }
@@ -491,7 +515,10 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
               : null,
         );
       },
-      preloadPagesCount: 1,
+      // 提前构建 2 页（不动播放器：非当前页不会 autoPlay，只有
+      // _prefetchAround 会命中下一集）。目的是让手势拖拽过程中
+      // 页面已经 measure/layout 完毕，避免滑动动画里才开始建树掉帧。
+      preloadPagesCount: 2,
     );
   }
 }

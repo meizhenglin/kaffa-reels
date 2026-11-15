@@ -14,7 +14,6 @@ import 'app/router/url_strategy_stub.dart'
 import 'app/providers/app_providers.dart';
 import 'app/router/router_config.dart' show routerProvider;
 import 'app/theme/app_theme.dart';
-import 'core/ads/ad_manager.dart';
 import 'core/ads/ad_mediator.dart';
 import 'core/constants/app_constants.dart';
 import 'core/config/build_flavor.dart';
@@ -55,14 +54,33 @@ Future<void> main() async {
   debugPrint('[MAIN] StorageService initialized');
 
   if (!kIsWeb) {
-    await _withTimeout(
+    // 【启动优化】原来的顺序：
+    //   Firebase(上限 15s) → AdManager → AdMediator 串行 await，
+    //   全部堆在 runApp 之前，白屏时间 = 三者耗时之和。
+    // 现在的顺序：
+    //   1) AdMediator.initialize() 内部本来就会调 AdManager.initialize()
+    //      （见 ad_mediator.dart:35-45），main 里那次单独的 AdManager 初始化
+    //      是重复劳动，删掉；
+    //   2) 广告 SDK 移到后台初始化：第一支广告要等用户跳转路由后才会展示，
+    //      晚几百毫秒初始化没有业务影响，不值得挡首帧；
+    //   3) Firebase 仍然 await —— firebase_auth 恢复会话依赖它，
+    //      且它通常几百毫秒就完成（15s 只是断网兜底上限）。
+    // 效果：白屏时间从「Firebase + AdMob + Meta」之和变成只剩 Firebase。
+    final firebaseReady = _withTimeout(
       FirebaseService.initialize(),
       const Duration(seconds: 15),
     );
     Mobcommonlib.submitPolicyGrantResult(true, null);
     ShareService.init();
-    await AdManager.instance.initialize();
-    await AdMediator.instance.initialize();
+
+    unawaited(
+      AdMediator.instance.initialize().then(
+        (_) => debugPrint('[MAIN] Ads initialized in background'),
+        onError: (Object e) => debugPrint('[MAIN] Ads init failed: $e'),
+      ),
+    );
+
+    await firebaseReady;
   }
 
   runApp(

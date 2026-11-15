@@ -128,18 +128,13 @@ class _ChangeNamePageState extends ConsumerState<ChangeNamePage> {
         await _ensureRegistrationIdentity(registrationContext);
       }
 
+      // updateNickname 已经把新昵称写进本地状态并调用 updateUserSettings
+      // 同步到后端，这里不再重复拉一次 getUserCenter：
+      // 1) 马上要跳回 profile tab，ProfileTab 的 _loadUserInfo 会用
+      //    服务端数据校正；
+      // 2) 原来的写法在刷新请求失败时会报"改名失败"，但其实昵称
+      //    已经保存成功了——属于误导性错误。
       await ref.read(authProvider.notifier).updateNickname(newName);
-
-      final resp = await apiServiceProvider.getUserCenter();
-      if (!resp.isSuccess) {
-        throw Exception(resp.error ?? l10n.failedToUpdateName);
-      }
-
-      if (resp.data != null && mounted) {
-        await ref
-            .read(authProvider.notifier)
-            .updateUserFromData(resp.data as Map<String, dynamic>);
-      }
 
       if (!mounted) {
         return;

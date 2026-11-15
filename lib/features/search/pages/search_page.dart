@@ -82,11 +82,12 @@ class _SearchPageState extends ConsumerState<SearchPage>
   }
 
   void _onDramaTap(Drama drama) {
+    // 点击瞬间才需要这两个状态，用 ref.read；watch 留给 build 里的订阅。
     openDramaPlayerWithVipCheck(
       context: context,
       drama: drama,
-      authState: ref.watch(authProvider),
-      memberState: ref.watch(memberStateProvider),
+      authState: ref.read(authProvider),
+      memberState: ref.read(memberStateProvider),
     );
   }
 

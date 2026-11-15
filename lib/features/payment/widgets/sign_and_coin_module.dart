@@ -54,11 +54,17 @@ class _KCoinModule extends ConsumerWidget {
 
   Future<void> _refreshBalanceAfterRecharge(WidgetRef ref) async {
     final balanceNotifier = ref.read(coinBalanceInfoProvider.notifier);
+    var previousBalance = ref.read(coinBalanceInfoProvider).balance;
     for (var attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) {
         await Future<void>.delayed(const Duration(seconds: 2));
       }
       await balanceNotifier.load();
+      // 【提前收兵】余额一旦变化（充值已到账）就没必要继续轮询了——
+      // 原来不管充值成功与否都固定打满 3 次 userPersonalCenter。
+      final currentBalance = ref.read(coinBalanceInfoProvider).balance;
+      if (currentBalance != previousBalance) return;
+      previousBalance = currentBalance;
     }
   }
 

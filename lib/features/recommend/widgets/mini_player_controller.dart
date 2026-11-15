@@ -112,10 +112,21 @@ class MiniPlayerController extends StateNotifier<MiniPlayerState> {
       _positionTimer = Timer.periodic(const Duration(milliseconds: 300), (_) {
         if (!mounted || _player == null) return;
         final v = _player!.value;
+        final positionMs = v.position.inMilliseconds;
+        final isPlaying = v.isPlaying;
+        final isLoading = v.isBuffering;
+        // 【去抖】provider 是 keep-alive 的，暂停/播完后这个 300ms 定时器
+        // 仍会每秒 tick 约 3 次。值没变就不发新 state，避免 mini player
+        // 每 0.3 秒被无意义地重建一次。
+        if (state.positionMs == positionMs &&
+            state.isPlaying == isPlaying &&
+            state.isLoading == isLoading) {
+          return;
+        }
         state = state.copyWith(
-          positionMs: v.position.inMilliseconds,
-          isPlaying: v.isPlaying,
-          isLoading: v.isBuffering,
+          positionMs: positionMs,
+          isPlaying: isPlaying,
+          isLoading: isLoading,
         );
       });
     } catch (_) {

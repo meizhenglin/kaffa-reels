@@ -20,12 +20,13 @@ const bool kShowFacebookLogin = false;
 const bool kShowTikTokLogin = true;
 
 /// Google Play 版不上 TikTok 登录（审核与渠道要求），只在自建平台版显示。
+/// Web 端也显示（走浏览器弹窗 OAuth，Login Kit Web 流，与渠道审核无关）。
 bool get _canShowTikTokLogin =>
     kShowTikTokLogin &&
-    BuildFlavor.isPlatform &&
-    !kIsWeb &&
-    (defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS);
+    (kIsWeb ||
+        (BuildFlavor.isPlatform &&
+            (defaultTargetPlatform == TargetPlatform.android ||
+                defaultTargetPlatform == TargetPlatform.iOS)));
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key, this.redirect, this.backTarget = '/'});

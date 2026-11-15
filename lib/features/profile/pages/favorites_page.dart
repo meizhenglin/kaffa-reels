@@ -181,8 +181,8 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
   }
 
   Widget _buildDramaCard(BuildContext context, Drama drama) {
-    final authState = ref.watch(authProvider);
-    final memberState = ref.watch(memberStateProvider);
+    // 这两个状态只在点击瞬间需要：ref.read，避免每张卡片都订阅
+    // auth/member 状态，用户信息一刷新整页卡片全部重建。
     final coverUrl = drama.coverUrl;
     final vipBadgeAsset = localizedHomeVipBadgeAsset(context);
     final cardWidth = HomeCardLayout.smallCardWidth(context);
@@ -209,8 +209,8 @@ class _FavoritesPageState extends ConsumerState<FavoritesPage> {
               openDramaPlayerWithVipCheck(
                 context: context,
                 drama: drama,
-                authState: authState,
-                memberState: memberState,
+                authState: ref.read(authProvider),
+                memberState: ref.read(memberStateProvider),
               );
             },
             child: Stack(

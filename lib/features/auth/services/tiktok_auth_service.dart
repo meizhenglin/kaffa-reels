@@ -8,6 +8,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../app/router/router_config.dart' show rootNavigatorKey;
+import 'tiktok_web_bridge.dart';
 import '../exceptions/auth_exceptions.dart';
 
 /// TikTok Login Kit OAuth authorization-code flow using an in-app WebView.
@@ -91,6 +92,68 @@ class TiktokAuthService {
       authCode: result.authCode,
       redirectUri: result.redirectUri,
       codeVerifier: codeVerifier,
+    );
+  }
+
+  /// Flutter Web 端 TikTok OAuth（Login Kit · Web 流，浏览器弹窗）。
+  ///
+  /// 与原生端的应用内 WebView 不同，Web 端的流程是：
+  /// 1. `window.open(authorizeUrl)` 拉起 TikTok 授权页弹窗；
+  /// 2. 用户完成授权后 TikTok 302 到 Portal 登记的 redirect_uri（静态回调页）；
+  /// 3. 回调页把 `code/state/error` 用 postMessage 发回 opener 并自关；
+  /// 4. 这里校验 state 防 CSRF，code 交由上层调后端换 token。
+  ///
+  /// 授权 URL 与原生端共用 [_buildAuthorizeUrl]（同一 client_key/scope/
+  /// redirect_uri，Portal 的 Login Kit → Web 产品管这条流程）。
+  static Future<TiktokLoginResult> loginOnWeb() async {
+    final state = _generateState();
+    final authorizeUrl = _buildAuthorizeUrl(AppConfig.tiktokRedirectUri, state);
+    final message = await TiktokWebBridge.openPopupAndAwait(authorizeUrl)
+        .timeout(
+          AppConfig.tiktokLoginTimeout,
+          onTimeout: () => const TiktokWebMessage(error: 'timeout'),
+        );
+
+    if (message.cancelled) throw const AuthCancelledException();
+    switch (message.error) {
+      case 'popup-blocked':
+        throw const TiktokSignInException(
+          'tiktok-popup-blocked',
+          'Your browser blocked the TikTok login window. '
+          'Please allow popups for this site and try again.',
+        );
+      case 'timeout':
+        throw const TiktokSignInException(
+          'tiktok-timeout',
+          'TikTok login timed out. Please try again.',
+        );
+      case null:
+        break;
+      default:
+        // TikTok 在 authorize 端点直接报错（回调 URL 上带 error=）。
+        throw TiktokSignInException(
+          'tiktok-authorize-error',
+          'TikTok authorization failed: ${message.error}',
+        );
+    }
+
+    // CSRF：回调带回的 state 必须与本次请求生成的一致。
+    if (message.state != state) {
+      throw const TiktokSignInException(
+        'tiktok-state-mismatch',
+        'TikTok login state mismatch. Please try again.',
+      );
+    }
+    final code = message.code;
+    if (code == null || code.isEmpty) {
+      throw const TiktokSignInException(
+        'tiktok-missing-code',
+        'TikTok did not return an authorization code.',
+      );
+    }
+    return TiktokLoginResult(
+      authCode: code,
+      redirectUri: AppConfig.tiktokRedirectUri,
     );
   }
 

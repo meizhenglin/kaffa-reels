@@ -36,9 +36,24 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final recommendState = ref.watch(recommendProvider);
-    final authState = ref.watch(authProvider);
-    final memberState = ref.watch(memberStateProvider);
+    // 【select 只订阅需要的字段】recommendProvider 是 7 个列表 + 15 个分页
+    // 标志的巨型 state：推荐页每翻一页都会 copyWith 出一个新 state，
+    // watch 整个 provider 会让首页（Banner + 3 个 section）跟着全量重建。
+    // select 之后只有对应列表的数据本身变化才会触发重建。
+    final banners = ref.watch(
+      recommendProvider.select((s) => s.banners),
+    );
+    final topRecommend = ref.watch(
+      recommendProvider.select((s) => s.topRecommend),
+    );
+    final newForThisMonth = ref.watch(
+      recommendProvider.select((s) => s.newForThisMonth),
+    );
+    final vipZone = ref.watch(recommendProvider.select((s) => s.vipZone));
+    // 【不 watch auth/member】这两个状态只在点击回调里需要（见 openDramaPlayerWithVipCheck）。
+    // 之前 watch 整个 authProvider：用户信息一刷新（购买后、切 tab、回前台），
+    // 整个首页 CustomScrollView（Banner + 3 个 section + 几十张封面）全量重建。
+    // 现在回调里 ref.read，build 路径零订阅。
 
     return RefreshIndicator(
       onRefresh: _onRefresh,
@@ -50,9 +65,7 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
         slivers: [
           SliverToBoxAdapter(
             child: BannerCarousel(
-              banners: recommendState.banners.isNotEmpty
-                  ? recommendState.banners
-                  : [preloadBanner],
+              banners: banners.isNotEmpty ? banners : [preloadBanner],
               height: HomeCardLayout.scaled(context, 540),
               onBannerTap: (banner) => _onBannerTap(banner),
               onSearchTap: () => context.push('/search'),
@@ -67,12 +80,12 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
           ),
           SliverToBoxAdapter(
             child: _TopRecommendList(
-              dramas: recommendState.topRecommend,
+              dramas: topRecommend,
               onTapDrama: (drama) => openDramaPlayerWithVipCheck(
                 context: context,
                 drama: drama,
-                authState: authState,
-                memberState: memberState,
+                authState: ref.read(authProvider),
+                memberState: ref.read(memberStateProvider),
               ),
             ),
           ),
@@ -85,12 +98,12 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
           ),
           SliverToBoxAdapter(
             child: _NewForThisMonthGrid(
-              dramas: recommendState.newForThisMonth,
+              dramas: newForThisMonth,
               onTapDrama: (drama) => openDramaPlayerWithVipCheck(
                 context: context,
                 drama: drama,
-                authState: authState,
-                memberState: memberState,
+                authState: ref.read(authProvider),
+                memberState: ref.read(memberStateProvider),
               ),
             ),
           ),
@@ -103,12 +116,12 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
           ),
           SliverToBoxAdapter(
             child: _VipZoneGrid(
-              dramas: recommendState.vipZone,
+              dramas: vipZone,
               onTapDrama: (drama) => openDramaPlayerWithVipCheck(
                 context: context,
                 drama: drama,
-                authState: authState,
-                memberState: memberState,
+                authState: ref.read(authProvider),
+                memberState: ref.read(memberStateProvider),
               ),
             ),
           ),
@@ -133,8 +146,8 @@ class _HomeTabState extends ConsumerState<HomeTab> with TabScrollMixin {
       openDramaPlayerWithVipCheck(
         context: context,
         drama: drama,
-        authState: ref.watch(authProvider),
-        memberState: ref.watch(memberStateProvider),
+        authState: ref.read(authProvider),
+        memberState: ref.read(memberStateProvider),
       );
     }
   }

@@ -622,8 +622,8 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
                       onTap: () => openDramaPlayerWithVipCheck(
                         context: context,
                         drama: drama,
-                        authState: ref.watch(authProvider),
-                        memberState: ref.watch(memberStateProvider),
+                        authState: ref.read(authProvider),
+                        memberState: ref.read(memberStateProvider),
                       ),
                     )
                   : _DramaCardPlaceholder(),

@@ -278,8 +278,8 @@ class _DramaListPageState extends ConsumerState<DramaListPage> {
             onTap: () => openDramaPlayerWithVipCheck(
               context: context,
               drama: drama,
-              authState: ref.watch(authProvider),
-              memberState: ref.watch(memberStateProvider),
+              authState: ref.read(authProvider),
+              memberState: ref.read(memberStateProvider),
             ),
             child: Stack(
               children: [

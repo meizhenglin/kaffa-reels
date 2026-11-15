@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../home/pages/main_page.dart' show currentTabIndexProvider;
 import '../models/game_carousel_item.dart';
 
 /// 游戏轮播图组件 - 无限轮播
-class GameCarousel extends StatefulWidget {
+class GameCarousel extends ConsumerStatefulWidget {
   const GameCarousel({super.key, required this.items, this.onItemTap});
 
   final List<GameCarouselItem> items;
@@ -13,10 +15,10 @@ class GameCarousel extends StatefulWidget {
   static const double imageAspectRatio = 945 / 321;
 
   @override
-  State<GameCarousel> createState() => _GameCarouselState();
+  ConsumerState<GameCarousel> createState() => _GameCarouselState();
 }
 
-class _GameCarouselState extends State<GameCarousel> {
+class _GameCarouselState extends ConsumerState<GameCarousel> {
   late PageController _pageController;
   int _currentIndex = 0;
   Timer? _autoPlayTimer;
@@ -24,15 +26,34 @@ class _GameCarouselState extends State<GameCarousel> {
   // 初始位置设为中间的大数字，实现伪无限滚动
   static const int _initialPage = 10000;
 
+  /// 游戏 tab 在底部导航中的索引（对应 NavigationConfig.branchPaths[3]）。
+  static const int _gamesTabIndex = 3;
+
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _initialPage);
     _startAutoPlay();
+
+    // 【离屏停表】MainPage 用 StatefulShellRoute.indexedStack，切到其它 tab
+    // 时本 State 仍然 mounted、不会触发 deactivate —— 原来的定时器会在
+    // 用户看不到的地方每 3 秒播一次 400ms 动画 + setState，纯浪费 CPU/GPU。
+    // 现在监听全局 tab 索引：不在游戏 tab 就停表，切回来再恢复。
+    ref.listenManual<int>(currentTabIndexProvider, (previous, next) {
+      if (next == _gamesTabIndex) {
+        _startAutoPlay();
+      } else {
+        _autoPlayTimer?.cancel();
+        _autoPlayTimer = null;
+      }
+    });
   }
 
   void _startAutoPlay() {
     _autoPlayTimer?.cancel();
+    _autoPlayTimer = null;
+    if (widget.items.isEmpty) return;
+    if (ref.read(currentTabIndexProvider) != _gamesTabIndex) return;
     _autoPlayTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (!mounted) return;
       _pageController.nextPage(
@@ -40,6 +61,15 @@ class _GameCarouselState extends State<GameCarousel> {
         curve: Curves.easeOut,
       );
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant GameCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 数据从空到有（异步加载完成）时恢复轮播。
+    if (oldWidget.items.isEmpty != widget.items.isEmpty) {
+      _startAutoPlay();
+    }
   }
 
   void _onPageChanged(int index) {

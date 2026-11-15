@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:preload_page_view/preload_page_view.dart';
 
 import '../../l10n/app_localizations.dart';
-import '../home/pages/main_page.dart';
 import '../home/providers/last_watched_provider.dart';
 import '../../core/ads/ad_mediator.dart';
 import '../../core/ads/ad_config.dart';
@@ -24,6 +24,7 @@ import '../payment/widgets/unlock_bottom_sheet.dart';
 import '../payment/models/unlock_product.dart';
 import '../../app/providers/app_providers.dart';
 import '../../core/widgets/share_button.dart';
+import 'hls_prefetch.dart';
 import 'watch_short_video_item.dart'
     if (dart.library.html) 'watch_short_video_item_web.dart';
 
@@ -172,6 +173,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   static const String _tag = 'ShortVideoPage';
 
   int? _pendingLockedDialogIndex;
+  /// 用户手动选择的清晰度档位（480P/720P/1080P），选哪个播哪个。
   String _currentQuality = '480P';
 
   Future<void> _toggleLike(VideoInfo videoInfo) async {
@@ -228,7 +230,6 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   List<GlobalKey<WatchShortVideoItemState>> _itemKeys = [];
   bool _isLoading = true;
   String? _errorMessage;
-  bool _isCurrentTabActive = false;
   bool _isDataLoaded = false;
   ProviderSubscription<int>? _tabIndexSubscription;
   int? _pendingLockedEpisodeIndex;
@@ -237,12 +238,41 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   bool _isShowingUnlockSheet = false;
   String? _pendingVideoId;
 
+  /// 拖拽期预取的节流时间戳（见 [_handlePreloadPageChanged]）。
+  DateTime _lastDragPrefetchAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// 切页后补试预取的定时器。
+  ///
+  /// 切页那一帧目标 item 可能还没挂载（PreloadPageView 是懒构建），
+  /// 此时 `_itemKeys[target].currentState` 是 null，预热会被**静默跳过**，
+  /// 而且要等到下次切页才有机会重来 —— 表现就是这一集必然冷启动。
+  final List<Timer> _prefetchRetryTimers = <Timer>[];
+
   void _setCurrentIndex(int index) {
     debugPrint('[_shortVideoPage] _setCurrentIndex: $_currentIndex -> $index');
     _currentIndex = index;
   }
 
-  bool get _shouldFollowHomeTabVisibility => widget.videoId.isNotEmpty;
+  /// 本页现在是否"该播放"。
+  ///
+  /// 【原来这里是个 bug】以前是
+  /// `_isCurrentTabActive = ref.read(currentTabIndexProvider) == 2`，
+  /// 也就是"首页当前 tab 是不是推荐页"。但播放页是 `/short-video` 这个
+  /// **push 出来的独立路由**，它的可见性和首页在哪个 tab 毫无关系。
+  /// 于是只有"从推荐 tab 点进播放页"这一条路径恰好为 true；
+  /// 从首页、Banner、迷你播放器、详情页、登录返回、直链进来全是 false，导致：
+  ///   1. `_onPageChanged` 不调 activateForPlayback()；
+  ///   2. `_prefetchAround` 对中心集传 playIfReady=false，
+  ///      中心集只走"预热"分支（initialize 但**不 play**）；
+  ///   3. 结果是整页一直转圈、看起来就是"加载特别长"。
+  /// 正确的判据只有一个：自己是不是导航栈顶的可见路由
+  /// （被登录页/解锁页盖住时 isCurrent 为 false，自动暂停）。
+  bool get _isCurrentTabActive {
+    if (!mounted) return false;
+    final route = ModalRoute.of(context);
+    if (route == null) return true;
+    return route.isCurrent;
+  }
 
   bool get _usePreloadMode => widget.preload;
 
@@ -269,27 +299,13 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       episodes: () => videoInfoList,
     );
 
-    _isCurrentTabActive = _shouldFollowHomeTabVisibility
-        ? ref.read(currentTabIndexProvider) == 2
-        : true;
-
     // 预加载插屏广告
     AdMediator.instance.preloadInterstitialAd();
 
-    if (_shouldFollowHomeTabVisibility) {
-      _tabIndexSubscription = ref.listenManual<int>(currentTabIndexProvider, (
-        previous,
-        next,
-      ) {
-        if (!mounted) return;
-        _isCurrentTabActive = next == 2;
-        if (_isCurrentTabActive) {
-          _resumeCurrent();
-        } else {
-          _pauseCurrent();
-        }
-      });
-    }
+    // 不再订阅 currentTabIndexProvider：本页是 push 出来的独立路由，
+    // 首页切 tab 时它要么不在栈顶（被别的页面盖住）、要么根本不存在，
+    // 用 tab 下标判断可见性只会把"该播"误判成"不该播"。
+    // 现在可见性统一由 [_isCurrentTabActive] 按路由栈顶判断。
   }
 
   void _setupAuthListener() {
@@ -340,6 +356,10 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   @override
   void dispose() {
     _tabIndexSubscription?.close();
+    for (final timer in _prefetchRetryTimers) {
+      timer.cancel();
+    }
+    _prefetchRetryTimers.clear();
     WidgetsBinding.instance.removeObserver(this);
     if (_usePreloadMode) {
       _preloadPageController.removeListener(_handlePreloadPageChanged);
@@ -374,6 +394,14 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
     debugPrint(
       '[$_tag] fetching by videoId=${widget.videoId}, _isDataLoaded=$_isDataLoaded',
     );
+    // 【进页即预热】进来时有两段串行网络：directory + playVideo，
+    // 跨境 RTT 各 ~480ms，加上首分片 1.93MB 的下载，全压在用户看到第一帧之前。
+    // seedVideo 带着「用户点进来那一集」的真实地址，先用它把首分片灌进浏览器
+    // 缓存，等列表回来、播放器 initialize 时就直接命中，白赚这 2~3 秒。
+    final seedUrl = widget.seedVideo?.videoUrl.trim() ?? '';
+    if (kIsWeb && seedUrl.isNotEmpty) {
+      unawaited(HlsPrefetcher.warmUp(seedUrl));
+    }
     final l10n = AppLocalizations.of(context);
 
     try {
@@ -656,16 +684,28 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
   void _handlePreloadPageChanged() {
     if (!widget.preload) return;
-    final newIndex = _preloadPageController.page?.round() ?? 0;
-    if (newIndex == _currentIndex) return;
+    final page = _preloadPageController.page;
 
-    final previousIndex = _currentIndex;
-    if (_isEpisodeLocked(newIndex)) {
-      _guardLockedEpisode(newIndex, previousIndex: previousIndex);
-      return;
+    // 【只做拖拽预热，不在这里改 _currentIndex】
+    // 原来这里用 `page.round()` 提交页码，翻页过半（0.5）就切集。
+    // 问题是 round() 在手势中途就会翻转，而 PageView 在
+    // "没滑过半 → 弹回原页" 或 "快速连滑" 时 final position 并不等于
+    // 中途读到的 round()：于是 `_currentIndex` 已经跳到第 N+1 集，
+    // 屏幕上却停在第 N 集 —— 旧集被 `_pauseAtIndex` 暂停、新集又不是可见页，
+    // 结果就是一整页黑着/停着不动。
+    // 页码提交改由 PreloadPageView.onPageChanged 负责（前者只在真正
+    // 落位后触发），这里只负责"手指一动就给下一集推一把"。
+    if (page != null && (page - page.roundToDouble()).abs() > 0.02) {
+      final now = DateTime.now();
+      if (now.difference(_lastDragPrefetchAt) >
+          const Duration(milliseconds: 400)) {
+        _lastDragPrefetchAt = now;
+        final target = page > _currentIndex ? _currentIndex + 1 : _currentIndex - 1;
+        if (target >= 0 && target < _itemKeys.length) {
+          _itemKeys[target].currentState?.prefetchPlayableUrl();
+        }
+      }
     }
-
-    _handlePageChanged(newIndex, previousIndex: previousIndex);
   }
 
   void _onPageChanged(int newPageIndex) {
@@ -692,20 +732,50 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           unawaited(currentItem?.activateForPlayback());
         }
         _prefetchAround(newPageIndex);
+        // 相邻页可能在本帧之后才真正挂载，补试两次。
+        _schedulePrefetchRetry(newPageIndex);
       });
     }
   }
 
+  /// 切页后补试预热。
+  ///
+  /// [_prefetchAround] 只在 postFrame 跑一次，而 PreloadPageView 的相邻页
+  /// 是懒构建的：首次进入、快速连滑、`jumpToPage` 之后都可能取不到
+  /// `currentState`，预热被静默跳过，这一集就永远是冷启动。
+  void _schedulePrefetchRetry(int centerIndex) {
+    for (final timer in _prefetchRetryTimers) {
+      timer.cancel();
+    }
+    _prefetchRetryTimers.clear();
+    for (final delay in const [
+      Duration(milliseconds: 200),
+      Duration(milliseconds: 700),
+    ]) {
+      _prefetchRetryTimers.add(
+        Timer(delay, () {
+          if (!mounted || _currentIndex != centerIndex) return;
+          _prefetchAround(centerIndex);
+        }),
+      );
+    }
+  }
+
   void _prefetchAround(int centerIndex) {
-    final indices = <int>{centerIndex, centerIndex + 1};
+    final warmIndices = <int>{centerIndex, centerIndex + 1};
+    // center-1 是用户刚刚离开的那一集：它的播放器已经 initialize 过，
+    // 首分片也在缓存里，释放它省不下带宽，却让「往回滑」必然冷启动。
+    // 原生端例外：ExoPlayer 暂停后仍会继续下载到 ~50s，必须释放。
+    final keepIndices = <int>{centerIndex - 1};
+    debugPrint('[PrefetchDbg] around center=$centerIndex warm=$warmIndices');
     for (var index = 0; index < _itemKeys.length; index++) {
       final item = _itemKeys[index].currentState;
       if (item == null) continue;
-      if (indices.contains(index)) {
+      if (warmIndices.contains(index)) {
         item.prefetchPlayableUrl(
           playIfReady: index == centerIndex && _isCurrentTabActive,
         );
-      } else {
+      } else if (!(kIsWeb && keepIndices.contains(index))) {
         item.releasePrefetched();
       }
     }
@@ -1366,7 +1436,14 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       bottom: false,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Row(
+        // 【点击穿透】顶部栏空白处（标题两侧、按钮边缘）不拦截点击的话，
+        // 会落到下层全屏 GestureDetector 触发播放/暂停——点「清晰度」按钮
+        // 点偏时最容易被感知。按钮自身的手势是子节点，竞技场里优先命中，
+        // 不受影响。
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {},
+          child: Row(
           children: [
             IconButton(
               onPressed: () => Navigator.of(context).maybePop(),
@@ -1387,6 +1464,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
             ),
             _buildQualityButton(context),
           ],
+          ),
         ),
       ),
     );
@@ -1394,9 +1472,12 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
 
   Widget _buildQualityButton(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => _showQualityPicker(context),
+      // 【扩大命中区】原 padding 只有 8/4，按钮命中区太小，点偏就穿透到
+      // 视频层触发播放/暂停。
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1473,6 +1554,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
                       padding: const EdgeInsets.only(top: 5, bottom: 20),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           _buildQualityItem('480P', true, sheetContext),
                           const Spacer(),
@@ -1511,9 +1593,7 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         }
         if (canTap) {
           Navigator.of(sheetContext).pop();
-          setState(() {
-            _currentQuality = label;
-          });
+          setState(() => _currentQuality = label);
         }
       },
       child: SizedBox(
@@ -1796,6 +1876,8 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
             itemCount: videoInfoList.length,
             itemBuilder: _buildItem,
             preloadPagesCount: 2,
+            // 落位后才提交页码（见 _handlePreloadPageChanged 的注释）。
+            onPageChanged: (index) => _handlePageChanged(index),
           )
         : PageView.builder(
             controller: _pageController,

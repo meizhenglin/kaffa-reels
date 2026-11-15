@@ -74,6 +74,36 @@
       // Authorization values must not remain in browser history or the address bar.
       window.history.replaceState({}, document.title, window.location.pathname);
 
+      // 【Flutter Web 弹窗流】本页是 TikTok 回调页。App 以弹窗方式打开授权页，
+      // TikTok 302 回本页后，把 code/state/error 以 JSON 字符串 postMessage
+      // 回 opener（App 监听并校验 state），然后自关弹窗。
+      // 直接在浏览器打开（无 opener）时仍然显示诊断信息。
+      if (window.opener) {
+        try {
+          window.opener.postMessage(
+            JSON.stringify({
+              source: 'qahwa-tiktok-login',
+              code: code,
+              state: params.get('state'),
+              error: error || (code ? null : 'missing_code'),
+            }),
+            '*'
+          );
+        } catch (e) { /* opener 不可达（跨域已关闭等），走下方提示 */ }
+        setTimeout(function () { window.close(); }, 300);
+        if (error) {
+          statusEl.textContent = 'Login failed. Closing...';
+          statusEl.className = 'status error';
+        } else if (code) {
+          statusEl.textContent = 'Authorization received. Closing...';
+          statusEl.className = 'status success';
+        } else {
+          statusEl.textContent = 'No authorization response. Closing...';
+          statusEl.className = 'status error';
+        }
+        return;
+      }
+
       if (error) {
         statusEl.textContent = 'Login failed. Return to the app and try again.';
         statusEl.className = 'status error';

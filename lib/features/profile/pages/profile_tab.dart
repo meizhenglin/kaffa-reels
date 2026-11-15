@@ -15,7 +15,6 @@ import '../../recommend/utils/drama_navigation.dart';
 import '../../payment/widgets/sign_and_coin_module.dart';
 import '../../payment/providers/coin_record_provider.dart';
 import '../../payment/providers/membership_provider.dart' show isVipProvider;
-import 'chat_page.dart';
 
 class ProfileTab extends ConsumerStatefulWidget {
   const ProfileTab({super.key});
@@ -28,6 +27,10 @@ class _ProfileTabState extends ConsumerState<ProfileTab>
     with WidgetsBindingObserver {
   ProviderSubscription<AuthState>? _authStateSubscription;
   bool _isLoadingUserInfo = false;
+
+  /// 上一次成功拉取用户信息的时间，用于节流（见 _loadUserInfo）。
+  DateTime _lastUserInfoLoad = DateTime.fromMillisecondsSinceEpoch(0);
+  static const _userInfoRefreshInterval = Duration(seconds: 15);
 
   @override
   void initState() {
@@ -99,6 +102,16 @@ class _ProfileTabState extends ConsumerState<ProfileTab>
     // VIP 变化 / 应用前后台切换）在同一帧内并发触发 _loadUserInfo 导致
     // getUserCenter 被连续调用多次。
     if (_isLoadingUserInfo) return;
+
+    // 【节流】这里共有 5 个触发源（tab 切换 / 登录态变化 / didChangeDependencies /
+    // VIP 变化 / App 回前台），短时间内常连环触发。间隔内的调用直接复用
+    // 上一次结果，避免"进会员页再返回"这类操作连打两次 userPersonalCenter。
+    // 购买成功等关键状态更新由 authProvider.refreshUserInfo 主动推送，不依赖这里。
+    if (DateTime.now().difference(_lastUserInfoLoad) <
+        _userInfoRefreshInterval) {
+      return;
+    }
+
     _isLoadingUserInfo = true;
 
     try {
@@ -117,6 +130,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab>
           // 同时更新余额状态和用户信息（同一个接口返回的数据，不重复请求）
           ref.read(coinBalanceInfoProvider.notifier).updateFromData(userData);
           ref.read(authProvider.notifier).updateUserFromData(userData);
+          _lastUserInfoLoad = DateTime.now();
         }
       } catch (e) {
         debugPrint('[ProfileTab._loadUserInfo] getUserCenter error: $e');
