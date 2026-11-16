@@ -126,7 +126,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                       const Expanded(
                         child: Center(
                           child: Text(
-                            '${BuildFlavor.isPlatform ? 'Log in to Kaffa Reels' : 'Log in to Qahwa Tv'}',
+                            'Log in to ${BuildFlavor.brandName}',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 18,
@@ -980,7 +980,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                       child: RichText(
                         text: TextSpan(
                           text:
-                              '${BuildFlavor.isPlatform ? 'Do not have Kaffa Reels account? ' : 'Do not have Qahwa Tv account? '}',
+                              'Do not have ${BuildFlavor.brandName} account? ',
                           style: const TextStyle(
                             color: Color(0xFF999999),
                             fontSize: 13,

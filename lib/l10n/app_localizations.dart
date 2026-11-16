@@ -98,12 +98,6 @@ abstract class AppLocalizations {
     Locale('en'),
   ];
 
-  /// No description provided for @appTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Qahwa TV'**
-  String get appTitle;
-
   /// No description provided for @bottomNav_home.
   ///
   /// In en, this message translates to:

@@ -301,7 +301,7 @@ class _LoginEmailPageState extends ConsumerState<LoginEmailPage> {
                       const Expanded(
                         child: Center(
                           child: Text(
-                            '${BuildFlavor.isPlatform ? 'Log in to Kaffa Reels' : 'Log in to Qahwa Tv'}',
+                            'Log in to ${BuildFlavor.brandName}',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 18,

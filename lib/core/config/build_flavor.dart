@@ -65,4 +65,23 @@ class BuildFlavor {
   /// App display name suffix (debug overlays only — Android uses gradle
   /// productFlavor resValue("string", "app_name", ...) for the launcher).
   static const String appNameSuffix = current == platform ? ' (Platform)' : '';
+
+  /// 品牌名（用户能看到的那个名字）。
+  ///
+  /// google 渠道是「Qahwa TV」，platform / web 渠道是「Kaffa Reels」。
+  /// 与 `tool/build.dart` 的 `_channelAppName` 一一对应 —— 那边决定
+  /// 桌面图标名和产物文件名，这边决定界面上的文字和浏览器标签页标题。
+  ///
+  /// 【为什么需要它】之前品牌名散落在好几个地方，各写各的：
+  ///  - `web/index.html` 的 `<title>` → 写死 Kaffa Reels
+  ///  - `MaterialApp.title` → 写死 Qahwa TV（来自 AppConstants.appName）
+  ///  - 登录页的 `BuildFlavor.isPlatform ? 'Kaffa Reels' : 'Qahwa Tv'`
+  ///
+  /// 结果是 Web 端加载时标签页标题先显示 Kaffa Reels，Flutter 启动后
+  /// 被 `MaterialApp.title` 改成 Qahwa TV，跳一下；而登录页因为
+  /// `isPlatform` 对 web 不成立（web 是第三个渠道），直接落到了
+  /// Qahwa Tv 那一边。
+  ///
+  /// 现在只有一个真相源：[brandName]。
+  static const String brandName = current == google ? 'Qahwa TV' : 'Kaffa Reels';
 }

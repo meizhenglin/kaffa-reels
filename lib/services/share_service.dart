@@ -1,5 +1,7 @@
 import 'package:sharesdk_plugin/sharesdk_plugin.dart';
 
+import '../core/config/build_flavor.dart';
+
 class ShareService {
   static bool _initialized = false;
 
@@ -12,7 +14,8 @@ class ShareService {
       register.setupFacebook(
         '1153560107115108',
         'df2865bc78128762e7ed0e65ab08d179',
-        'Kaffa Reels',
+        // 分享面板里显示的应用名跟着渠道走，别再写死。
+        BuildFlavor.brandName,
       );
       register.setupTwitter(
         'ZUV2bEZaNWtVYmFPUTljeDZhUzc6MTpjaQ',

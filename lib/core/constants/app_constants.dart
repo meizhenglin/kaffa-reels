@@ -1,3 +1,5 @@
+import '../config/build_flavor.dart';
+
 /// ============================================================================
 /// 应用全局常量配置文件
 ///
@@ -14,7 +16,15 @@ class AppConstants {
 
   // ==================== 应用基础信息 ====================
   /// 应用名称，显示在启动页和关于页面
-  static const String appName = 'Qahwa TV';
+  ///
+  /// 【为什么不是常量】品牌名按渠道不同：google 渠道是「Qahwa TV」，
+  /// platform / web 渠道是「Kaffa Reels」。真相源在
+  /// `BuildFlavor.brandName`（lib/core/config/build_flavor.dart），
+  /// 那里还和 `tool/build.dart` 的 `_channelAppName` 保持一致。
+  ///
+  /// 这里保留这个名字只是为了兼容旧调用点，新代码请直接用
+  /// `BuildFlavor.brandName`。
+  static String get appName => BuildFlavor.brandName;
 
   // ==================== API 配置 ====================
   /// API 服务器基础地址，所有 API 请求都会基于此地址

@@ -29,6 +29,14 @@
   <!-- Favicon -->
   <link rel="icon" type="image/x-icon" href="logo.ico">
 
+  <!--
+    标题必须和 Flutter 侧的 `BuildFlavor.brandName`（lib/core/config/build_flavor.dart）
+    一致，否则加载时会出现「先显示这个标题，Flutter 起来后再跳一次」。
+
+    Web 渠道的品牌名是 Kaffa Reels（和 `tool/build.dart` 的 `_channelAppName`
+    里的 'web' 一致）。android/ios 用的不是这个文件，它们从
+    AndroidManifest / Info.plist 拿标题。
+  -->
   <title>Kaffa Reels</title>
   <link rel="manifest" href="manifest.json">
 </head>

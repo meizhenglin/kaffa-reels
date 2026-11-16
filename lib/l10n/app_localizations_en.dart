@@ -9,9 +9,6 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Qahwa TV';
-
-  @override
   String get bottomNav_home => 'Main Page';
 
   @override

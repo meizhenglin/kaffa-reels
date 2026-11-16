@@ -15,7 +15,6 @@ import 'app/providers/app_providers.dart';
 import 'app/router/router_config.dart' show routerProvider;
 import 'app/theme/app_theme.dart';
 import 'core/ads/ad_mediator.dart';
-import 'core/constants/app_constants.dart';
 import 'core/config/build_flavor.dart';
 import 'core/config/build_info.dart';
 import 'core/widgets/mouse_drag_scroll.dart';
@@ -182,7 +181,11 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
     final locale = ref.watch(localeProvider);
 
     final app = MaterialApp.router(
-      title: AppConstants.appName,
+      // Web 端这个值会写进浏览器标签页标题。必须和 `web/index.html` 的
+      // `<title>` 一致，否则页面加载时标题会「先显示 index.html 的、
+      // Flutter 起来后再跳一次」。品牌名由 BuildFlavor.brandName 决定，
+      // google 渠道是 Qahwa TV，其余是 Kaffa Reels。
+      title: BuildFlavor.brandName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
