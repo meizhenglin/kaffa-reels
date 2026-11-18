@@ -57,7 +57,19 @@ class _ShortVideoPageState extends ConsumerState<ShortVideoPage> {
       );
     }
 
-    return ShortVideoListPage(videos: state.videos);
+    // 【非全屏】推荐流不再顶到屏幕最上沿：
+    // 顶部让出状态栏高度（时间/电量/信号不再压在画面上），
+    // 底部由 MainPage 的 AppBottomNavBar 负责，系统手势条落在导航栏
+    // 自己的 SafeArea 底色里。SafeArea 之外用纯黑填底，避免状态栏区域
+    // 露出 MainPage 的紫色渐变，和视频区割裂。
+    return ColoredBox(
+      color: Colors.black,
+      child: SafeArea(
+        top: true,
+        bottom: false,
+        child: ShortVideoListPage(videos: state.videos),
+      ),
+    );
   }
 }
 

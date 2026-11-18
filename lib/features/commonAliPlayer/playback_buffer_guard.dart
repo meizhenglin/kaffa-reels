@@ -29,6 +29,10 @@ class PlaybackBufferGuard {
   /// 预热一个分片也从 1.93MB 降到 403KB，带宽争抢烈度完全不同了。
   /// 门槛越低，center+1 的预热越早启动，快滑时 `prepared=true` 的
   /// 概率越高（快滑场景预热窗口只有 1~3 秒）。
+  /// 【实测不能再降：2s 会让并发预热互相抢死】加入 center+2 预热后，
+  /// 门槛降到 2s 时三个预热实例同时满足启动条件一起抢同一条跨境链路，
+  /// 结果谁都下不动：`ready=0 / abandoned=6`，当前集缓冲也被拖到 0，
+  /// 体感比 3s 明显更慢。3s 的作用不只是"留余量"，更是**把预热串起来**。
   static const Duration prefetchStartAhead = Duration(seconds: 3);
 
   /// 低于该缓冲领先量时，预取必须让出带宽。
@@ -154,7 +158,14 @@ class PlaybackBufferGuard {
     //（_activeAtStart）时的缓冲是起播的一部分，放行预取；
     // 真正播起来后的卡顿依旧封锁。
     if (_activeBuffering && !_activeAtStart) return false;
-    if (_activeAhead < effectivePrefetchStopAhead) return false;
+    // 【起播豁免 ahead 判定】position 还在 0 附近时 ahead 天然是 0：这一集
+    // 才刚开始下载，数据还没到，但这不代表带宽吃紧（实测同一时刻
+    // buffering=false）。若此时连预取也封掉，下一集必然冷启动；冷启动的
+    // 新集 ahead 又是 0，闭环成立 —— 实测 21 次切集里 8 次这样被拒。
+    // atStart 结束后（position > 0.5s）仍严格按 ahead 判定。
+    if (!_activeAtStart && _activeAhead < effectivePrefetchStopAhead) {
+      return false;
+    }
 
     // 当前集快播完了：此时它通常已缓存充足，而且马上要切集，
     // 值得提前准备下一集。
@@ -171,6 +182,24 @@ class PlaybackBufferGuard {
       return false;
     }
     return _activeAhead >= effectivePrefetchStartAhead;
+  }
+
+  /// **已经开始的**预热是否该让出带宽。
+  ///
+  /// 【与 prefetchAllowed 的区别】`prefetchAllowed` 回答的是"够不够格开始
+  /// 一轮新预热"，其中包含 `startAhead`(3s) 门槛；而这个 getter 回答的是
+  /// "已经下到一半的预热要不要中止"，只需要看当前集是否真的吃紧。
+  ///
+  /// 【为什么必须分开】预热循环原来用 `prefetchAllowed` 判 abort：
+  /// 当前集缓冲 2s（高于 stopAhead 1s，完全安全）但低于 startAhead 3s，
+  /// 于是刚下好的分片被 `_release()` 丢弃，重新预热又要再下一次 ——
+  /// 实测 `abandoned state=... ahead=2s buffering=false` 正是这一类，
+  /// 属于纯粹的白丢带宽。
+  static bool get prefetchShouldYield {
+    if (_activeOwner == null) return false;
+    if (_activeAtStart) return false;
+    if (_activeBuffering) return true;
+    return _activeAhead < effectivePrefetchStopAhead;
   }
 
   /// 正在播放的组件上报自己的缓冲状态。

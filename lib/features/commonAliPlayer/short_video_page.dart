@@ -241,6 +241,15 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   /// 拖拽期预取的节流时间戳（见 [_handlePreloadPageChanged]）。
   DateTime _lastDragPrefetchAt = DateTime.fromMillisecondsSinceEpoch(0);
 
+  /// 曾经作为"当前页"出现过的索引。
+  ///
+  /// 切页时只需要暂停这些 —— **不能无差别暂停所有非当前页**：
+  /// web 的预热实例是"离屏 `<video>` + setVolume(0) + play()"，
+  /// 而 `<video>` 一旦 pause 就停止缓冲（原生 ExoPlayer 暂停后仍会继续下，
+  /// 所以手机端不受影响）。无差别暂停会把 center+1/+2 刚推起来的预热
+  /// 全部掐死，这正是 web 比手机端明显不丝滑的直接原因。
+  final Set<int> _playedIndices = <int>{};
+
   /// 切页后补试预取的定时器。
   ///
   /// 切页那一帧目标 item 可能还没挂载（PreloadPageView 是懒构建），
@@ -702,7 +711,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
         _lastDragPrefetchAt = now;
         final target = page > _currentIndex ? _currentIndex + 1 : _currentIndex - 1;
         if (target >= 0 && target < _itemKeys.length) {
-          _itemKeys[target].currentState?.prefetchPlayableUrl();
+          final targetItem = _itemKeys[target].currentState;
+          targetItem?.allowBackgroundPrefetch();
+          targetItem?.prefetchPlayableUrl();
         }
       }
     }
@@ -721,7 +732,22 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       }
     }
 
-    _pauseAtIndex(_currentIndex);
+    // 【暂停所有"播放过"的非当前页，而不是所有非当前页】
+    // 快速 fling 时 `PreloadPageView.onPageChanged` 只回调一次（0 → 3），
+    // 中间 1、2 从未上报；而 `_currentIndex` 还可能被拖拽预热、解锁守卫、
+    // `_jumpToEpisode` 等路径改过。只暂停"上一个索引"会漏掉真正在出声
+    // 的那一集——实测"画面停在第 3 集还没加载出来，声音还是第 1 集的"。
+    //
+    // 但也不能无差别暂停：web 的预热实例是离屏 `<video>` + play()，
+    // pause 即停止缓冲（原生 ExoPlayer 暂停后继续下载，不受影响）。
+    // 所以按 [_playedIndices] 精确打击，只停"真的响过"的那几集。
+    _playedIndices.add(_currentIndex);
+    _playedIndices.add(newPageIndex);
+    for (final i in _playedIndices) {
+      if (i == newPageIndex) continue;
+      if (i < 0 || i >= _itemKeys.length) continue;
+      _itemKeys[i].currentState?.pause(reason: 'episode changed to $newPageIndex');
+    }
     _currentIndex = newPageIndex;
     if (mounted) {
       setState(() {});
@@ -748,6 +774,10 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       timer.cancel();
     }
     _prefetchRetryTimers.clear();
+    // 【不要加密到 80ms】实测 80/250/600 反而更慢：`prefetchPlayableUrl` 对
+    // 未挂载的页无效，而被反复调用时会连带执行 `releasePrefetched()`，
+    // 把刚预热好的相邻页释放掉（ready=0 / thin=3 / 命中 5-12）。
+    // 200/700 是实测最优的组合。
     for (final delay in const [
       Duration(milliseconds: 200),
       Duration(milliseconds: 700),
@@ -762,7 +792,18 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
   }
 
   void _prefetchAround(int centerIndex) {
-    final warmIndices = <int>{centerIndex, centerIndex + 1};
+    // 【为什么把 center+2 也纳入预热】预热从启动到 ready 实测要 ~3s
+    //（15:52:27.9 启动 → 15:52:30.5 ready），而用户滑一集只用 1.5~2s
+    //（当前集自己冷启动就要 1.2s）。只预热 center+1 时，等它 ready
+    // 用户早已滑过去，命中率长期停在 44%。
+    // 提前一格预热后，center+1 有了 3~4s 的窗口。
+    // 带宽风险由 waitForPrefetchSlot 兜住：它仍要求当前集 ahead>=3s
+    // 才放行，三个预热实例会排队而不是同时抢。
+    final warmIndices = <int>{
+      centerIndex,
+      centerIndex + 1,
+      centerIndex + 2,
+    };
     // center-1 是用户刚刚离开的那一集：它的播放器已经 initialize 过，
     // 首分片也在缓存里，释放它省不下带宽，却让「往回滑」必然冷启动。
     // 原生端例外：ExoPlayer 暂停后仍会继续下载到 ~50s，必须释放。
@@ -772,6 +813,9 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       final item = _itemKeys[index].currentState;
       if (item == null) continue;
       if (warmIndices.contains(index)) {
+        // 这一集之前可能作为 center+2 被 release 过（抑制标记已置位），
+        // 现在它是预热目标，必须解除抑制，否则预热会被静默跳过。
+        item.allowBackgroundPrefetch();
         item.prefetchPlayableUrl(
           playIfReady: index == centerIndex && _isCurrentTabActive,
         );

@@ -62,11 +62,37 @@ class ShortVideoItemState extends State<ShortVideoItem> {
   DateTime? _playRequestedAt;
   bool _playLatencyReported = false;
 
+  /// 【卡死自愈】position 连续 [_stallTimeout] 不前进即判定为卡住。
+  ///
+  /// 实测"起播一秒后卡住不动"有两个来源：预热收尾 seekTo(0) 清空缓冲后
+  /// 只剩不到 1s 数据；CDN 节点拒绝连接导致 ExoPlayer 进入 error 态。
+  /// 两者都不会自动恢复，必须在 tick 里主动兜底。
+  static const Duration _stallTimeout = Duration(milliseconds: 2500);
+  static const Duration _recoverCooldown = Duration(seconds: 2);
+  Duration _lastObservedPosition = Duration.zero;
+  DateTime _positionIdleSince = DateTime.now();
+  DateTime _lastRecoveryAt = DateTime.fromMillisecondsSinceEpoch(0);
+  int _stallAttempts = 0;
+  int _errorRestarts = 0;
+  bool _recoveryInProgress = false;
+
   /// 本集首分片是否已进入浏览器缓存（web）。
   bool _webPrefetchWarmed = false;
 
   /// 要求播放时播放器是否已经准备好（预热出来的实例）。
   bool _controllerWasPrepared = false;
+
+  /// 用户手动点了暂停。
+  ///
+  /// 【为什么单独记一个标记】推荐流里 `widget.autoPlay` 对当前页恒为 true，
+  /// 而 [_watchForStall] 的判定条件是「autoPlay 或 _playbackRequested」——
+  /// 只按播放器状态判断的话，用户暂停 2.5 秒后会被卡死自愈逻辑当成
+  /// "卡住了"重新拉起来，表现就是"点了暂停过两秒自己又播了"。
+  bool _userPaused = false;
+
+  /// 单击后短暂显示的播放/暂停图标。
+  bool _showPlayPauseHint = false;
+  Timer? _playPauseHintTimer;
 
   @override
   void initState() {
@@ -83,6 +109,8 @@ class ShortVideoItemState extends State<ShortVideoItem> {
       _webPrefetchWarmed = false;
       _playRequestedAt = null;
       _playLatencyReported = false;
+      // 换片了：用户对上一集的暂停意图不能带到新的一集。
+      _userPaused = false;
       if (widget.autoPlay) {
         _setup(widget.videoInfo.videoUrl, true);
       } else {
@@ -92,6 +120,7 @@ class ShortVideoItemState extends State<ShortVideoItem> {
       if (widget.autoPlay) {
         // 已经预热好了就直接播，别把预热出来的 controller 丢掉重建 ——
         // 那等于把预加载成果一次性作废，又回到冷启动。
+        _userPaused = false;
         _playbackRequested = true;
         _markPlaybackRequested();
         final controller = _controller;
@@ -127,6 +156,7 @@ class ShortVideoItemState extends State<ShortVideoItem> {
 
   Future<void> prefetchPlayableUrl({bool playIfReady = false}) async {
     if (playIfReady) {
+      _userPaused = false;
       _playbackRequested = true;
       _markPlaybackRequested();
     }
@@ -264,6 +294,11 @@ class ShortVideoItemState extends State<ShortVideoItem> {
 
       final old = _controller;
       _controller = next;
+      // 新实例起来了，自愈计数与卡死观察窗口全部归零。
+      _errorRestarts = 0;
+      _stallAttempts = 0;
+      _lastObservedPosition = Duration.zero;
+      _positionIdleSince = DateTime.now();
       _controller!.addListener(_onPlayerTick);
       await old?.dispose();
 
@@ -297,6 +332,11 @@ class ShortVideoItemState extends State<ShortVideoItem> {
       }
       if (mounted && generation == _setupGeneration) {
         setState(() => _isLoading = false);
+        if (_controller == null && !_playbackRequested && !widget.autoPlay) {
+          // 预热因"没换到数据"被释放后要排队重试，否则这一集永远停在
+          // 没有实例的状态，用户滑过来只能走冷启动。
+          _schedulePrefetchRetry();
+        }
       }
     } catch (e) {
       await next.dispose();
@@ -318,19 +358,41 @@ class ShortVideoItemState extends State<ShortVideoItem> {
   Future<void> _warmup(VideoPlayerController controller, int generation) async {
     try {
       await controller.setVolume(0);
-      await controller.play();
+      // 【原生绝不能 play()】video_player 的 ExoPlayer 开了 handleAudioFocus，
+      // 预热实例一旦 play() 就抢走音频焦点，把正在播的那一集顶成暂停。
+      // 实测症状：正在看的集 position 停在 77ms~2.6s 不动，而 buffered
+      // 高达 12~48s —— 数据早就够了，只是播放被掐停。
+      // ExoPlayer 在 playWhenReady=false 时照样会预加载（LoadControl 的
+      // bufferForPlaybackMs 与播放状态无关），所以原生只轮询缓冲量即可；
+      // web 的 <video> 暂停时不拉流，仍需 play() 推着走。
+      if (kIsWeb) {
+        await controller.play();
+      }
       final deadline = DateTime.now().add(_warmupMax);
+      var lastBuffered = Duration.zero;
+      var stagnantTicks = 0;
+      var abandoned = false;
       while (mounted &&
           generation == _setupGeneration &&
           !_playbackRequested &&
           !widget.autoPlay &&
           DateTime.now().isBefore(deadline) &&
           _bufferedAhead(controller) < _warmupTarget) {
-        if (!PlaybackBufferGuard.prefetchAllowed) {
+        if (PlaybackBufferGuard.prefetchShouldYield) {
+          abandoned = true;
           debugPrint(
             '[ShortVideoItem] warmup abandoned buffered=${_bufferedAhead(controller).inMilliseconds}ms '
             'state=${PlaybackBufferGuard.debugState}',
           );
+          break;
+        }
+        final buffered = _bufferedAhead(controller);
+        if (buffered > lastBuffered) {
+          lastBuffered = buffered;
+          stagnantTicks = 0;
+        } else if (++stagnantTicks >= 8) {
+          // 原生暂停态最多预加载到 bufferForPlaybackMs（约 2.5s）就不再增长，
+          // 干等只会白占预取槽，让后面几集完全没机会预热。
           break;
         }
         await Future<void>.delayed(const Duration(milliseconds: 150));
@@ -340,16 +402,149 @@ class ShortVideoItemState extends State<ShortVideoItem> {
         await controller.setVolume(1);
         return;
       }
+      final buffered = _bufferedAhead(controller);
+      if (abandoned && buffered < const Duration(milliseconds: 800)) {
+        // 【保留而不是丢弃】冷启动最贵的一步（解析 m3u8 + 建解码器）已经
+        // 做完了，扔掉等于把白送的 500ms 起播时间还回去——实测丢弃后
+        // prepared=false 的样本全是 1.0~2.6s 冷启动。
+        // ExoPlayer 在暂停态仍会继续预加载，用户滑过来时通常已攒到 1~2s，
+        // 剩下的靠正常流式补上；真卡住还有 _watchForStall 兜底。
+        debugPrint(
+          '[ShortVideoItem] warmup shallow kept buffered=${buffered.inMilliseconds}ms',
+        );
+      }
       await controller.pause();
-      await controller.seekTo(Duration.zero);
+      final position = controller.value.position;
+      if (position > Duration.zero) {
+        // 【seek 会 flush 整条缓冲】ExoPlayer 与 HTMLMediaElement 在 seek
+        // 之后都会丢弃已下载数据重新请求。原实现 seek 完立刻返回，用户
+        // 滑入时拿到的是"已 initialize 但缓冲 0ms"的实例 —— 实测表现就是
+        // 起播一秒后画面停住不动（日志 warmup ready buffered=0ms）。
+        await controller.seekTo(Duration.zero);
+        await _awaitRebuffered(
+          controller,
+          generation,
+          const Duration(milliseconds: 1200),
+        );
+      }
       await controller.setVolume(1);
+      final aheadMs = _bufferedAhead(controller).inMilliseconds;
+      // 【区分 ready 与 ready(thin)】原来超时退出也打印 ready，
+      // 于是日志里出现 `warmup ready buffered=0ms`——看着像预热成功，
+      // 实际一个字节都没下下来。分开打，排查时不会被误导。
       debugPrint(
-        '[ShortVideoItem] warmup ready buffered=${_bufferedAhead(controller).inMilliseconds}ms '
-        'target=${_warmupTarget.inMilliseconds}ms',
+        '[ShortVideoItem] warmup ${aheadMs >= 800 ? 'ready' : 'ready(thin)'} '
+        'buffered=${aheadMs}ms target=${_warmupTarget.inMilliseconds}ms',
       );
     } catch (e) {
       // 预热失败不影响正常播放：用户滑过来时会重新走 _setup。
       debugPrint('[ShortVideoItem] warmup failed: $e');
+    }
+  }
+
+  /// seek 之后等缓冲重新填回来。
+  ///
+  /// ExoPlayer 暂停时仍会继续预加载（LoadControl 的 bufferForPlaybackMs
+  /// 与 playWhenReady 无关），所以这里能等到数据；web 的 `<video>` 暂停时
+  /// 不会主动拉流，超时返回即可，不能把预取收尾卡死。
+  Future<void> _awaitRebuffered(
+    VideoPlayerController controller,
+    int generation,
+    Duration target,
+  ) async {
+    final deadline = DateTime.now().add(const Duration(milliseconds: 1500));
+    while (mounted &&
+        generation == _setupGeneration &&
+        DateTime.now().isBefore(deadline)) {
+      if (_bufferedAhead(controller) >= target) return;
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+    }
+  }
+
+  /// 检测"卡住不动"，必要时自愈。
+  ///
+  /// 只在用户真正在看这一条时生效：离屏预热实例的 position 本来就该停着。
+  void _watchForStall(VideoPlayerController controller, VideoPlayerValue value) {
+    // 用户主动暂停时位置当然不动，这不是卡死。
+    if (_userPaused) return;
+    if (!(_playbackRequested || widget.autoPlay) || !value.isInitialized) {
+      return;
+    }
+    if (value.hasError) {
+      _recoverFromStall(controller, reason: 'error: ${value.errorDescription}');
+      return;
+    }
+    if (value.position != _lastObservedPosition) {
+      _lastObservedPosition = value.position;
+      _positionIdleSince = DateTime.now();
+      _stallAttempts = 0;
+      return;
+    }
+    // 播完停在末帧是正常状态，不算卡住。
+    if (value.duration > Duration.zero && value.position >= value.duration) {
+      return;
+    }
+    if (value.isPlaying && !value.isBuffering) return;
+    if (DateTime.now().difference(_positionIdleSince) > _stallTimeout) {
+      _recoverFromStall(controller, reason: 'position stalled');
+    }
+  }
+
+  void _recoverFromStall(
+    VideoPlayerController controller, {
+    required String reason,
+  }) {
+    if (_recoveryInProgress || !mounted) return;
+    final now = DateTime.now();
+    if (now.difference(_lastRecoveryAt) < _recoverCooldown) return;
+    _lastRecoveryAt = now;
+    _positionIdleSince = now;
+    final value = controller.value;
+    debugPrint(
+      '[ShortVideoItem] stall recovery attempt=${_stallAttempts + 1} '
+      'reason=$reason position=${value.position.inMilliseconds}ms '
+      'buffered=${_bufferedAhead(controller).inMilliseconds}ms',
+    );
+    if (value.hasError || _stallAttempts >= 1) {
+      _stallAttempts = 0;
+      unawaited(_restartPlayback());
+      return;
+    }
+    _stallAttempts++;
+    // 回退 100ms 再 seek：seek 到与当前完全相同的位置在部分实现里会被
+    // 优化掉，必须保证真的触发一次新的数据请求。
+    final position = value.position;
+    final target = position > const Duration(milliseconds: 200)
+        ? position - const Duration(milliseconds: 100)
+        : Duration.zero;
+    unawaited(() async {
+      await controller.seekTo(target);
+      if (mounted && identical(controller, _controller)) {
+        await controller.play();
+      }
+    }());
+  }
+
+  Future<void> _restartPlayback() async {
+    if (_recoveryInProgress || !mounted) return;
+    if (!(_playbackRequested || widget.autoPlay)) return;
+    if (_errorRestarts >= 3) {
+      if (mounted) {
+        setState(() => _lastError ??= 'playback failed');
+      }
+      return;
+    }
+    _recoveryInProgress = true;
+    try {
+      _errorRestarts++;
+      debugPrint(
+        '[ShortVideoItem] rebuilding controller attempt=$_errorRestarts',
+      );
+      await _disposeController();
+      if (!mounted || !(_playbackRequested || widget.autoPlay)) return;
+      await _setup(widget.videoInfo.videoUrl, true);
+    } finally {
+      _recoveryInProgress = false;
     }
   }
 
@@ -382,6 +577,9 @@ class ShortVideoItemState extends State<ShortVideoItem> {
         owner: this,
         buffering: value.isBuffering,
         bufferedAhead: _bufferedAhead(c),
+        // 位置还在 0 附近 = 刚起播。此时 ahead 必然是 0、也可能短暂
+        // buffering，都不该当成"带宽吃紧"去封锁下一集的预取。
+        atStart: value.position < const Duration(milliseconds: 500),
       );
     }
     if (value.position >= value.duration && value.duration > Duration.zero) {
@@ -391,6 +589,7 @@ class ShortVideoItemState extends State<ShortVideoItem> {
     } else if (value.isPlaying) {
       _didNotifyCompletion = false;
     }
+    _watchForStall(c, value);
   }
 
   Future<void> _disposeController() async {
@@ -409,6 +608,33 @@ class ShortVideoItemState extends State<ShortVideoItem> {
     unawaited(_controller?.pause());
   }
 
+  /// 单击视频区域：暂停 / 继续播放。
+  void _togglePlayPause() {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+    if (controller.value.isPlaying) {
+      _userPaused = true;
+      pause();
+    } else {
+      _userPaused = false;
+      resume();
+    }
+    _showPlayPauseFeedback();
+  }
+
+  /// 在画面中央短暂显示一下当前的播放/暂停图标。
+  ///
+  /// 暂停后没有任何反馈的话，用户会以为是卡住了（尤其是 720P 缓冲慢时）。
+  void _showPlayPauseFeedback() {
+    if (!mounted) return;
+    _playPauseHintTimer?.cancel();
+    setState(() => _showPlayPauseHint = true);
+    _playPauseHintTimer = Timer(const Duration(milliseconds: 700), () {
+      if (!mounted) return;
+      setState(() => _showPlayPauseHint = false);
+    });
+  }
+
   /// 彻底释放播放器（包括当前正在播放的这一条）。
   ///
   /// 进入全屏播放页时必须调用：仅仅 [pause] 时 ExoPlayer 仍会继续下载到
@@ -424,6 +650,7 @@ class ShortVideoItemState extends State<ShortVideoItem> {
   }
 
   void resume() {
+    _userPaused = false;
     _playbackRequested = true;
     if (_controller == null) {
       _setup(widget.videoInfo.videoUrl, true);
@@ -438,6 +665,7 @@ class ShortVideoItemState extends State<ShortVideoItem> {
   @override
   void dispose() {
     _prefetchRetryTimer?.cancel();
+    _playPauseHintTimer?.cancel();
     _setupGeneration++;
     unawaited(_disposeController());
     super.dispose();
@@ -471,10 +699,41 @@ class ShortVideoItemState extends State<ShortVideoItem> {
               ),
             ),
           ),
+        // 【单击暂停/播放】铺在视频之上、业务浮层之下：
+        // 右侧点赞/收藏/Watch 按钮在后面的 overlayBuilder 里，命中优先级更高，
+        // 点按钮不会误触发暂停。
+        if (!_isLoading && controller != null && controller.value.isInitialized)
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: _togglePlayPause,
+            ),
+          ),
         if (widget.overlayBuilder != null)
           widget.overlayBuilder!(context, widget.videoInfo),
         if (widget.topOverlayBuilder != null)
           widget.topOverlayBuilder!(context, widget.videoInfo),
+        if (_showPlayPauseHint)
+          Center(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.36),
+                  shape: BoxShape.circle,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Icon(
+                    controller?.value.isPlaying == true
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 38,
+                  ),
+                ),
+              ),
+            ),
+          ),
         if (_lastError != null)
           Center(
             child: Padding(

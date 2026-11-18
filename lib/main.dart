@@ -10,6 +10,9 @@ import 'package:qahwa_tv/l10n/app_localizations.dart';
 import 'app/router/url_strategy_stub.dart'
     if (dart.library.html) 'app/router/url_strategy_web.dart'
     as url_strategy;
+import 'features/commonAliPlayer/video_pointer_guard_stub.dart'
+    if (dart.library.html) 'features/commonAliPlayer/video_pointer_guard_web.dart'
+    as video_pointer_guard;
 
 import 'app/providers/app_providers.dart';
 import 'app/router/router_config.dart' show routerProvider;
@@ -47,6 +50,11 @@ Future<void> main() async {
 
   // Web: 配置 URL 策略，移除 hash
   url_strategy.configureRouterUrlStrategy();
+
+  // Web: 让 `<video>` 放弃接收指针事件（pointer-events: none）。
+  // 否则视频这块 DOM 会独占点击，铺在上面的 GestureDetector 收不到 tap，
+  // 表现就是「单击暂停/播放没反应」。非 web 平台是空实现。
+  video_pointer_guard.allowVideoTapThrough();
 
   final storage = StorageService();
   await storage.init();

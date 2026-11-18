@@ -10,7 +10,7 @@
 /// - 版本更新：修改 pubspec.yaml 里的 version（不要改这里）
 /// ============================================================================
 library;
-  
+
 class AppConfig {
   AppConfig._();
 
@@ -36,26 +36,32 @@ class AppConfig {
 
   // dart tool\build.dart web --debug
 
-// dart tool\build.dart google   --release --appbundle --version-code=2017
-// dart tool\build.dart platform --release --appbundle --version-code=2017
+  // dart tool\build.dart google   --release --appbundle --version-code=2017
+  // dart tool\build.dart platform --release --appbundle --version-code=2017
 
+  // 运行到手机上调试的命令
+  // # Google Play 版
+  // dart tool\run.dart google
 
-// 运行到手机上调试的命令
-// # Google Play 版
-// dart tool\run.dart google
+  // # 自建平台版（Kaffa Reels）
+  // dart tool\run.dart platform
 
-// # 自建平台版（Kaffa Reels）
-// dart tool\run.dart platform
+  // # 默认 debug，约 130 MB，有热重载
+  // dart tool\run.dart platform
+  // dart tool\run.dart google
 
+  // # release，约 40 MB，没有热重载
+  // dart tool\run.dart platform --release
+  // dart tool\run.dart google --release
 
-// # 默认 debug，约 130 MB，有热重载
-// dart tool\run.dart platform
-// dart tool\run.dart google
+  // web打包
+  // dart tool/build.dart web
 
-// # release，约 40 MB，没有热重载
-// dart tool\run.dart platform --release
-// dart tool\run.dart google --release
+  // 谷歌aab打包
+  // dart tool/build.dart google --appbundle
 
+  // 平台打包拆包v8
+  // dart tool/build.dart platform --split-per-abi
 
   /// 如需切回联调环境，可临时使用：
   /// https://scolding-unbaked-refrain.ngrok-free.dev/
