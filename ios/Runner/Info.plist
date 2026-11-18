@@ -26,6 +26,24 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<!-- Facebook Login / Share (FBSDK) -->
+		<string>fbapi</string>
+		<string>fbauth2</string>
+		<string>fbshareprotocol</string>
+		<string>fb-messenger-share-api</string>
+		<!-- TikTok / Douyin (检测 App 是否安装、ShareSDK 分享) -->
+		<string>snssdk1233</string>
+		<string>snssdk1230</string>
+		<string>snssdk1180</string>
+		<string>snssdk1112</string>
+		<string>tiktok</string>
+		<string>tiktoksharesdk</string>
+		<!-- Twitter / X (ShareSDK 回跳) -->
+		<string>twitter</string>
+		<string>twitterauth</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -66,6 +84,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- 【TODO 提审】NSAllowsArbitraryLoads 会被审核问用途；
+	     上线前建议改成按域名白名单（NSExceptionDomains）或全部走 https -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -75,11 +95,85 @@
 	<array>
 		<string>audio</string>
 	</array>
-	<key>AlivcLicenseKey</key>
-	<string>YOUR_ALIYUN_LICENSE_KEY</string>
-	<key>AlivcLicenseFile</key>
-	<string>license.crt</string>
-	<!-- Universal Links: 允许 App 处理 qahwatv.com 链接 -->
+
+	<!-- ==================== 隐私权限描述（缺了用到即闪退） ==================== -->
+	<!-- image_picker 从相册选图（头像上传等） -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need access to your photo library so you can choose a profile picture.</string>
+	<!-- image_picker 拍照 -->
+	<key>NSCameraUsageDescription</key>
+	<string>We need access to your camera so you can take a profile picture.</string>
+	<!-- 保存内容到相册 -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>We need permission to save pictures to your photo library.</string>
+	<!-- AdMob / Meta Audience Network 个性化广告（ATT） -->
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Your data will be used to show you more relevant ads.</string>
+
+	<!-- ==================== AdMob ==================== -->
+	<!-- 【TODO】换成 iOS 端真实的 AdMob App ID（AdMob 控制台新建 iOS 应用），
+	     当前是 Google 官方测试 App ID，不会崩溃但不能上架 -->
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-3940256099942544~3347511713</string>
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict><key>SKAdNetworkIdentifier</key><string>cstr6suwn9.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>4fzdc2evr5.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>2fnua5tdw4.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>ydx93a7ass.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>p78axxw29g.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>v72qych5uu.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>ludvb6z3bs.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>cp8zw746q7.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>c3frkrj4fj.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>4c6t7gpr54.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>3sh42k64tq.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>3rd42ekr43.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>hs6bdu6m7z.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>a2p9lx4jpn.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>22mmun2rn5.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>44jx6755aq.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>k674qkevps.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>4468km3ulz.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>2u9pt9hc89.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>8s468mfl3y.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>klf5c3l5u5.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>ppxm44t74a.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>kbmxgpxpgc.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>uw77c3534h.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>578prtvx9j.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>4dzt52r2t5.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>tl55sbb4fm.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>ei25pb5f8l.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>3qcrz7gvgs.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>yclnxrl5pm.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>7ug5zh24hu.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>gta9lk7p23.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>vutu7akeur.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>y5ghdnxjpf.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>v9wttpbfk9.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>n38lu8286q.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>47vhws6wlr.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>kqdffwr57w.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>mlmmfzh3r3.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>9nzbchr3bx.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>8c4e2ghe7u.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>r45fhb6rf7.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>v4nxqhlyqp.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>zq492l623r.skadnetwork</string></dict>
+		<dict><key>SKAdNetworkIdentifier</key><string>3qy594r5u5.skadnetwork</string></dict>
+	</array>
+
+	<!-- ==================== Facebook / Meta ==================== -->
+	<!-- 与 android/app/src/main/res/values/strings.xml 保持一致 -->
+	<key>FacebookAppID</key>
+	<string>1153560107115108</string>
+	<key>FacebookClientToken</key>
+	<string>c8fbb86b18d593cb0c68a13680d700eb</string>
+	<key>FacebookDisplayName</key>
+	<string>Kaffa Reels</string>
+
+	<!-- ==================== URL Scheme / Universal Links ==================== -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -90,8 +184,10 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>qahwatv</string>
+				<!-- Facebook Login 深度链接回调，必须为 fb<APP_ID> 格式 -->
+				<string>fb1153560107115108</string>
 			</array>
 		</dict>
-	</array>
+	</dict>
 </dict>
 </plist>

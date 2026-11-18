@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
 import '../../../app/providers/app_providers.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/service/pay_service.dart';
@@ -242,7 +243,8 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
 
   /// Initialize the provider
   Future<void> initialize() async {
-    _receiptService.initialize(baseUrl: 'https://api.your-domain.com');
+    // 之前写死的是 'https://api.your-domain.com' 占位符，后端验证永远打不通。
+    _receiptService.initialize(baseUrl: AppConfig.apiBaseUrl);
 
     // Set user ID for purchase association
     //

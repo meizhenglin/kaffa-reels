@@ -1,0 +1,164 @@
+# ============================================================================
+# Codemagic CI —— iOS 构建配置
+#
+# 【为什么要这个文件】你在 Windows 上开发，本地无法编 iOS（需要 macOS + Xcode）。
+# Codemagic 提供 macOS 云机器，push 代码后自动出包：
+#   - ios-simulator-debug : 不签名，出模拟器包（功能验证，不需要苹果账号配置）
+#   - ios-app-store       : 签名出 .ipa（可上传 TestFlight / App Store）
+#
+# 【首次使用前必须做（Codemagic 网页控制台）】
+# 1. 把本仓库接入 Codemagic（Team settings → Repositories / Add application）
+# 2. 配置 App Store Connect API 集成：
+#      Teams → Codemagic API settings → App Store Connect → 连接
+#    需要 Apple 后台生成的 API Key（Issuer ID / Key ID / .p8 私钥）
+# 3. 如果 bundle id / capability 变了，去 Apple Developer 后台确认
+#    App ID `com.playlet.qahwatvshorts` 已勾选：
+#      Sign In with Apple + Associated Domains
+#    （xcode-project use-profiles 会自动选带这些 capability 的 profile）
+#
+# 【代码侧前置条件（提交前必须完成，CI 代替不了）】
+# - firebase_options.dart 已用 flutterfire configure 生成真实值
+# - ios/Runner/GoogleService-Info.plist 已加入工程（firebase 需要时）
+# - ios/Podfile 已存在（本仓库已有）
+# ============================================================================
+
+workflows:
+
+  # ------------------------------------------------------------------
+  # 工作流 1：iOS 模拟器 Debug 包（免签名，验证功能用）
+  # ------------------------------------------------------------------
+  ios-simulator-debug:
+    name: iOS Simulator (debug, unsigned)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      groups:
+        - flutter_config  # 可选：Codemagic 里建的 Environment variable group
+      vars:
+        BUNDLE_ID: com.playlet.qahwatvshorts
+    cache:
+      cache_paths:
+        - $FLUTTER_HOME/.pub-cache
+        - $HOME/.gradle
+    triggering:
+      events: [push, tag]
+      branch_patterns:
+        - pattern: 'recharge-new'
+          include: true
+          source: true
+      cancel_previous_builds: true
+    scripts:
+      - name: Get dependencies
+        script: |
+          flutter packages pub get
+
+      - name: Run analyzer（警告不拦截）
+        script: |
+          flutter analyze || true
+
+      - name: Build iOS simulator app
+        script: |
+          flutter build ios --debug --simulator \
+            --no-codesign
+
+      - name: Check iOS 配置完整性（构建后自检）
+        script: |
+          set -e
+          echo "=== Info.plist 关键项检查 ==="
+          PLIST=ios/Runner/Info.plist
+          for key in NSPhotoLibraryUsageDescription NSCameraUsageDescription \
+                     GADApplicationIdentifier FacebookAppID FacebookClientToken; do
+            grep -q "<key>$key</key>" $PLIST || echo "⚠️  Info.plist 缺少 $key"
+          done
+          echo "=== Entitlements 检查 ==="
+          grep -q "applinks:tv.qahwatv.com" ios/Runner/Runner.entitlements \
+            || echo "⚠️  entitlements 缺少 applinks:tv.qahwatv.com"
+          grep -q "com.apple.developer.applesignin" ios/Runner/Runner.entitlements \
+            || echo "⚠️  entitlements 缺少 Sign In with Apple"
+          echo "=== firebase_options 占位符检查（应无输出）==="
+          grep -n "YOUR_IOS_API_KEY\|com.yourcompany" lib/core/firebase/firebase_options.dart \
+            || echo "✅ firebase_options 已配置"
+
+    artifacts:
+      - build/ios/iphonesimulator/Runner.app
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com   # TODO: 改成你的邮箱
+        notify:
+          success: true
+          failure: true
+
+  # ------------------------------------------------------------------
+  # 工作流 2：App Store 签名 .ipa（TestFlight / 提审用）
+  # ------------------------------------------------------------------
+  ios-app-store:
+    name: iOS App Store (signed ipa)
+    instance_type: mac_mini_m2
+    max_build_duration: 90
+    integrations:
+      app_store_connect: qahwa_asc_api   # TODO: Codemagic 里创建的 ASC API 集成名
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.playlet.qahwatvshorts
+      vars:
+        BUNDLE_ID: com.playlet.qahwatvshorts
+    cache:
+      cache_paths:
+        - $FLUTTER_HOME/.pub-cache
+    triggering:
+      events: [tag]
+      branch_patterns:
+        - pattern: '*'
+          include: true
+          source: true
+      cancel_previous_builds: true
+    scripts:
+      - name: Get dependencies
+        script: |
+          flutter packages pub get
+
+      - name: Set up signing keychain
+        script: |
+          keychain initialize
+
+      - name: Fetch provisioning profiles
+        script: |
+          xcode-project use-profiles
+
+      - name: Build & sign ipa
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=$HOME/export_options.plist
+
+      - name: Verify signing
+        script: |
+          set -e
+          IPA=$(find build/ios/ipa -name "*.ipa")
+          test -n "$IPA" || { echo "❌ 没找到 ipa"; exit 1; }
+          echo "✅ 产出: $IPA"
+          # 校验 entitlements 真的进了签名
+          unzip -o -q "$IPA" -d /tmp/ipa_check
+          codesign -d --entitlements - /tmp/ipa_check/Payload/Runner.app \
+            | grep -E "applesignin|associated-domains" \
+            || echo "⚠️  签名里没有 Sign In with Apple / Associated Domains entitlement"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+    # 发布到 App Store Connect（TestFlight）：配好集成后取消下面注释
+    # publishing:
+    #   app_store_connect:
+    #     auth: integration
+    #     submit_to_testflight: true
+    #     beta_groups:
+    #       - internal-testers           # TODO: TestFlight 内测组名
+    #   email:
+    #     recipients:
+    #       - your-email@example.com     # TODO: 改成你的邮箱
