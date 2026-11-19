@@ -72,7 +72,7 @@ workflows:
       - name: Build iOS device app（免签名）
         script: |
           set -e
-          flutter build ios --config-only --debug
+          flutter build ios --config-only --debug --no-codesign
           cd ios
           set +e
           xcodebuild \
