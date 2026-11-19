@@ -28,7 +28,7 @@ workflows:
   # 工作流 1：iOS 模拟器 Debug 包（免签名，验证功能用）
   # ------------------------------------------------------------------
   ios-simulator-debug:
-    name: iOS Simulator (debug, unsigned)
+    name: iOS Debug (device, unsigned)
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
@@ -61,10 +61,12 @@ workflows:
         script: |
           flutter analyze || true
 
-      - name: Build iOS simulator app
+      # 注意：不能编 --simulator。mob_sharesdk / mobcommonlib 是二进制 SDK，
+      # 只带真机切片（FBSDKLoginKit.xcframework 无 ios-arm64_x86_64-simulator），
+      # 模拟器构建必然失败。这里编真机 debug 包（免签名）用于验证可编译性。
+      - name: Build iOS device app（免签名）
         script: |
-          flutter build ios --debug --simulator \
-            --no-codesign
+          flutter build ios --debug --no-codesign
 
       - name: Check iOS 配置完整性（构建后自检）
         script: |
@@ -85,7 +87,7 @@ workflows:
             || echo "✅ firebase_options 已配置"
 
     artifacts:
-      - build/ios/iphonesimulator/Runner.app
+      - build/ios/iphoneos/Runner.app
     publishing:
       email:
         recipients:
