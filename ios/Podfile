@@ -29,6 +29,11 @@ target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
+  # mob_sharesdk 拉的 KakaoSDKAuth 按 Alamofire 5.10+ 编译
+  # （引用 RequestAdapter.adapt(_:using:) 等 5.10 新符号），
+  # 不显式钉版本会解析到旧版 Alamofire，导致链接期 symbol not found
+  pod 'Alamofire', '5.10.2'
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
   target 'RunnerTests' do
