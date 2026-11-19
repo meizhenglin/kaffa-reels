@@ -88,23 +88,15 @@ workflows:
             build > /tmp/xcb.log 2>&1
           STATUS=$?
           if [ $STATUS -ne 0 ]; then
-            echo "=== 失败脚本阶段上下文 ==="
-            # Flutter 的 Run Script 阶段（xcode_backend.sh build）报错通常没有 error: 前缀，
-            # 直接把该阶段结束位置前 80 行打出来
-            LN=$(grep -n "Run\\\\ Script\|Script-9740EEB61CF901F6004384FC" /tmp/xcb.log \
-                  | head -1 | cut -d: -f1)
-            if [ -n "$LN" ]; then
-              sed -n "$((LN>5 ? LN-5 : 1)),$((LN+120))p" /tmp/xcb.log
-            else
-              tail -60 /tmp/xcb.log
-            fi
+            echo "=== 去噪后的最后 100 行（过滤 deployment target 警告）==="
+            grep -v "IPHONEOS_DEPLOYMENT_TARGET" /tmp/xcb.log | tail -100
             echo ""
-            echo "=== 全部 error: 行 ==="
-            grep -n "error:" /tmp/xcb.log | tail -40
+            echo "=== 脚本阶段 / Flutter 相关行 ==="
+            grep -n "PhaseScriptExecution\|xcode_backend\|Command PhaseScript\|nonzero exit" \
+              /tmp/xcb.log | tail -15
             echo ""
-            echo "=== BUILD FAILED 前的 40 行 ==="
-            LN2=$(grep -n "BUILD FAILED" /tmp/xcb.log | head -1 | cut -d: -f1)
-            [ -n "$LN2" ] && sed -n "$((LN2>40 ? LN2-40 : 1)),$((LN2+12))p" /tmp/xcb.log
+            echo "=== error: 行 ==="
+            grep -n "error:" /tmp/xcb.log | grep -v "statusOfValueForKey" | tail -20
             exit 1
           fi
           echo "✅ xcodebuild 成功"
