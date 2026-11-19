@@ -102,6 +102,11 @@ dev_dependencies:
   # tool/build.dart 用它把 Web 构建产物打成带版本号的 zip
   archive: ^4.0.9
 
+dependency_overrides:
+  # flutter_html 3.0.0 已停止维护，与 html>=0.15.5 不兼容
+  # （html 包移除了 QuerySelector.matches，导致 styled_element.dart 编译失败）
+  html: 0.15.4
+
 flutter_launcher_icons:
   android: true
   ios: true
