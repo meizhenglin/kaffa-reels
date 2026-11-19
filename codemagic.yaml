@@ -32,11 +32,9 @@ workflows:
     instance_type: mac_mini_m2
     max_build_duration: 60
     environment:
-      flutter: stable
+      flutter: 3.44.0          # 与本地开发环境一致（Dart 3.12.0）
       xcode: latest
       cocoapods: default
-      groups:
-        - flutter_config  # 可选：Codemagic 里建的 Environment variable group
       vars:
         BUNDLE_ID: com.playlet.qahwatvshorts
     cache:
@@ -102,7 +100,7 @@ workflows:
     integrations:
       app_store_connect: qahwa_asc_api   # TODO: Codemagic 里创建的 ASC API 集成名
     environment:
-      flutter: stable
+      flutter: 3.44.0          # 与本地开发环境一致（Dart 3.12.0）
       xcode: latest
       cocoapods: default
       ios_signing:
