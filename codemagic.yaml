@@ -64,9 +64,39 @@ workflows:
       # 注意：不能编 --simulator。mob_sharesdk / mobcommonlib 是二进制 SDK，
       # 只带真机切片（FBSDKLoginKit.xcframework 无 ios-arm64_x86_64-simulator），
       # 模拟器构建必然失败。这里编真机 debug 包（免签名）用于验证可编译性。
+      #
+      # 不用 `flutter build ios` 的原因：真机构建失败时 Flutter 会统一打印
+      # "requires a selected Development Team"（flutter_tools 里 _missingDevelopmentTeam
+      # 的兜底提示），把 xcodebuild 的真实报错盖掉。这里改成 config-only + 原生
+      # xcodebuild，失败时把 error: 行完整打出来。
       - name: Build iOS device app（免签名）
         script: |
-          flutter build ios --debug --no-codesign
+          set -e
+          flutter build ios --config-only --debug
+          cd ios
+          set +e
+          xcodebuild \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ../build/ios_dd \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build > /tmp/xcb.log 2>&1
+          STATUS=$?
+          if [ $STATUS -ne 0 ]; then
+            echo "=== xcodebuild 失败，最后 30 行 ==="
+            tail -30 /tmp/xcb.log
+            echo ""
+            echo "=== 全部 error: 行 ==="
+            grep -n "error:" /tmp/xcb.log | tail -40
+            exit 1
+          fi
+          echo "✅ xcodebuild 成功"
+          tail -3 /tmp/xcb.log
 
       - name: Check iOS 配置完整性（构建后自检）
         script: |
@@ -87,7 +117,7 @@ workflows:
             || echo "✅ firebase_options 已配置"
 
     artifacts:
-      - build/ios/iphoneos/Runner.app
+      - build/ios_dd/Build/Products/Debug-iphoneos/Runner.app
     publishing:
       email:
         recipients:
