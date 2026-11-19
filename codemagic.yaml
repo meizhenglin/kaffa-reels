@@ -74,6 +74,11 @@ workflows:
           set -e
           flutter build ios --config-only --debug --no-codesign
           cd ios
+          echo "=== Podfile.lock 中 Alamofire / Kakao 实际解析版本 ==="
+          grep -iE "alamofire|kakaosdk" Podfile.lock
+          echo "=== Pods 目录里的 KakaoSDKAuth 是源码还是二进制 ==="
+          ls Pods/KakaoSDKAuth 2>/dev/null && echo "(源码 pod)" || true
+          ls Pods/mob_sharesdk/ShareSDK/Support/PlatformSDK/ 2>/dev/null | head -40
           set +e
           xcodebuild \
             -workspace Runner.xcworkspace \
@@ -97,6 +102,14 @@ workflows:
             echo ""
             echo "=== error: 行 ==="
             grep -n "error:" /tmp/xcb.log | grep -v "statusOfValueForKey" | tail -20
+            echo ""
+            echo "=== Runner 链接命令（看 -framework 列表里有没有 Alamofire/KakaoSDKAuth）==="
+            LN3=$(grep -n "Ld /Users/builder/clone/build.*Runner.debug.dylib" /tmp/xcb.log | head -1 | cut -d: -f1)
+            [ -n "$LN3" ] && sed -n "$LN3,$((LN3+40))p" /tmp/xcb.log
+            echo ""
+            echo "=== Undefined symbols 段落 ==="
+            LN4=$(grep -n "Undefined symbols" /tmp/xcb.log | head -1 | cut -d: -f1)
+            [ -n "$LN4" ] && sed -n "$((LN4>3 ? LN4-3 : 1)),$((LN4+8))p" /tmp/xcb.log
             exit 1
           fi
           echo "✅ xcodebuild 成功"
