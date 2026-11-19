@@ -138,12 +138,17 @@ class UnlockResult {
     required this.resultType,
     this.episodeIndex,
     this.errorMessage,
+    this.wholeDrama = false,
   });
 
-  factory UnlockResult.success({required int episodeIndex}) {
+  factory UnlockResult.success({
+    required int episodeIndex,
+    bool wholeDrama = false,
+  }) {
     return UnlockResult._(
       resultType: UnlockResultType.success,
       episodeIndex: episodeIndex,
+      wholeDrama: wholeDrama,
     );
   }
 
@@ -169,6 +174,10 @@ class UnlockResult {
   final UnlockResultType resultType;
   final int? episodeIndex;
   final String? errorMessage;
+
+  /// 整剧解锁成功时为 true：调用方需要把同一部剧的所有集都标记为可播放，
+  /// 否则用户划到下一集还会看到锁定状态。
+  final bool wholeDrama;
 
   bool get isSuccess => resultType == UnlockResultType.success;
   bool get isFailed => resultType == UnlockResultType.failed;

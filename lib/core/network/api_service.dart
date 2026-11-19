@@ -690,18 +690,24 @@ class ApiService {
 
   /// 开通/充值会员/购买整剧
   /// [payType] 3=抖音 2=微信 5=Android 6=iOS
+  ///
+  /// 【videoId 必须是数字】后端 PayRequestBO.videoId 定义为 int32，
+  /// 传字符串会被严格反序列化成 null（订单里 videoId 落库为空，
+  /// 整剧解锁就丢了剧信息）。这里统一转成 int 再发。
   Future<ApiResponse> userRechange({
     required int payType,
     int? payConfigId,
     String? videoId,
   }) {
+    final body = <String, dynamic>{
+      'payType': payType,
+      if (payConfigId != null) 'payConfigId': payConfigId,
+      if (videoId != null) 'videoId': int.tryParse(videoId) ?? videoId,
+    };
+    debugPrint('[userRechange] 精确请求体: $body');
     return request(
       ApiEndpoints.userRechange,
-      data: {
-        'payType': payType,
-        if (payConfigId != null) 'payConfigId': payConfigId,
-        if (videoId != null) 'videoId': videoId,
-      },
+      data: body,
     );
   }
 

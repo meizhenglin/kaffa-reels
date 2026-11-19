@@ -246,12 +246,14 @@ class UnifiedPaymentHandler {
     required HaiPayMethod method,
     required int payConfigId,
     required String productType,
+    String? videoId,
     void Function(bool success)? onPaymentComplete,
   }) async {
     try {
       final order = await _haiPayService.createAndInit(
         payType: method.id,
         payConfigId: payConfigId,
+        videoId: videoId,
       );
 
       if (order == null || order.payInfo.isEmpty) {
@@ -469,6 +471,10 @@ class UnifiedPaymentHandler {
       method: selectedMethod,
       payConfigId: payConfigId,
       productType: '3',
+      // 【整剧/单集解锁】订单里必须带 videoId，后端收到 HiPay 回调时
+      // 按订单的 videoId 决定解锁哪部剧。之前这里把它丢了，
+      // 导致 HaiPay 支付的解锁订单 videoId=null，和谷歌端同一个坑。
+      videoId: videoId,
       onPaymentComplete: onPaymentComplete,
     );
   }

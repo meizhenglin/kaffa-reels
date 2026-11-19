@@ -407,7 +407,28 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
         // 重试3次，指数退避
         for (int attempt = 1; attempt <= 3; attempt++) {
           try {
-            if (payment['purchaseToken'] != null) {
+            if (payment['type'] == 'unlockEpisode') {
+              // 单集/整剧解锁：Play 侧已付款但解锁接口没发出去 →
+              // 补发解锁接口。注意必须在 purchaseToken / createOrder
+              // 分支之前判断，否则会被误当成「补建订单」处理。
+              final goodsId = (payment['goodsId'] as num?)?.toInt();
+              final videoId = payment['videoId'] as String?;
+              final episodesId = payment['episodesId'] as String?;
+              final episodesNum = (payment['episodesNum'] as num?)?.toInt();
+              if (goodsId == null || videoId == null || episodesId == null) {
+                break;
+              }
+              debugPrint(
+                '[Membership] Retrying unlockEpisode: goodsId=$goodsId '
+                'videoId=$videoId episodesId=$episodesId',
+              );
+              success = await _payService.purchaseEpisode(
+                videoId: videoId,
+                episodesId: episodesId,
+                episodesNum: episodesNum ?? 0,
+                goodsId: goodsId,
+              );
+            } else if (payment['purchaseToken'] != null) {
               // 旧版本客户端遗留下的「客户端直发 /notice/google」待重试数据，
               // 继续按老接口补发，成功后本地清掉。
               success = await _payService.confirmGooglePurchase(params: payment);

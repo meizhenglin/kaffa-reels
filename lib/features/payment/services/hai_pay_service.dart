@@ -113,6 +113,7 @@ class HaiPayService {
   Future<String?> userRechange({
     required int payType,
     required int payConfigId,
+    String? videoId,
   }) async {
     try {
       final headers = (await _authHeaders()) ?? {};
@@ -121,6 +122,10 @@ class HaiPayService {
         data: {
           'payType': payType,
           'payConfigId': payConfigId,
+          // 【videoId 必须是数字】和 ApiService.userRechange 同一约定：
+          // 后端 PayRequestBO.videoId 是 int32，传字符串会反序列化成 null，
+          // 整剧解锁订单丢了剧信息后端回调解锁不了。
+          if (videoId != null) 'videoId': int.tryParse(videoId) ?? videoId,
         },
         options: Options(headers: headers),
       );
@@ -204,10 +209,12 @@ class HaiPayService {
   Future<HaiPayOrder?> createAndInit({
     required int payType,
     required int payConfigId,
+    String? videoId,
   }) async {
     final platformOrderNo = await userRechange(
       payType: payType,
       payConfigId: payConfigId,
+      videoId: videoId,
     );
     if (platformOrderNo == null || platformOrderNo.isEmpty) return null;
     final order = await initPay(orderNo: platformOrderNo);

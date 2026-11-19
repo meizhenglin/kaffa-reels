@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:in_app_purchase/in_app_purchase.dart' show PurchaseDetails, PurchaseStatus;
 
 import '../../../l10n/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -933,9 +934,12 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         await coinNotifier.load();
 
         AppSnackBar.show(context, message: l10n.unlockSuccess);
-        Navigator.of(
-          context,
-        ).pop(UnlockResult.success(episodeIndex: widget.episodeIndex));
+        Navigator.of(context).pop(
+          UnlockResult.success(
+            episodeIndex: widget.episodeIndex,
+            wholeDrama: product.type == UnlockProductType.season,
+          ),
+        );
       } else {
         AppSnackBar.show(context, message: resp?.error ?? l10n.unlockFailed);
       }
@@ -948,6 +952,11 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   }
 
   /// 通过 Google Play 购买解锁
+  ///
+  /// 单集/整剧解锁是一次性权益，必须走 [PaymentService.purchaseConsumable]
+  /// （buyConsumable + autoConsume）。之前用 `purchase()`（buyNonConsumable）
+  /// 会让 Play 把该商品标记为 owned：第一次买完不 consume，之后每次再买
+  /// 都报 itemAlreadyOwned（"已拥有此内容"），解锁接口永远不会被调用。
   Future<void> _performUnlockByGooglePlay(UnlockProduct product) async {
     final l10n = AppLocalizations.of(context);
     _setProcessing(product.goodsId, true);
@@ -966,44 +975,140 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         return;
       }
 
-      final success = await paymentService.purchase(product: products.first);
+      debugPrint(
+        '[Unlock] Google Play purchase start: goodsId=${product.goodsId} '
+        'playId=${product.googlePlayId} type=${product.type}',
+      );
 
-      if (!mounted) return;
-      _setProcessing(product.goodsId, false);
-
-      if (success) {
+      // 【先建单】后端 /notice/google 回调需要 orderNo 来关联这笔 Play 支付。
+      // 【必须带 videoId】解锁订单里如果没有 videoId，后端订单记录的
+      // videoId 是 0，回调按 orderNo 反查订单时拿不到剧集信息，
+      // 整剧解锁就不知道要解锁哪部剧。
+      // createOrder 不支持 videoId，这里直接调 userRechange（它支持）。
+      // 建单失败不阻塞支付，回调里会缺 orderNo。
+      String? orderNo;
+      try {
         final apiService = ApiService(
           dioClient: ref.read(dioClientProvider),
           storage: ref.read(storageServiceProvider),
         );
-
-        if (product.type == UnlockProductType.episode) {
-          await apiService.getUserPayEpisodes(
-            videoId: widget.videoId,
-            episodesId: widget.episodeId,
-            episodesNum: widget.episodesNum,
-            goodsId: product.goodsId,
-          );
-        } else if (product.type == UnlockProductType.season) {
-          await apiService.userRechange(
-            payType: 5,
-            payConfigId: product.goodsId,
-            videoId: widget.videoId,
-          );
+        final resp = await apiService.userRechange(
+          payType: 5, // 5 = Android
+          payConfigId: product.goodsId,
+          videoId: widget.videoId,
+        );
+        if (resp.isSuccess && resp.data is Map) {
+          final data = Map<String, dynamic>.from(resp.data as Map);
+          final nested = data['data'] is Map
+              ? Map<String, dynamic>.from(data['data'] as Map)
+              : const <String, dynamic>{};
+          final rawOrderNo =
+              data['orderNo'] ?? nested['orderNo'] ?? data['orderId'] ?? nested['orderId'];
+          orderNo = rawOrderNo?.toString();
         }
+        debugPrint(
+          '[Unlock] Unlock order created: ok=${resp.isSuccess} '
+          'orderNo=$orderNo goodsId=${product.goodsId} videoId=${widget.videoId}',
+        );
+      } catch (e) {
+        debugPrint('[Unlock] Create unlock order failed: $e');
+      }
 
-        final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
-        await coinNotifier.load();
+      // onComplete 在 purchaseStream 投递真实购买结果时被调用，
+      // 用它把 PurchaseDetails（含 purchaseToken）带出来发后端回调。
+      PurchaseDetails? completedPurchase;
+      final paid = await paymentService.purchaseConsumable(
+        product: products.first,
+        applicationUserName:
+            await ref.read(storageServiceProvider).getUserIdAsync(),
+        onComplete: (purchase) => completedPurchase = purchase,
+      );
 
-        AppSnackBar.show(context, message: l10n.purchaseSuccess);
-        Navigator.of(
-          context,
-        ).pop(UnlockResult.success(episodeIndex: widget.episodeIndex));
-      } else {
+      if (!mounted) return;
+      _setProcessing(product.goodsId, false);
+
+      if (!paid) {
+        final err = paymentService.lastError ?? '';
+        debugPrint(
+          '[Unlock] Google Play purchase failed: err=$err '
+          'goodsId=${product.goodsId}',
+        );
+        // itemAlreadyOwned 说明用户之前已经为这个商品付过钱（旧版本把
+        // 一次性商品买成了非消耗型，Play 账户里还留着）。消耗掉旧购买
+        // 并直接补发解锁接口，让用户不用再付一次钱。
+        if (err.contains('itemAlreadyOwned') || err.contains('ITEM_ALREADY_OWNED')) {
+          debugPrint(
+            '[Unlock] itemAlreadyOwned detected — recovering previous purchase '
+            'and calling unlock API directly (goodsId=${product.goodsId})',
+          );
+          await _recoverAlreadyOwnedUnlock(product);
+          return;
+        }
         AppSnackBar.show(
           context,
-          message: paymentService.lastError ?? l10n.purchaseFailed,
+          message: err.isNotEmpty ? err : l10n.purchaseFailed,
         );
+        return;
+      }
+
+      debugPrint(
+        '[Unlock] Google Play payment confirmed: goodsId=${product.goodsId} '
+        '→ sending google callback then calling unlock API',
+      );
+      await _callUnlockApiAfterGooglePlayPayment(
+        product,
+        purchase: completedPurchase,
+        orderNo: orderNo,
+      );
+    } catch (e) {
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+        AppSnackBar.show(context, message: '${l10n.purchaseFailed}: $e');
+      }
+    }
+  }
+
+  /// 用户此前已经付过钱（Play 里该商品是 owned 状态）：
+  /// 查到旧购买后 consume 掉，然后直接补发解锁接口。
+  Future<void> _recoverAlreadyOwnedUnlock(UnlockProduct product) async {
+    final l10n = AppLocalizations.of(context);
+    _setProcessing(product.goodsId, true);
+
+    try {
+      final paymentService = PaymentService.instance;
+      final past = await paymentService.queryExistingPurchases(forceRefresh: true);
+      final playId = product.googlePlayId ?? '';
+      PurchaseDetails? ownedPurchase;
+      for (final p in past) {
+        if (p.productID == playId &&
+            (p.status == PurchaseStatus.purchased ||
+                p.status == PurchaseStatus.restored)) {
+          ownedPurchase = p;
+          break;
+        }
+      }
+
+      if (ownedPurchase != null) {
+        debugPrint(
+          '[Unlock] Consuming previously owned purchase: ${ownedPurchase.productID}',
+        );
+        await paymentService.consumePurchase(ownedPurchase);
+        if (!mounted) return;
+        _setProcessing(product.goodsId, false);
+        await _callUnlockApiAfterGooglePlayPayment(
+          product,
+          purchase: ownedPurchase,
+        );
+        return;
+      }
+
+      debugPrint(
+        '[Unlock] itemAlreadyOwned but no matching past purchase found '
+        '(playId=$playId) — cannot auto-recover',
+      );
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+        AppSnackBar.show(context, message: l10n.purchaseFailed);
       }
     } catch (e) {
       if (mounted) {
@@ -1011,6 +1116,166 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         AppSnackBar.show(context, message: '${l10n.purchaseFailed}: $e');
       }
     }
+  }
+
+  /// Play 侧支付已确认（或旧购买已消耗）：先给后端发 /notice/google 回调，
+  /// 再调用解锁接口完成解锁。
+  ///
+  /// 【为什么要发回调】之前单集解锁的 Google 流程从来没有给后端发过
+  /// /notice/google，后端看不到这笔 Play 收入。参数结构和 K币 充值链路
+  /// （recharge_provider._handlePurchaseSuccess）保持一致，
+  /// payConfigType=3 表示单集/整剧解锁（对齐 HaiPay 的 productType '3'）。
+  ///
+  /// 解锁接口失败也不能当普通失败处理 —— 存入待重试队列，
+  /// 下次启动/重试时补发，避免「钱付了集没解锁」。
+  Future<void> _callUnlockApiAfterGooglePlayPayment(
+    UnlockProduct product, {
+    PurchaseDetails? purchase,
+    String? orderNo,
+  }) async {
+    final l10n = AppLocalizations.of(context);
+    _setProcessing(product.goodsId, true);
+
+    try {
+      // 1. 发谷歌支付回调（先存后发 + 3 次指数退避，弱网不丢单）
+      if (purchase != null) {
+        await _sendGoogleUnlockCallback(
+          product: product,
+          purchase: purchase,
+          orderNo: orderNo,
+        );
+      }
+
+      final apiService = ApiService(
+        dioClient: ref.read(dioClientProvider),
+        storage: ref.read(storageServiceProvider),
+      );
+
+      ApiResponse? resp;
+      if (product.type == UnlockProductType.episode) {
+        resp = await apiService.getUserPayEpisodes(
+          videoId: widget.videoId,
+          episodesId: widget.episodeId,
+          episodesNum: widget.episodesNum,
+          goodsId: product.goodsId,
+        );
+      } else if (product.type == UnlockProductType.season) {
+        resp = await apiService.userRechange(
+          payType: 5,
+          payConfigId: product.goodsId,
+          videoId: widget.videoId,
+        );
+      }
+
+      if (!mounted) return;
+      _setProcessing(product.goodsId, false);
+
+      final ok = resp?.isSuccess ?? false;
+      debugPrint(
+        '[Unlock] Unlock API result: ok=$ok '
+        'code=${resp?.code} error=${resp?.error} goodsId=${product.goodsId}',
+      );
+
+      final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
+      await coinNotifier.load();
+
+      if (ok) {
+        AppSnackBar.show(context, message: l10n.unlockSuccess);
+        // 整剧解锁：带上 wholeDrama 标记，让调用方刷新整部剧的集数状态。
+        Navigator.of(context).pop(
+          UnlockResult.success(
+            episodeIndex: widget.episodeIndex,
+            wholeDrama: product.type == UnlockProductType.season,
+          ),
+        );
+      } else {
+        // 已付款但解锁接口失败 —— 存待重试，避免用户重复付钱。
+        await ref.read(storageServiceProvider).savePendingPayment({
+          'orderId': 'goods-${product.goodsId}',
+          'type': 'unlockEpisode',
+          'goodsId': product.goodsId,
+          'videoId': widget.videoId,
+          'episodesId': widget.episodeId,
+          'episodesNum': widget.episodesNum,
+        });
+        AppSnackBar.show(
+          context,
+          message: resp?.error ?? l10n.unlockFailed,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+        AppSnackBar.show(context, message: '${l10n.unlockFailed}: $e');
+      }
+    }
+  }
+
+  /// 给后端补发谷歌支付回调（POST /notice/google）。
+  ///
+  /// 【先存后发】发送前先把回调参数落盘（同 orderId 去重），成功后再出队。
+  /// App 在发送过程中被杀/断网，下次启动或进会员页时
+  /// checkAndRetryPendingPayments 看到这条记录（含 purchaseToken）
+  /// 会自动补发 /notice/google。
+  Future<void> _sendGoogleUnlockCallback({
+    required UnlockProduct product,
+    required PurchaseDetails purchase,
+    String? orderNo,
+  }) async {
+    final storage = ref.read(storageServiceProvider);
+    final callbackOrderId =
+        orderNo ?? 'google-${purchase.purchaseID ?? product.goodsId}';
+
+    final callbackPayload = <String, dynamic>{
+      // 后端订单字段名是 orderNo（/api/pay/userRechange 返回 orderNo），
+      // 两个都带上，兼容后端两种读法。
+      'orderNo': orderNo,
+      'orderId': callbackOrderId,
+      'productId': purchase.productID,
+      'purchaseId': purchase.purchaseID,
+      'transactionDate': purchase.transactionDate,
+      'status': purchase.status.name,
+      'payConfigType': 2, // 2 = 单集/整剧解锁（后端订单返回 payConfigType=2）
+      'goodsId': product.goodsId,
+      'videoId': widget.videoId,
+      'episodesId': widget.episodeId,
+      'episodesNum': widget.episodesNum,
+      'purchaseToken': purchase.verificationData.serverVerificationData,
+      'verificationData': {
+        'localVerificationData':
+            purchase.verificationData.localVerificationData,
+        'serverVerificationData':
+            purchase.verificationData.serverVerificationData,
+        'source': purchase.verificationData.source,
+      },
+    };
+
+    await storage.savePendingPayment(callbackPayload);
+    debugPrint('[Unlock] Google callback payload: $callbackPayload');
+
+    var confirmed = false;
+    for (var retry = 0; retry < 3 && !confirmed; retry++) {
+      if (retry > 0) {
+        await Future<void>.delayed(Duration(seconds: 2 << (retry - 1)));
+      }
+      try {
+        confirmed = await payServiceProvider.confirmGooglePurchase(
+          params: callbackPayload,
+        );
+      } catch (e) {
+        debugPrint(
+          '[Unlock] Google callback failed (attempt ${retry + 1}): $e',
+        );
+      }
+    }
+
+    if (confirmed) {
+      await storage.removePendingPayment(callbackOrderId);
+    }
+    debugPrint(
+      '[Unlock] Google callback confirmed=$confirmed '
+      'product=${purchase.productID} orderNo=$orderNo goodsId=${product.goodsId}',
+    );
   }
 
   /// 通过 HaiPay H5 购买解锁
@@ -1037,9 +1302,13 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
             AppSnackBar.show(context, message: l10n.purchaseSuccessful);
             // Close the unlock sheet immediately so the caller can trigger
             // automatic playback now that the payment is confirmed.
-            Navigator.of(
-              context,
-            ).pop(UnlockResult.success(episodeIndex: widget.episodeIndex));
+            // 整剧解锁：带上 wholeDrama 标记，让调用方刷新整部剧的集数状态。
+            Navigator.of(context).pop(
+              UnlockResult.success(
+                episodeIndex: widget.episodeIndex,
+                wholeDrama: product.type == UnlockProductType.season,
+              ),
+            );
           }
         },
       );

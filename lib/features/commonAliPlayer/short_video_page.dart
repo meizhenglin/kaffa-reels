@@ -995,6 +995,23 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
           }
         }
       }
+      // 【排序】快捷支付第一项固定为整剧解锁（season），其余商品保持
+      // 后端返回顺序不变。用分区而不是 sort，保证非整剧商品的相对顺序
+      // 不变（Dart 的 List.sort 不是稳定排序）。
+      if (allProducts.any((p) => p.type == UnlockProductType.season)) {
+        final seasonProducts = allProducts
+            .where((p) => p.type == UnlockProductType.season)
+            .toList();
+        final otherProducts = allProducts
+            .where((p) => p.type != UnlockProductType.season)
+            .toList();
+        allProducts
+          ..clear()
+          ..addAll([...seasonProducts, ...otherProducts]);
+        debugPrint(
+          '[_showUnlockBottomSheet] Reordered: season unlock moved to first',
+        );
+      }
       debugPrint(
         '[_showUnlockBottomSheet] allProducts length: ${allProducts.length}',
       );
@@ -1062,8 +1079,23 @@ class _ShortVideoListPageState extends ConsumerState<ShortVideoListPage>
       _clearPendingLockedOverlay();
       if (mounted) {
         setState(() {
-          // 更新该集的可播放状态
-          videoInfoList[index] = videoInfo.copyWith(isCanPlay: 1);
+          if (result.wholeDrama) {
+            // 整剧解锁：把同一部剧（videoId 相同）的所有集都标记为可播放。
+            // 之前只更新当前集，用户划到下一集还会看到锁定状态。
+            final dramaVideoId = videoInfo.videoId;
+            for (var i = 0; i < videoInfoList.length; i++) {
+              if (videoInfoList[i].videoId == dramaVideoId) {
+                videoInfoList[i] = videoInfoList[i].copyWith(isCanPlay: 1);
+              }
+            }
+            debugPrint(
+              '[_showUnlockBottomSheet] whole drama unlocked, '
+              'refreshed all episodes of videoId=$dramaVideoId',
+            );
+          } else {
+            // 更新该集的可播放状态
+            videoInfoList[index] = videoInfo.copyWith(isCanPlay: 1);
+          }
         });
         // 显示成功提示
         final l10n = AppLocalizations.of(context);
