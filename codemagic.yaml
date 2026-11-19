@@ -49,6 +49,10 @@ workflows:
           source: true
       cancel_previous_builds: true
     scripts:
+      - name: Disable Swift Package Manager（google_mobile_ads 不支持 SPM）
+        script: |
+          flutter config --no-enable-swift-package-manager
+
       - name: Get dependencies
         script: |
           flutter packages pub get
@@ -119,6 +123,10 @@ workflows:
           source: true
       cancel_previous_builds: true
     scripts:
+      - name: Disable Swift Package Manager（google_mobile_ads 不支持 SPM）
+        script: |
+          flutter config --no-enable-swift-package-manager
+
       - name: Get dependencies
         script: |
           flutter packages pub get
