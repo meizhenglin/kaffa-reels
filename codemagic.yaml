@@ -297,6 +297,25 @@ workflows:
 
       - name: Build & sign ipa
         script: |
+          set -e
+          # 先显式跑一次 pod install（flutter build ipa 之后会复用，不会重装）
+          cd ios && pod install && cd ..
+          # Apple 自 Xcode 14 起拒收含 bitcode 的二进制（上传报错 90482）。
+          # 部分三方 pod 的预编译框架（如 MobTech 的 OasisSDK）还带着 bitcode，
+          # 归档前统一用 bitcode_strip 剥掉。
+          echo "=== 剥离 Pods 框架中的 bitcode ==="
+          STRIP_COUNT=0
+          while IFS= read -r FW; do
+            BIN="$FW/$(basename "${FW%.framework}")"
+            [ -f "$BIN" ] || continue
+            if xcrun bitcode_strip "$BIN" -r -o /tmp/_strip_bin 2>/dev/null && [ -s /tmp/_strip_bin ]; then
+              mv /tmp/_strip_bin "$BIN"
+              echo "  stripped: $BIN"
+              STRIP_COUNT=$((STRIP_COUNT+1))
+            fi
+          done < <(find ios/Pods -name "*.framework" -type d)
+          echo "=== 共处理 $STRIP_COUNT 个框架二进制 ==="
+
           flutter build ipa --release \
             --export-options-plist=$HOME/export_options.plist
 
