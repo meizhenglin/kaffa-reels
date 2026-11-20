@@ -336,10 +336,12 @@ workflows:
             --sign "$IDENTITY" "$WORK/Payload/Runner.app"
           echo "=== 共处理 $N 个内嵌 bundle, 主 App 已重签 ==="
 
-          # 3) 重新打包覆盖原 ipa
+          # 3) 重新打包覆盖原 ipa（先打到固定路径再移回，避免相对路径随 cd 漂移）
           rm -f "$IPA"
-          cd "$WORK" && zip -q -r -X "$IPA" Payload && cd - > /dev/null
+          cd "$WORK" && zip -q -r -X /tmp/fixed.ipa Payload && cd - > /dev/null
+          mv /tmp/fixed.ipa "$IPA"
           rm -rf "$WORK"
+          ls -lh "$IPA"
           echo "✅ ipa 已重新打包: $IPA"
 
       - name: Verify signing
