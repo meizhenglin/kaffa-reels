@@ -224,13 +224,51 @@ workflows:
             exit 1
           fi
 
-      - name: Set up signing keychain
+      - name: 手动签名（装证书 + 装 profile + 生成 exportOptions）
         script: |
+          # 不用 xcode-project use-profiles 自动匹配（对 profile/证书绑定要求苛刻且
+          # 失败时不给日志）。改为从 Codemagic 加密变量手动安装签名材料：
+          #   CERT_PASSWORD        (.p12 密码, secret)
+          #   CERTIFICATE_P12      (文件变量: Apple Distribution 证书 .p12)
+          #   PROVISIONING_PROFILE (文件变量: qahwatvshorts-appstore2.mobileprovision)
+          set -e
           keychain initialize
+          keychain add-certificates \
+            --certificate-path "$CERTIFICATE_P12" \
+            --certificate-password "$CERT_PASSWORD"
+          echo "=== 钥匙串中的签名身份 ==="
+          security find-identity -v -p codesigning | grep "Apple Distribution" \
+            || { echo "❌ 未找到 Apple Distribution 证书"; exit 1; }
 
-      - name: Fetch provisioning profiles
-        script: |
-          xcode-project use-profiles
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          PROFILE_PLIST=$(mktemp -u).plist
+          security cms -D -i "$PROVISIONING_PROFILE" > "$PROFILE_PLIST"
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$PROFILE_PLIST")
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$PROFILE_PLIST")
+          rm -f "$PROFILE_PLIST"
+          cp "$PROVISIONING_PROFILE" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          echo "✅ profile 已安装: $PROFILE_NAME ($PROFILE_UUID)"
+
+          cat > "$HOME/export_options.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.playlet.qahwatvshorts</key>
+              <string>$PROFILE_NAME</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+          echo "✅ export_options.plist 已生成"
 
       - name: Build & sign ipa
         script: |
