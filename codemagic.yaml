@@ -229,24 +229,31 @@ workflows:
           # 不用 xcode-project use-profiles 自动匹配（对 profile/证书绑定要求苛刻且
           # 失败时不给日志）。改为从 Codemagic 加密变量手动安装签名材料：
           #   CERT_PASSWORD        (.p12 密码, secret)
-          #   CERTIFICATE_P12      (文件变量: Apple Distribution 证书 .p12)
-          #   PROVISIONING_PROFILE (文件变量: qahwatvshorts-appstore2.mobileprovision)
+          #   CERTIFICATE_P12      (证书 .p12 的 base64 文本, secret)
+          #   PROVISIONING_PROFILE (mobileprovision 的 base64 文本, secret)
           set -e
+          test -n "$CERT_PASSWORD" && test -n "$CERTIFICATE_P12" && test -n "$PROVISIONING_PROFILE" \
+            || { echo "❌ 缺少签名变量 CERT_PASSWORD / CERTIFICATE_P12 / PROVISIONING_PROFILE"; exit 1; }
+
           keychain initialize
+          echo "$CERTIFICATE_P12" | base64 --decode > /tmp/cert.p12
           keychain add-certificates \
-            --certificate-path "$CERTIFICATE_P12" \
+            --certificate-path /tmp/cert.p12 \
             --certificate-password "$CERT_PASSWORD"
+          rm -f /tmp/cert.p12
           echo "=== 钥匙串中的签名身份 ==="
           security find-identity -v -p codesigning | grep "Apple Distribution" \
             || { echo "❌ 未找到 Apple Distribution 证书"; exit 1; }
 
+          echo "$PROVISIONING_PROFILE" | base64 --decode > /tmp/profile.mobileprovision
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           PROFILE_PLIST=$(mktemp -u).plist
-          security cms -D -i "$PROVISIONING_PROFILE" > "$PROFILE_PLIST"
+          security cms -D -i /tmp/profile.mobileprovision > "$PROFILE_PLIST"
           PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" "$PROFILE_PLIST")
           PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$PROFILE_PLIST")
           rm -f "$PROFILE_PLIST"
-          cp "$PROVISIONING_PROFILE" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          cp /tmp/profile.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+          rm -f /tmp/profile.mobileprovision
           echo "✅ profile 已安装: $PROFILE_NAME ($PROFILE_UUID)"
 
           cat > "$HOME/export_options.plist" <<EOF
