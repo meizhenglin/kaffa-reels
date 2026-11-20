@@ -252,8 +252,8 @@ workflows:
           keychain initialize
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/cert.p12
           keychain add-certificates \
-            --certificate-path /tmp/cert.p12 \
-            --certificate-password "$CERT_PASSWORD"
+            --certificate /tmp/cert.p12 \
+            --password "$CERT_PASSWORD"
           rm -f /tmp/cert.p12
           echo "=== 钥匙串中的签名身份 ==="
           security find-identity -v -p codesigning | grep "Apple Distribution" \
