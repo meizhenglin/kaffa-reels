@@ -249,14 +249,18 @@ workflows:
           test -n "${CERT_PASSWORD:-}" && test -n "${CERTIFICATE_P12:-}" && test -n "${PROVISIONING_PROFILE:-}" \
             || { echo "❌ 缺少签名变量, 请检查 Codemagic 变量组 ios-signing 是否绑定本 app"; exit 1; }
 
-          keychain initialize
+          # 用原生 security 命令建钥匙串并导入证书（不依赖 Codemagic CLI 的参数版本）
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/cert.p12
-          keychain add-certificates \
-            --certificate /tmp/cert.p12 \
-            --password "$CERT_PASSWORD"
+          KC_PW=cm_kb_2026
+          security create-keychain -p "$KC_PW" build.keychain 2>/dev/null || security unlock-keychain -p "$KC_PW" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KC_PW" build.keychain
+          security import /tmp/cert.p12 -k build.keychain -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KC_PW" build.keychain > /dev/null
           rm -f /tmp/cert.p12
           echo "=== 钥匙串中的签名身份 ==="
-          security find-identity -v -p codesigning | grep "Apple Distribution" \
+          security find-identity -v -p codesigning build.keychain | grep "Apple Distribution" \
             || { echo "❌ 未找到 Apple Distribution 证书"; exit 1; }
 
           echo "$PROVISIONING_PROFILE" | base64 --decode > /tmp/profile.mobileprovision
