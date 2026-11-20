@@ -186,7 +186,8 @@ workflows:
       flutter: 3.44.0          # 与本地开发环境一致（Dart 3.12.0）
       xcode: latest
       cocoapods: default
-      groups: ios-signing
+      groups:            # ← groups 后面是列表
+        - ios-signing    # ← 注意前面的短横线和空格
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.playlet.qahwatvshorts
