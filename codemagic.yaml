@@ -72,6 +72,20 @@ workflows:
       - name: Build iOS device app（免签名）
         script: |
           set -e
+          # iOS 端移除 Kakao 分享：sharesdk_plugin 的 podspec 硬编码了
+          # ShareSDKPlatforms/Kakao 依赖，其内置的 KakaoSDKAuth 预编译二进制
+          # 与 CocoaPods 解析的 Alamofire ABI 不匹配，链接期必报
+          # "symbol(s) not found for architecture arm64"，且钉版本/静态链接均无法修复。
+          # iOS 端本来就不注册 Kakao（init 只注册 Facebook/Twitter），移除安全；
+          # Android 端走 gradle 不受影响。做法：在 pod install 之前改 pub cache 里的 podspec。
+          PUB_CACHE_DIR="${PUB_CACHE:-$HOME/.pub-cache}"
+          PODSPEC=$(find "$PUB_CACHE_DIR" -path "*sharesdk_plugin*/ios/sharesdk_plugin.podspec" 2>/dev/null | head -1)
+          if [ -n "$PODSPEC" ]; then
+            sed -i.bak '/ShareSDKPlatforms\/Kakao/d' "$PODSPEC"
+            echo "✅ 已从 podspec 移除 iOS 端 Kakao 分享依赖: $PODSPEC"
+          else
+            echo "⚠️ 未找到 sharesdk_plugin.podspec，Kakao 依赖仍在"
+          fi
           # --config-only 内部也会跑 pod install，但它失败时 Flutter 会吞掉真实报错，
           # 所以这里先跑一次（失败不拦截），再独立执行 pod install 记录完整日志
           flutter build ios --config-only --debug --no-codesign || true
@@ -195,6 +209,20 @@ workflows:
       - name: Get dependencies
         script: |
           flutter packages pub get
+
+      - name: 移除 iOS 端 Kakao 分享依赖（KakaoSDKAuth 二进制与 Alamofire ABI 不匹配）
+        script: |
+          # 与工作流 1 相同的处理：改 pub cache 里的 podspec，在 pod install 之前生效。
+          # iOS 端未注册 Kakao 平台，移除安全；Android 不受影响。
+          PUB_CACHE_DIR="${PUB_CACHE:-$HOME/.pub-cache}"
+          PODSPEC=$(find "$PUB_CACHE_DIR" -path "*sharesdk_plugin*/ios/sharesdk_plugin.podspec" 2>/dev/null | head -1)
+          if [ -n "$PODSPEC" ]; then
+            sed -i.bak '/ShareSDKPlatforms\/Kakao/d' "$PODSPEC"
+            echo "✅ 已移除: $PODSPEC"
+          else
+            echo "⚠️ 未找到 sharesdk_plugin.podspec"
+            exit 1
+          fi
 
       - name: Set up signing keychain
         script: |

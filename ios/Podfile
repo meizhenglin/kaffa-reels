@@ -31,10 +31,6 @@ target 'Runner' do
   use_frameworks! :linkage => :static
   use_modular_headers!
 
-  # mob_sharesdk 内置的 KakaoSDKAuth 按 Alamofire 5.10+ 接口编译
-  # （引用 RequestAdapter.adapt(_:using:) 等 5.10 新符号）
-  pod 'Alamofire', '5.10.2'
-
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
   target 'RunnerTests' do
