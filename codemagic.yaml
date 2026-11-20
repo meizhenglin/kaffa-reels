@@ -251,13 +251,13 @@ workflows:
 
     artifacts:
       - build/ios/ipa/*.ipa
-    # 发布到 App Store Connect（TestFlight）：配好集成后取消下面注释
-    # publishing:
-    #   app_store_connect:
-    #     auth: integration
-    #     submit_to_testflight: true
-    #     beta_groups:
-    #       - internal-testers           # TODO: TestFlight 内测组名
-    #   email:
-    #     recipients:
-    #       - your-email@example.com     # TODO: 改成你的邮箱
+    # 构建成功后自动上传 TestFlight（需要先在 Codemagic 配好 App Store Connect API key 集成）
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Internal Testers          # TestFlight 内测组名（需与 ASC 里的组名一致）
+      email:
+        recipients:
+          - your-email@example.com    # TODO: 构建结果通知邮箱，改成你的
