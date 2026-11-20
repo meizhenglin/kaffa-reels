@@ -234,8 +234,20 @@ workflows:
           #   CERTIFICATE_P12      (证书 .p12 的 base64 文本, secret)
           #   PROVISIONING_PROFILE (mobileprovision 的 base64 文本, secret)
           set -e
-          test -n "$CERT_PASSWORD" && test -n "$CERTIFICATE_P12" && test -n "$PROVISIONING_PROFILE" \
-            || { echo "❌ 缺少签名变量 CERT_PASSWORD / CERTIFICATE_P12 / PROVISIONING_PROFILE"; exit 1; }
+          echo "=== 变量注入诊断 ==="
+          for v in CERT_PASSWORD CERTIFICATE_P12 PROVISIONING_PROFILE; do
+            VAL="${!v:-}"
+            if [ -z "$VAL" ]; then
+              echo "❌ 未注入: $v"
+            else
+              echo "✅ 已注入: $v (长度 ${#VAL})"
+            fi
+          done
+          echo "--- 环境里与签名相关的变量名 ---"
+          env | cut -d= -f1 | grep -iE "CERT|PROFILE|SIGN|APP_STORE|IOS" || echo "(无)"
+          echo "==================="
+          test -n "${CERT_PASSWORD:-}" && test -n "${CERTIFICATE_P12:-}" && test -n "${PROVISIONING_PROFILE:-}" \
+            || { echo "❌ 缺少签名变量, 请检查 Codemagic 变量组 ios-signing 是否绑定本 app"; exit 1; }
 
           keychain initialize
           echo "$CERTIFICATE_P12" | base64 --decode > /tmp/cert.p12
