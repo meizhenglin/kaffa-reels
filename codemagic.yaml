@@ -105,7 +105,7 @@ workflows:
           echo "✅ pod install 成功"
           set -e
           echo "=== Podfile.lock 中 Alamofire / Kakao 实际解析版本 ==="
-          grep -iE "alamofire|kakaosdk" Podfile.lock
+          grep -iE "alamofire|kakaosdk" Podfile.lock || echo "(无匹配 = Kakao/Alamofire 已移除, 正常)"
           echo "=== Pods 目录里的 KakaoSDKAuth 是源码还是二进制 ==="
           ls Pods/KakaoSDKAuth 2>/dev/null && echo "(源码 pod)" || true
           ls Pods/mob_sharesdk/ShareSDK/Support/PlatformSDK/ 2>/dev/null | head -40
