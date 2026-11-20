@@ -26,12 +26,13 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  use_frameworks!
-  use_modular_headers!
-
-  # mob_sharesdk 拉的 KakaoSDKAuth 按 Alamofire 5.10+ 编译
-  # （引用 RequestAdapter.adapt(_:using:) 等 5.10 新符号），
-  # 不显式钉版本会解析到旧版 Alamofire，导致链接期 symbol not found
+  # 不用 use_frameworks!（保持 Flutter 官方默认的静态链接）。
+  # 动态框架模式下 mob_sharesdk 内置的 KakaoSDKAuth 二进制引用的
+  # Alamofire 符号在链接期解析不到（Xcode 26 debug dylib 下 pod 框架
+  # 不进链接参数），静态链接可保证所有符号被链接器解析。
+  #
+  # 仍需显式钉 Alamofire 5.10.2：KakaoSDKAuth 按 5.10+ 接口编译
+  # （引用 RequestAdapter.adapt(_:using:) 等 5.10 新符号）
   pod 'Alamofire', '5.10.2'
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
