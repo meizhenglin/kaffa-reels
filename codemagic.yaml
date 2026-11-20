@@ -72,8 +72,24 @@ workflows:
       - name: Build iOS device app（免签名）
         script: |
           set -e
-          flutter build ios --config-only --debug --no-codesign
+          # --config-only 内部也会跑 pod install，但它失败时 Flutter 会吞掉真实报错，
+          # 所以这里先跑一次（失败不拦截），再独立执行 pod install 记录完整日志
+          flutter build ios --config-only --debug --no-codesign || true
           cd ios
+          echo "=== 独立执行 pod install ==="
+          set +e
+          pod install > /tmp/pod.log 2>&1
+          PSTATUS=$?
+          if [ $PSTATUS -ne 0 ]; then
+            echo "=== pod install 失败，日志最后 80 行 ==="
+            tail -80 /tmp/pod.log
+            echo ""
+            echo "=== pod install 日志中的错误行 ==="
+            grep -n -iE "\[!\]|error|conflict|could not" /tmp/pod.log | tail -30
+            exit 1
+          fi
+          echo "✅ pod install 成功"
+          set -e
           echo "=== Podfile.lock 中 Alamofire / Kakao 实际解析版本 ==="
           grep -iE "alamofire|kakaosdk" Podfile.lock
           echo "=== Pods 目录里的 KakaoSDKAuth 是源码还是二进制 ==="
