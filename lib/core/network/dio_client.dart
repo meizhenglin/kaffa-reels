@@ -55,6 +55,8 @@ class DioClient {
         },
       )
       ..httpClientAdapter = _buildHttpClientAdapter()
+      // 连接类失败自动重试（必须加在业务拦截器之前，重试成功直接返回）。
+      ..interceptors.add(_buildConnectionRetryInterceptor())
       ..interceptors.add(
         InterceptorsWrapper(
           onRequest: (options, handler) async {
@@ -193,6 +195,52 @@ class DioClient {
         ),
       );
   }
+
+  // ============================================================
+  // 连接类失败自动重试
+  // ============================================================
+
+  /// 场景：iOS（尤其国行设备）首次启动会弹「允许 App 使用无线数据」
+  /// 权限窗，弹窗期间发出的所有请求连接直接失败；用户点「允许」后
+  /// iOS 不会自动恢复已失败的请求，页面就停在空白，只能杀掉重开。
+  /// 这里对连接层失败做带退避的自动重试（最多 3 次），权限授予后
+  /// 重试即成功，无需退出重进。
+  ///
+  /// 只重试「连接建立失败」这类错误（connectionError / connectionTimeout），
+  /// 不重试 receiveTimeout / HTTP 4xx 5xx，避免重复请求慢接口或放大错误。
+  Interceptor _buildConnectionRetryInterceptor() {
+    return InterceptorsWrapper(
+      onError: (error, handler) async {
+        final opts = error.requestOptions;
+        final attempt = (opts.extra['_connRetry'] as int?) ?? 0;
+
+        if (attempt >= 3 || !_isConnectionLevelFailure(error)) {
+          handler.next(error);
+          return;
+        }
+
+        final delay = Duration(milliseconds: 800 * (attempt + 1));
+        _logger.w(
+          '【RETRY】连接失败(${error.type}), '
+          '第 ${attempt + 1}/3 次重试, ${delay.inMilliseconds}ms 后: '
+          '${opts.uri}',
+        );
+        await Future<void>.delayed(delay);
+        opts.extra['_connRetry'] = attempt + 1;
+        try {
+          // fetch 会重新走完整拦截器链（token / X-Client 会重新注入）
+          final response = await _dio.fetch(opts);
+          handler.resolve(response);
+        } on DioException catch (e) {
+          handler.next(e);
+        }
+      },
+    );
+  }
+
+  bool _isConnectionLevelFailure(DioException e) =>
+      e.type == DioExceptionType.connectionError ||
+      e.type == DioExceptionType.connectionTimeout;
 
   static const Set<String> _sensitiveLogKeys = {
     'access_token',
