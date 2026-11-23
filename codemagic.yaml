@@ -81,8 +81,12 @@ workflows:
           PUB_CACHE_DIR="${PUB_CACHE:-$HOME/.pub-cache}"
           PODSPEC=$(find "$PUB_CACHE_DIR" -path "*sharesdk_plugin*/ios/sharesdk_plugin.podspec" 2>/dev/null | head -1)
           if [ -n "$PODSPEC" ]; then
+            # Kakao: 预编译二进制与 Alamofire ABI 不匹配, 链接失败
             sed -i.bak '/ShareSDKPlatforms\/Kakao/d' "$PODSPEC"
-            echo "✅ 已从 podspec 移除 iOS 端 Kakao 分享依赖: $PODSPEC"
+            # SnapChat: SCSDKLoginKit 等框架的 +load 在启动时读不到 SCSDKClientId
+            # 配置直接抛 NSException, App 启动即崩(崩溃队列 com.snap.connect.SCSDKOAuth2Manager)
+            sed -i.bak '/ShareSDKPlatforms\/SnapChat/d' "$PODSPEC"
+            echo "✅ 已从 podspec 移除 iOS 端 Kakao/SnapChat 分享依赖: $PODSPEC"
           else
             echo "⚠️ 未找到 sharesdk_plugin.podspec，Kakao 依赖仍在"
           fi
@@ -215,12 +219,14 @@ workflows:
       - name: 移除 iOS 端 Kakao 分享依赖（KakaoSDKAuth 二进制与 Alamofire ABI 不匹配）
         script: |
           # 与工作流 1 相同的处理：改 pub cache 里的 podspec，在 pod install 之前生效。
-          # iOS 端未注册 Kakao 平台，移除安全；Android 不受影响。
+          # iOS 端未注册 Kakao/SnapChat 平台，移除安全（SnapChat 框架 +load 缺配置启动即崩）；
+          # Android 不受影响。
           PUB_CACHE_DIR="${PUB_CACHE:-$HOME/.pub-cache}"
           PODSPEC=$(find "$PUB_CACHE_DIR" -path "*sharesdk_plugin*/ios/sharesdk_plugin.podspec" 2>/dev/null | head -1)
           if [ -n "$PODSPEC" ]; then
             sed -i.bak '/ShareSDKPlatforms\/Kakao/d' "$PODSPEC"
-            echo "✅ 已移除: $PODSPEC"
+            sed -i.bak '/ShareSDKPlatforms\/SnapChat/d' "$PODSPEC"
+            echo "✅ 已移除 Kakao/SnapChat: $PODSPEC"
           else
             echo "⚠️ 未找到 sharesdk_plugin.podspec"
             exit 1
