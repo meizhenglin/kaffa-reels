@@ -1052,19 +1052,24 @@ class _PlatformButton extends StatelessWidget {
             ? Row(
                 children: [
                   const SizedBox(width: 28),
-                  Image.asset(
-                    iconPath!,
-                    width: 30,
-                    height: 30,
-                    errorBuilder: (_, __, ___) =>
-                        Icon(icon, color: Colors.black, size: 30),
-                  ),
+                  // Apple 按钮是黑底，内置的 apple_icon.png 是黑色 logo 会隐身，
+                  // 改用白色的系统图标；其他平台仍用各自的彩色 PNG。
+                  if (isApple)
+                    Icon(icon, color: Colors.white, size: 30)
+                  else
+                    Image.asset(
+                      iconPath!,
+                      width: 30,
+                      height: 30,
+                      errorBuilder: (_, __, ___) =>
+                          Icon(icon, color: Colors.black, size: 30),
+                    ),
                   Expanded(
                     child: Center(
                       child: Text(
                         label,
-                        style: const TextStyle(
-                          color: Colors.black,
+                        style: TextStyle(
+                          color: isApple ? Colors.white : Colors.black,
                           fontSize: 15,
                         ),
                       ),
