@@ -42,6 +42,11 @@ class _LoginPageState extends ConsumerState<LoginPage>
     with WidgetsBindingObserver {
   bool _appIsInForeground = true;
   bool _googleSignInInProgress = false;
+  /// Apple / TikTok 按钮各自的 loading 状态。
+  /// 【为什么不用 authProvider.isLoading】它是全局共享的，Apple 登录时
+  /// TikTok 按钮也会跟着转圈（反之亦然），观感像两个按钮被同时点了。
+  bool _appleSignInInProgress = false;
+  bool _tiktokSignInInProgress = false;
 
   @override
   void initState() {
@@ -493,16 +498,16 @@ class _LoginPageState extends ConsumerState<LoginPage>
                             const SizedBox(height: 16),
                             Consumer(
                               builder: (_, ref, __) {
-                                final isLoading = ref
-                                    .watch(authProvider)
-                                    .isLoading;
                                 return _PlatformButton(
                                   label: 'Continue with TikTok',
                                   icon: Icons.music_note,
                                   iconPath: 'assets/images/tiktok_icon.png',
-                                  isLoading: isLoading,
+                                  isLoading: _tiktokSignInInProgress,
                                   onTap: () async {
                                     if (!_appIsInForeground) return;
+                                    setState(
+                                      () => _tiktokSignInInProgress = true,
+                                    );
 
                                     // Loading dialog
                                     showDialog(
@@ -568,6 +573,9 @@ class _LoginPageState extends ConsumerState<LoginPage>
                                         .signInWithTikTok();
 
                                     if (!mounted) return;
+                                    setState(
+                                      () => _tiktokSignInInProgress = false,
+                                    );
 
                                     if (success) {
                                       // Close loading dialog
@@ -723,17 +731,17 @@ class _LoginPageState extends ConsumerState<LoginPage>
                             const SizedBox(height: 16),
                             Consumer(
                               builder: (_, ref, __) {
-                                final isLoading = ref
-                                    .watch(authProvider)
-                                    .isLoading;
                                 return _PlatformButton(
                                   label: 'Continue with Apple',
                                   icon: Icons.apple,
                                   iconPath: 'assets/images/apple_icon.png',
-                                  isLoading: isLoading,
+                                  isLoading: _appleSignInInProgress,
                                   isApple: true,
                                   onTap: () async {
                                     if (!_appIsInForeground) return;
+                                    setState(
+                                      () => _appleSignInInProgress = true,
+                                    );
 
                                     // Show loading dialog
                                     showDialog(
@@ -797,6 +805,9 @@ class _LoginPageState extends ConsumerState<LoginPage>
                                         .signInWithApple();
 
                                     if (!mounted) return;
+                                    setState(
+                                      () => _appleSignInInProgress = false,
+                                    );
 
                                     if (success) {
                                       // Close loading dialog
@@ -1036,7 +1047,9 @@ class _PlatformButton extends StatelessWidget {
         width: double.infinity,
         height: 50,
         decoration: BoxDecoration(
-          color: isApple ? Colors.black : Colors.white,
+          // 按 Apple HIG「白底样式」：深色页面上 Apple 登录按钮用白底 + 黑色
+          // logo/文字（white style），与其他平台按钮观感一致。
+          color: Colors.white,
           borderRadius: BorderRadius.circular(30),
         ),
         child: (isLoading
@@ -1045,17 +1058,16 @@ class _PlatformButton extends StatelessWidget {
                 height: 22,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: isApple ? Colors.white : Colors.black,
+                  color: Colors.black,
                 ),
               )
             : iconPath != null
             ? Row(
                 children: [
                   const SizedBox(width: 28),
-                  // Apple 按钮是黑底，内置的 apple_icon.png 是黑色 logo 会隐身，
-                  // 改用白色的系统图标；其他平台仍用各自的彩色 PNG。
+                  // Apple 按钮白底黑 logo；其他平台仍用各自的彩色 PNG。
                   if (isApple)
-                    Icon(icon, color: Colors.white, size: 30)
+                    Icon(icon, color: Colors.black, size: 30)
                   else
                     Image.asset(
                       iconPath!,
@@ -1068,8 +1080,8 @@ class _PlatformButton extends StatelessWidget {
                     child: Center(
                       child: Text(
                         label,
-                        style: TextStyle(
-                          color: isApple ? Colors.white : Colors.black,
+                        style: const TextStyle(
+                          color: Colors.black,
                           fontSize: 15,
                         ),
                       ),

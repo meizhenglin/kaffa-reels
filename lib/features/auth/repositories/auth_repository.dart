@@ -889,16 +889,28 @@ class AuthRepository {
       ],
     );
 
+    debugPrint(
+      '[AppleLoginFlow] Apple 授权完成, 开始 Firebase 登录 '
+      '(token长度=${appleCredential.identityToken?.length ?? 0})',
+    );
+
     final oauthCredential = OAuthProvider('apple.com').credential(
       idToken: appleCredential.identityToken,
       accessToken: appleCredential.authorizationCode,
     );
 
-    final userCredential = await _auth.signInWithCredential(oauthCredential);
+    // ⚠️ Firebase Auth 在个别配置异常时会永久挂起（用户看到无限转圈），
+    // 加超时兜底，让失败可见而不是卡死。
+    final userCredential = await _auth
+        .signInWithCredential(oauthCredential)
+        .timeout(const Duration(seconds: 30));
     var user = userCredential.user;
     if (user == null) {
       throw FirebaseAuthException(code: 'user-not-found');
     }
+    debugPrint(
+      '[AppleLoginFlow] Firebase 登录成功 uid=${user.uid}, 同步后端 token',
+    );
 
     // 同步 Apple Token 到后端
     final backendSynced = await _syncBackendToken(
@@ -929,9 +941,12 @@ class AuthRepository {
     final familyName = appleCredential.familyName;
     if (givenName != null && user.displayName == null) {
       final fullName = [givenName, familyName].whereType<String>().join(' ');
-      await user.updateDisplayName(fullName);
+      await user
+          .updateDisplayName(fullName)
+          .timeout(const Duration(seconds: 15));
       user = await _reloadUser(user);
     }
+    debugPrint('[AppleLoginFlow] 全流程完成');
 
     final model = await _userModelFromFirebaseUser(user);
     final updatedModel = await _refreshVipStatusFromBackend(model);
