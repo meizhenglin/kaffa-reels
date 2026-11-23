@@ -190,6 +190,8 @@
 				<string>qahwatv</string>
 				<!-- Facebook Login 深度链接回调，必须为 fb<APP_ID> 格式 -->
 				<string>fb1153560107115108</string>
+				<!-- Google Sign-In 回跳 scheme（来自 GoogleService-Info.plist 的 REVERSED_CLIENT_ID） -->
+				<string>com.googleusercontent.apps.278933660671-g0pb4el9n614u3jj3c0i8mhfs6b39p6q</string>
 			</array>
 		</dict>
 	</array>
