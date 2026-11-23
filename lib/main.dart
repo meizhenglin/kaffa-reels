@@ -20,6 +20,7 @@ import 'app/theme/app_theme.dart';
 import 'core/ads/ad_mediator.dart';
 import 'core/config/build_flavor.dart';
 import 'core/config/build_info.dart';
+import 'core/utils/app_restart.dart';
 import 'core/widgets/mouse_drag_scroll.dart';
 import 'core/firebase/firebase_service.dart';
 import 'features/auth/providers/auth_provider.dart';
@@ -35,6 +36,11 @@ Future<void> _withTimeout(Future<void> future, Duration timeout) async {
     await future.timeout(timeout, onTimeout: () {});
   } catch (_) {}
 }
+
+/// iOS 软重启的重建种子：值变化时以新 Key 重建 ProviderScope 子树。
+/// （iOS 不允许 App 自行退出后自动拉起，exit(0) 表现为闪退，
+/// 所以 iOS 的「重启」用软重启实现，见 AppRestart.registerSoftRestart）
+final _appRebuildSeed = ValueNotifier<int>(0);
 
 Future<void> main() async {
   debugPrint('[MAIN] === main() started ===');
@@ -90,10 +96,21 @@ Future<void> main() async {
     await firebaseReady;
   }
 
+  // iOS 软重启：以新 Key 重建 ProviderScope 子树（provider 状态全部归零，
+  // 路由回初始页），Firebase / 广告 SDK 等进程级单例保持已初始化状态。
+  AppRestart.registerSoftRestart(() async {
+    debugPrint('[MAIN] iOS soft restart: rebuilding app subtree');
+    _appRebuildSeed.value++;
+  });
+
   runApp(
-    ProviderScope(
-      overrides: [storageServiceProvider.overrideWithValue(storage)],
-      child: const QahwaTVApp(),
+    ValueListenableBuilder<int>(
+      valueListenable: _appRebuildSeed,
+      builder: (_, seed, __) => ProviderScope(
+        key: ValueKey('app-$seed'),
+        overrides: [storageServiceProvider.overrideWithValue(storage)],
+        child: const QahwaTVApp(),
+      ),
     ),
   );
 

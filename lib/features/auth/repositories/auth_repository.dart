@@ -949,53 +949,44 @@ class AuthRepository {
     debugPrint('[AppleLoginFlow] 后端登录成功');
 
     // ------------------------------------------------------------
-    // 2) Firebase 本地会话：尽力而为。
+    // 2) Firebase 本地会话：后台尽力而为，**不等待、不阻塞登录返回**。
     //    实测 iOS 上 signInWithCredential 可能永久挂起（TimeoutException
-    //    after 30s, Future not completed），它不是登录链路的必要环节，
-    //    失败/超时不阻塞登录，走后端用户信息降级返回。
+    //    after 30s），之前即使加了超时也要白等 10 秒才显示登录成功。
+    //    登录凭证在后端（第 1 步已完成），这里只是补建本地会话，放后台跑。
     // ------------------------------------------------------------
-    User? user;
-    try {
-      final oauthCredential = OAuthProvider('apple.com').credential(
-        idToken: appleCredential.identityToken,
-        accessToken: appleCredential.authorizationCode,
-      );
-      final userCredential = await _auth
-          .signInWithCredential(oauthCredential)
-          .timeout(const Duration(seconds: 10));
-      user = userCredential.user;
-      if (user != null) {
-        debugPrint('[AppleLoginFlow] Firebase 登录成功 uid=${user.uid}');
-      }
-    } catch (e) {
-      debugPrint('[AppleLoginFlow] Firebase 会话未建立(不阻塞登录): $e');
-    }
-
-    debugPrint('[AppleLoginFlow] 全流程完成');
-
-    if (user != null) {
-      final firebaseUser = user;
-      final givenName = appleCredential.givenName;
-      final familyName = appleCredential.familyName;
-      if (givenName != null && firebaseUser.displayName == null) {
-        final fullName = [givenName, familyName]
-            .whereType<String>()
-            .join(' ');
-        try {
+    unawaited(() async {
+      try {
+        final oauthCredential = OAuthProvider('apple.com').credential(
+          idToken: appleCredential.identityToken,
+          accessToken: appleCredential.authorizationCode,
+        );
+        final userCredential = await _auth
+            .signInWithCredential(oauthCredential)
+            .timeout(const Duration(seconds: 10));
+        final firebaseUser = userCredential.user;
+        debugPrint(
+          '[AppleLoginFlow] Firebase 会话建立: uid=${firebaseUser?.uid}',
+        );
+        final givenName = appleCredential.givenName;
+        final familyName = appleCredential.familyName;
+        if (firebaseUser != null &&
+            givenName != null &&
+            firebaseUser.displayName == null) {
+          final fullName = [givenName, familyName]
+              .whereType<String>()
+              .join(' ');
           await firebaseUser
               .updateDisplayName(fullName)
               .timeout(const Duration(seconds: 10));
-        } catch (e) {
-          debugPrint('[AppleLoginFlow] updateDisplayName 失败(忽略): $e');
         }
+      } catch (e) {
+        debugPrint('[AppleLoginFlow] Firebase 会话未建立(忽略): $e');
       }
-      final model = await _userModelFromFirebaseUser(firebaseUser);
-      final updatedModel = await _refreshVipStatusFromBackend(model);
-      await cacheUser(updatedModel);
-      return updatedModel;
-    }
+    }());
 
-    // Firebase 不可用时的降级路径：与 TikTok 流程一致，直接用后端用户信息。
+    debugPrint('[AppleLoginFlow] 全流程完成');
+
+    // 3) 用户信息直接走后端（与 TikTok 流程一致），不再依赖 Firebase。
     final resp = await apiServiceProvider.getUserCenter();
     if (resp.isSuccess && resp.data != null) {
       final userData = resp.data as Map<String, dynamic>;
