@@ -42,7 +42,9 @@ class RechargeProduct extends Equatable {
       case TargetPlatform.android:
         return googlePlayId;
       case TargetPlatform.iOS:
-        return iosProductId;
+        // 后台 goodsIosId 没配时兜底 Google ID：
+        // App Store / Google Play 两边用的是同一套产品 ID。
+        return iosProductId.isNotEmpty ? iosProductId : googlePlayId;
       default:
         return googlePlayId;
     }
@@ -52,7 +54,10 @@ class RechargeProduct extends Equatable {
     return RechargeProduct(
       goodsId: item.goodsId,
       googlePlayId: item.goodsGoogleId,
-      iosProductId: item.goodsIosId,
+      // iOS ID 缺省时兜底 Google ID（两边商店同 ID），避免 iOS 端查不到商品
+      iosProductId: item.goodsIosId.isNotEmpty
+          ? item.goodsIosId
+          : item.goodsGoogleId,
       price: item.price,
       coinAmount: _parseCoinAmount(item),
       bonusAmount: item.rechargeGoodsGive,

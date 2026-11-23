@@ -15,6 +15,7 @@ import '../models/recharge_product.dart';
 import '../providers/coin_record_provider.dart' as coin_record;
 import '../providers/recharge_provider.dart';
 import '../services/unified_payment_handler.dart';
+import '../services/payment_service.dart';
 import '../widgets/payment_channel_selector.dart';
 
 /// K-Coin recharge products page
@@ -88,9 +89,14 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
         final success = await handler.purchase(product);
         if (!success && mounted) {
           final raw = handler.lastError;
-          final reason = raw == null
+          var reason = raw == null
               ? l10n.purchaseFailedPleaseRetry
               : _localizePlayFailure(raw, l10n);
+          // 同会员页：把 Play 原始 debugMessage 带出来，方便测试排障。
+          final playDebug = PaymentService.instance.lastPlayDebugMessage;
+          if (playDebug != null && playDebug.isNotEmpty) {
+            reason = '$reason\n(Play: $playDebug)';
+          }
           AppSnackBar.show(context, message: reason);
         } else if (success && mounted) {
           AppSnackBar.show(context, message: l10n.purchaseSuccessful);
@@ -120,9 +126,14 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
         final success = await handler.purchase(product);
         if (!success && mounted) {
           final raw = handler.lastError;
-          final reason = raw == null
+          var reason = raw == null
               ? l10n.purchaseFailedPleaseRetry
               : _localizePlayFailure(raw, l10n);
+          // 同会员页：把 Play 原始 debugMessage 带出来，方便测试排障。
+          final playDebug = PaymentService.instance.lastPlayDebugMessage;
+          if (playDebug != null && playDebug.isNotEmpty) {
+            reason = '$reason\n(Play: $playDebug)';
+          }
           AppSnackBar.show(context, message: reason);
         } else if (success && mounted) {
           AppSnackBar.show(context, message: l10n.purchaseSuccessful);

@@ -751,6 +751,23 @@ class ApiService {
     );
   }
 
+  /// Apple 支付回调通知（`POST /notice/apple`）。
+  ///
+  /// 【请求体格式】和 [googleCallBack] 同构：后端 OpenAPI 里
+  /// requestBody 也是 `type: string`（@RequestBody String），
+  /// 所以同样「平铺字段 + params 字符串」双保险，
+  /// 两种后端解析方式都能拿到数据。
+  ///
+  /// [params] 是购买信息的 Map（orderNo / productId / receipt …）。
+  /// iOS 端 `verificationData.localVerificationData` 就是 App Store 收据
+  /// （Base64），原样放在 receipt / purchaseToken 里给后端验证。
+  Future<ApiResponse> appleCallBack({required Map<String, dynamic> params}) {
+    return request(
+      ApiEndpoints.appleCallBack,
+      data: <String, dynamic>{...params, 'params': jsonEncode(params)},
+    );
+  }
+
   /// 获取签到配置
   Future<ApiResponse> getSignConfig() {
     return request(ApiEndpoints.signConfig, method: 'GET');

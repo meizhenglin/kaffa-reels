@@ -429,9 +429,9 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
                 goodsId: goodsId,
               );
             } else if (payment['purchaseToken'] != null) {
-              // 旧版本客户端遗留下的「客户端直发 /notice/google」待重试数据，
-              // 继续按老接口补发，成功后本地清掉。
-              success = await _payService.confirmGooglePurchase(params: payment);
+              // 「客户端直发回调」待重试数据，按平台补发对应接口
+              // （iOS /notice/apple、Android /notice/google）。
+              success = await _payService.confirmStorePurchase(params: payment);
             } else {
               // 新流程：支付成功但 userRechange 没发出去 → 补建订单。
               final goodsId = (payment['goodsId'] as num?)?.toInt();
@@ -798,12 +798,13 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
             await Future<void>.delayed(Duration(seconds: 2 << (attempt - 2)));
           }
           try {
-            confirmed = await _payService.confirmGooglePurchase(
+            // 【按平台路由回调】iOS → /notice/apple，Android → /notice/google。
+            confirmed = await _payService.confirmStorePurchase(
               params: callbackPayload,
             );
           } catch (e) {
             debugPrint(
-              '[Purchase] Step 4: /notice/google attempt $attempt failed: $e',
+              '[Purchase] Step 4: store callback attempt $attempt failed: $e',
             );
           }
         }

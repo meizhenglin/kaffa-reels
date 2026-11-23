@@ -96,6 +96,16 @@ class ApiEndpoints {
   /// 「付了钱会员不到账」就是这么来的。
   static const String googleCallBack = '/notice/google';
 
+  /// Apple 内购结果回调。
+  ///
+  /// 后端 OpenAPI（pay-result-controller / appleCallBack）：
+  /// ```
+  /// /notice/apple  (POST, requestBody: application/json, type: string)
+  /// ```
+  /// iOS 端 App Store 内购的支付结果发这里（和 /notice/google 同构），
+  /// 不然「付了钱会员/金币不到账」。
+  static const String appleCallBack = '/notice/apple';
+
   // 签到
   static const String signConfig = '/api/userSign/getSignConfig';
   static const String userSignInfo = '/api/userSign/getSignInfo';

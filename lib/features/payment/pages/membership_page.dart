@@ -58,6 +58,13 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         } else {
           displayMessage = _localizePlayFailure(message, l10n) ?? message;
         }
+        // 把 Play 给出的原始 debugMessage 带到提示上（测试排障用）：
+        // 本地化文案只说「结算不可用」，Play 的 debugMessage 才是
+        // 真正原因（账号无资格 / 应用未发布 / 地区不支持等）。
+        final playDebug = PaymentService.instance.lastPlayDebugMessage;
+        if (playDebug != null && playDebug.isNotEmpty) {
+          displayMessage = '$displayMessage\n(Play: $playDebug)';
+        }
         _lastShownError = displayMessage;
         AppSnackBar.show(context, message: displayMessage);
       }

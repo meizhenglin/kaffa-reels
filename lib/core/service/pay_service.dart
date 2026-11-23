@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
 import '../config/app_config.dart';
+import '../config/runtime_os.dart';
 import '../network/api_service.dart';
 import '../storage/storage_service.dart';
 
@@ -33,8 +34,11 @@ class PayService {
   // ==================== 支付环境判断 ====================
 
   /// 获取当前设备 OS 名称
-  /// Flutter 无法直接判断真实系统，通过 platformType 读取 AppConfig
-  String get osName => AppConfig.platformType;
+  ///
+  /// 【不再读 AppConfig.platformType】那是打包前手改的常量（Android/iOS），
+  /// 忘改就会让 iOS 端拿到 Android 的 payType=5，订单全记错渠道。
+  /// 改为运行时判断（内购流程只在原生平台跑，web 不会走到这里）。
+  String get osName => runtimeOsName;
 
   /// 判断当前环境是否允许支付（基于后端返回的系统配置）
   Future<bool> isPayEnabled() async {
@@ -125,19 +129,49 @@ class PayService {
 
   // ==================== iOS 内购（App Store） ====================
 
+  /// Apple 内购回调（`POST /notice/apple`）。
+  ///
+  /// 【为什么不发 /notice/google】之前 iOS 的购买结果被丢进 Google 回调，
+  /// 后端 appleCallBack 永远收不到 —— 付了钱会员/金币不到账。
+  /// 报文结构和 Google 回调一致（orderNo/productId/purchaseToken…），
+  /// 额外带 platform=ios，receipt 放 App Store 收据（Base64）。
+  Future<bool> confirmApplePurchase({
+    required Map<String, dynamic> params,
+  }) async {
+    final resp = await _apiService.appleCallBack(params: params);
+    if (!resp.isSuccess) {
+      debugPrint(
+        '[PayService] Apple 回调失败: code=${resp.code} error=${resp.error}',
+      );
+    }
+    return resp.isSuccess;
+  }
+
+  /// 按当前平台把购买结果发到正确的回调接口：
+  /// iOS → /notice/apple，其余 → /notice/google。
+  ///
+  /// 各购买链路（K币/解锁/会员）统一走这里，不再各自判断平台。
+  Future<bool> confirmStorePurchase({
+    required Map<String, dynamic> params,
+  }) async {
+    if (osName == 'iOS') {
+      return confirmApplePurchase(params: {...params, 'platform': 'ios'});
+    }
+    return confirmGooglePurchase(params: {...params, 'platform': 'android'});
+  }
+
   /// iOS 内购确认
   /// [params] 包含 transactionId 和 productId
   Future<bool> confirmIOSPurchase({
     required String transactionId,
     required String productId,
   }) async {
-    // iOS 内购也走 Google Play 回调接口，参数格式兼容
     final callbackPayload = {
       'transactionId': transactionId,
       'productId': productId,
       'platform': 'ios',
     };
-    return confirmGooglePurchase(params: callbackPayload);
+    return confirmApplePurchase(params: callbackPayload);
   }
 
   // ==================== 播放器广告（Flutter 等价实现） ====================

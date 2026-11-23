@@ -4,6 +4,7 @@ import '../../app/providers/app_providers.dart';
 import '../config/app_config.dart';
 import '../config/app_version.dart';
 import '../config/build_flavor.dart';
+import '../config/runtime_os.dart';
 
 /// `X-Client` 请求头 —— **全项目唯一的构造入口**。
 ///
@@ -42,7 +43,9 @@ class XClientHeader {
     final version = await AppVersion.resolveBase();
     final build = await AppVersion.resolveFull();
     return '${AppConfig.currentXClient};version=$version;'
-        'osName=${AppConfig.platformType};x-lang=$lang;'
+        // 【运行时判断】之前读 AppConfig.platformType（打包前手改的常量），
+        // iOS 包忘改会一直发 osName=Android，后端按 Android 处理渠道/支付开关。
+        'osName=$runtimeOsName;x-lang=$lang;'
         'channel=${BuildFlavor.current};build=$build';
   }
 

@@ -76,6 +76,14 @@ class PaymentService {
   String? get lastPlayFailureCode => _lastPlayFailureCode;
   String? _lastPlayFailureCode;
 
+  /// 最近一次探针拿到的 Play 原始 `debugMessage`。
+  ///
+  /// 本地化文案只说「结算不可用」，而 Play 的 debugMessage 才是真正原因
+  /// （账号无资格 / 应用未发布 / 地区不支持 / 商店版本过旧）。
+  /// 测试排障时把它带到 UI 提示上，省得再翻日志。
+  String? get lastPlayDebugMessage => _lastPlayDebugMessage;
+  String? _lastPlayDebugMessage;
+
   /// 最近一次查询中，Play **明确表示不存在**的商品 ID。
   ///
   /// 只有在探针确认 Play 受理了请求（响应码 OK）时才会填充 —— 否则
@@ -156,6 +164,7 @@ class PaymentService {
 
     // 每次查询都重置，避免上一次的失败原因被这一次的调用误用。
     _lastPlayFailureCode = null;
+    _lastPlayDebugMessage = null;
     _lastMissingProductIds = <String>{};
 
     // Auto-initialize if needed
@@ -345,6 +354,13 @@ class PaymentService {
           .timeout(const Duration(seconds: 8));
       debugPrint('[PaymentService] ${PlayBillingProbe.describe(results)}');
       _lastPlayFailureCode = PlayBillingProbe.failureCode(results);
+      for (final r in results) {
+        final msg = r.debugMessage;
+        if (msg != null && msg.isNotEmpty) {
+          _lastPlayDebugMessage = msg;
+          break;
+        }
+      }
 
       // 只有 Play 明确受理（两种类型都返回 OK）才认为「没给详情」可信。
       final playProcessed = results.isNotEmpty && results.every((r) => r.isOk);
@@ -855,6 +871,21 @@ class PaymentService {
           //   2. 事件落到会员处理器 → 没有 pendingOrderId → 抛 StateError
           //      → 用户买完币看到「Failed to process purchase」
           if (_productKinds[purchase.productID] == PlayProductKind.consumable) {
+            // 【iOS 必须手动 finishTransaction】
+            // buyConsumable 的 autoConsume 只在 Android（Google Play）生效，
+            // iOS 的交易不会自动结束 —— 不 completePurchase 的话交易一直
+            // 挂在「未完成」，下次购买会先弹「有未完成的交易」。
+            if (purchase.pendingCompletePurchase &&
+                !kIsWeb &&
+                defaultTargetPlatform == TargetPlatform.iOS) {
+              try {
+                await _inAppPurchase.completePurchase(purchase);
+              } catch (e) {
+                debugPrint(
+                  '[PaymentService] iOS completePurchase failed: $e',
+                );
+              }
+            }
             if (isPendingProduct) {
               _pendingPurchaseCompleter?.complete(true);
               _pendingPurchaseCompleter = null;

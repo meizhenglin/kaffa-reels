@@ -42,10 +42,13 @@ class RechargePurchaseHandler {
 
     final paymentService = PaymentService.instance;
 
-    // Step 1: 先查 Play 商品。商品都查不到就别建订单了，
+    // Step 1: 先查商店商品。商品都查不到就别建订单了，
     // 否则会留下一笔永远不会被支付的订单。
+    // 【按平台取商品 ID】iOS 取 iosProductId（后台没配则兜底 Google ID，
+    // 两边商店用的是同一套 ID），Android 取 googlePlayId。
+    final platformProductId = product.getProductId(defaultTargetPlatform);
     final products = await paymentService.getProducts(
-      productIds: [product.googlePlayId],
+      productIds: [platformProductId],
     );
 
     if (products.isEmpty) {
@@ -155,12 +158,14 @@ class RechargePurchaseHandler {
         await Future.delayed(delay);
       }
       try {
-        confirmed = await payServiceProvider.confirmGooglePurchase(
+        // 【按平台路由回调】iOS → /notice/apple，Android → /notice/google。
+        // 之前 iOS 的购买结果也被丢进 Google 回调，后端永远收不到。
+        confirmed = await payServiceProvider.confirmStorePurchase(
           params: callbackPayload,
         );
       } catch (e) {
         debugPrint(
-          '[Recharge] Google callback failed (attempt ${retryCount + 1}): $e',
+          '[Recharge] store callback failed (attempt ${retryCount + 1}): $e',
         );
       }
       retryCount++;
@@ -284,12 +289,18 @@ class RechargeProductsNotifier extends StateNotifier<RechargeProductsState> {
               .toList();
         }
 
-        final products =
-            items
-                .where((item) => item.isEnable && item.goodsGoogleId.isNotEmpty)
-                .map((item) => RechargeProduct.fromGoodsConfig(item))
-                .toList()
-              ..sort((a, b) => a.sort.compareTo(b.sort));
+        // 【过滤条件按平台取 ID，并互相兜底】
+        // 之前只认 goodsGoogleId 非空 —— 后台如果只配了 iOS 商品 ID，
+        // iOS 端会整页空白。两边商店用同一套产品 ID，缺一边时用另一边兜底。
+        final products = items
+            .where(
+              (item) =>
+                  item.isEnable &&
+                  (item.goodsGoogleId.isNotEmpty || item.goodsIosId.isNotEmpty),
+            )
+            .map((item) => RechargeProduct.fromGoodsConfig(item))
+            .toList()
+          ..sort((a, b) => a.sort.compareTo(b.sort));
 
         state = state.copyWith(
           products: products,

@@ -1,4 +1,5 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart' show PurchaseDetails, PurchaseStatus;
 
@@ -918,7 +919,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         success = resp.isSuccess;
       } else if (product.type == UnlockProductType.season) {
         resp = await apiService.userRechange(
-          payType: 5,
+          // 【按平台传 payType】5=Android(Google Play)，6=iOS(App Store)。
+          // 之前写死 5，iOS 建出来的订单会被记成 Google 渠道。
+          payType: defaultTargetPlatform == TargetPlatform.iOS ? 6 : 5,
           payConfigId: product.goodsId,
           videoId: widget.videoId,
         );
@@ -963,8 +966,11 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
     try {
       final paymentService = PaymentService.instance;
+      // 【按平台取商品 ID】iOS 取 iosProductId（后台没配则兜底 Google ID），
+      // Android 取 googlePlayId。之前写死 Google ID，iOS 上永远查不到商品。
+      final platformProductId = product.getProductId(defaultTargetPlatform);
       final products = await paymentService.getProducts(
-        productIds: [product.googlePlayId ?? ''],
+        productIds: [platformProductId],
       );
 
       if (products.isEmpty) {
@@ -976,11 +982,12 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       }
 
       debugPrint(
-        '[Unlock] Google Play purchase start: goodsId=${product.goodsId} '
-        'playId=${product.googlePlayId} type=${product.type}',
+        '[Unlock] store purchase start: goodsId=${product.goodsId} '
+        'productId=$platformProductId type=${product.type}',
       );
 
-      // 【先建单】后端 /notice/google 回调需要 orderNo 来关联这笔 Play 支付。
+      // 【先建单】后端回调（iOS /notice/apple、Android /notice/google）
+      // 需要 orderNo 来关联这笔支付。
       // 【必须带 videoId】解锁订单里如果没有 videoId，后端订单记录的
       // videoId 是 0，回调按 orderNo 反查订单时拿不到剧集信息，
       // 整剧解锁就不知道要解锁哪部剧。
@@ -993,7 +1000,8 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           storage: ref.read(storageServiceProvider),
         );
         final resp = await apiService.userRechange(
-          payType: 5, // 5 = Android
+          // 5 = Android(Google Play)，6 = iOS(App Store)
+          payType: defaultTargetPlatform == TargetPlatform.iOS ? 6 : 5,
           payConfigId: product.goodsId,
           videoId: widget.videoId,
         );
@@ -1259,12 +1267,13 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         await Future<void>.delayed(Duration(seconds: 2 << (retry - 1)));
       }
       try {
-        confirmed = await payServiceProvider.confirmGooglePurchase(
+        // 【按平台路由回调】iOS → /notice/apple，Android → /notice/google。
+        confirmed = await payServiceProvider.confirmStorePurchase(
           params: callbackPayload,
         );
       } catch (e) {
         debugPrint(
-          '[Unlock] Google callback failed (attempt ${retry + 1}): $e',
+          '[Unlock] store callback failed (attempt ${retry + 1}): $e',
         );
       }
     }
@@ -1383,16 +1392,16 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     try {
       final paymentService = PaymentService.instance;
 
-      // 先查 Play 商品，再建订单。
+      // 先查商店商品（按平台取 ID），再建订单。
       // 商品根本不存在的时候没必要建订单，否则会留下一条永远不会被支付的订单。
       final products = await paymentService.getProducts(
-        productIds: [product.googlePlayId ?? ''],
+        productIds: [product.getProductId(defaultTargetPlatform)],
         requireSubscriptionOnAndroid: true,
       );
 
       if (products.isEmpty) {
         debugPrint(
-          '[Unlock] No Google Play product for "${product.googlePlayId}" '
+          '[Unlock] No store product for "${product.getProductId(defaultTargetPlatform)}" '
           '(goodsId=${product.goodsId}) — skipping order creation',
         );
         if (mounted) {

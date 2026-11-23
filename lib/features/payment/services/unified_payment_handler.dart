@@ -140,13 +140,13 @@ class UnifiedPaymentHandler {
   }) async {
     try {
       final products = await _paymentService.getProducts(
-        productIds: [product.googlePlayId],
+        productIds: [product.getProductId(defaultTargetPlatform)],
       );
       if (products.isEmpty) {
-        lastError = 'Product not available in Google Play';
+        lastError = 'Product not available in store';
         return false;
       }
-      // 注意：这里只负责把购买流程跑完，**不会**给后端发 pay/callback/google。
+      // 注意：这里只负责把购买流程跑完，**不会**给后端发回调。
       // Google Play 的 K币 充值请走 recharge_provider.dart 的
       // RechargePurchaseHandler —— 它负责建订单、发回调、刷新服务端余额。
       // 当前 UI 里的 Google Play 充值走的正是那条路径，这里只是兜底。
@@ -164,7 +164,7 @@ class UnifiedPaymentHandler {
     required BuildContext context,
   }) async {
     try {
-      final productId = product.googlePlayId ?? '';
+      final productId = product.getProductId(defaultTargetPlatform);
       if (productId.isEmpty) {
         lastError = 'Product not configured';
         return false;
@@ -189,7 +189,7 @@ class UnifiedPaymentHandler {
   }) async {
     try {
       final products = await _paymentService.getProducts(
-        productIds: [product.googlePlayId],
+        productIds: [product.getProductId(defaultTargetPlatform)],
         requireSubscriptionOnAndroid: true,
       );
       if (products.isEmpty) {
