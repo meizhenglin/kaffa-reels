@@ -841,9 +841,10 @@
       return this._request(ENDPOINTS.USER_AUTHORIZATION, {
         body: {
           passportType: PASSPORT_TYPE.APPLE,
+          passportName: appleUser.identityToken,
           idToken: appleUser.identityToken,
           authorizationCode: appleUser.authorizationCode,
-          fullName: appleUser.fullName || ''
+          nickName: appleUser.fullName || ''
         }
       }).then(function(res) {
         if (res.isSuccess) {

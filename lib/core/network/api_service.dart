@@ -220,6 +220,11 @@ class ApiService {
   }
 
   /// Apple 登录
+  ///
+  /// 与 Google/Facebook 保持一致的结构：凭证字符串放 `passportName`
+  /// （Apple 用 identityToken），显示名放 `nickName`（后端 UserLogin
+  /// schema 没有 fullName 字段，之前传的 fullName 会被后端忽略）。
+  /// 注意：Apple 只在**首次**授权时返回姓名，第二次起 nickName 可能为空。
   Future<ApiResponse> appleLogin({
     required String identityToken,
     required String authorizationCode,
@@ -229,9 +234,11 @@ class ApiService {
       ApiEndpoints.appleLogin,
       data: {
         'passportType': PassportType.apple,
+        'passportName': identityToken,
         'idToken': identityToken,
         'authorizationCode': authorizationCode,
-        if (fullName != null && fullName.isNotEmpty) 'fullName': fullName,
+        if (fullName != null && fullName.isNotEmpty)
+          'nickName': fullName,
       },
     );
   }
