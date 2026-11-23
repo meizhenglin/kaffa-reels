@@ -889,30 +889,14 @@ class AuthRepository {
       ],
     );
 
+    // ------------------------------------------------------------
+    // 1) 后端登录（真正的凭证方）——拿 Apple 的 identityToken/authorizationCode
+    //    即可，后端自行验签并下发业务 token。先走后端，Firebase 只做本地会话。
+    // ------------------------------------------------------------
     debugPrint(
-      '[AppleLoginFlow] Apple 授权完成, 开始 Firebase 登录 '
+      '[AppleLoginFlow] Apple 授权完成, 同步后端 '
       '(token长度=${appleCredential.identityToken?.length ?? 0})',
     );
-
-    final oauthCredential = OAuthProvider('apple.com').credential(
-      idToken: appleCredential.identityToken,
-      accessToken: appleCredential.authorizationCode,
-    );
-
-    // ⚠️ Firebase Auth 在个别配置异常时会永久挂起（用户看到无限转圈），
-    // 加超时兜底，让失败可见而不是卡死。
-    final userCredential = await _auth
-        .signInWithCredential(oauthCredential)
-        .timeout(const Duration(seconds: 30));
-    var user = userCredential.user;
-    if (user == null) {
-      throw FirebaseAuthException(code: 'user-not-found');
-    }
-    debugPrint(
-      '[AppleLoginFlow] Firebase 登录成功 uid=${user.uid}, 同步后端 token',
-    );
-
-    // 同步 Apple Token 到后端
     final backendSynced = await _syncBackendToken(
       () => apiServiceProvider.appleLogin(
         identityToken: appleCredential.identityToken ?? '',
@@ -936,22 +920,69 @@ class AuthRepository {
         'Apple sign-in succeeded, but backend token sync failed.',
       );
     }
+    debugPrint('[AppleLoginFlow] 后端登录成功');
 
-    final givenName = appleCredential.givenName;
-    final familyName = appleCredential.familyName;
-    if (givenName != null && user.displayName == null) {
-      final fullName = [givenName, familyName].whereType<String>().join(' ');
-      await user
-          .updateDisplayName(fullName)
-          .timeout(const Duration(seconds: 15));
-      user = await _reloadUser(user);
+    // ------------------------------------------------------------
+    // 2) Firebase 本地会话：尽力而为。
+    //    实测 iOS 上 signInWithCredential 可能永久挂起（TimeoutException
+    //    after 30s, Future not completed），它不是登录链路的必要环节，
+    //    失败/超时不阻塞登录，走后端用户信息降级返回。
+    // ------------------------------------------------------------
+    User? user;
+    try {
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode,
+      );
+      final userCredential = await _auth
+          .signInWithCredential(oauthCredential)
+          .timeout(const Duration(seconds: 10));
+      user = userCredential.user;
+      if (user != null) {
+        debugPrint('[AppleLoginFlow] Firebase 登录成功 uid=${user.uid}');
+      }
+    } catch (e) {
+      debugPrint('[AppleLoginFlow] Firebase 会话未建立(不阻塞登录): $e');
     }
+
     debugPrint('[AppleLoginFlow] 全流程完成');
 
-    final model = await _userModelFromFirebaseUser(user);
-    final updatedModel = await _refreshVipStatusFromBackend(model);
-    await cacheUser(updatedModel);
-    return updatedModel;
+    if (user != null) {
+      final firebaseUser = user;
+      final givenName = appleCredential.givenName;
+      final familyName = appleCredential.familyName;
+      if (givenName != null && firebaseUser.displayName == null) {
+        final fullName = [givenName, familyName]
+            .whereType<String>()
+            .join(' ');
+        try {
+          await firebaseUser
+              .updateDisplayName(fullName)
+              .timeout(const Duration(seconds: 10));
+        } catch (e) {
+          debugPrint('[AppleLoginFlow] updateDisplayName 失败(忽略): $e');
+        }
+      }
+      final model = await _userModelFromFirebaseUser(firebaseUser);
+      final updatedModel = await _refreshVipStatusFromBackend(model);
+      await cacheUser(updatedModel);
+      return updatedModel;
+    }
+
+    // Firebase 不可用时的降级路径：与 TikTok 流程一致，直接用后端用户信息。
+    final resp = await apiServiceProvider.getUserCenter();
+    if (resp.isSuccess && resp.data != null) {
+      final userData = resp.data as Map<String, dynamic>;
+      final incomingUser = UserModel.fromJson(userData).copyWith(
+        isGuest: false,
+      );
+      final updatedModel = await _refreshVipStatusFromBackend(incomingUser);
+      await cacheUser(updatedModel);
+      return updatedModel;
+    }
+    throw StateError(
+      'Apple sign-in succeeded, but user profile is unavailable.',
+    );
   }
 
   Future<void> sendPasswordResetEmail(String email) async {
