@@ -75,28 +75,55 @@ import '../../features/search/pages/search_page.dart';
 /// ============================================================================
 
 // ==================== 导航键定义 ====================
+/// ⚠️ 这些键**必须随 routerProvider 一起重建**（见 routerProvider 开头）。
+///
+/// 【为什么不是 final 全局键】iOS 登出走「软重启」时（AppRestart →
+/// main.dart 重建 ProviderScope 子树），会创建新的 GoRouter。如果新
+/// router 复用旧 GlobalKey，Flutter 的 GlobalKey reparenting 会把已被
+/// dispose 的旧 Navigator 元素搬进新树 —— 表现为首页内容区空白、
+/// 切换 tab 才恢复显示。
+/// 外部代码只读 `.currentState`，所以用 getter 暴露即可。
+GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'root',
+);
+
 /// 根导航器键（用于全屏页面，如播放器、登录等）
-final rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+GlobalKey<NavigatorState> get rootNavigatorKey => _rootNavigatorKey;
+
+GlobalKey<NavigatorState> _shellNavigatorHomeKey = GlobalKey<NavigatorState>(
+  debugLabel: 'shellHome',
+);
 
 /// 首页 Tab 导航器键
-final shellNavigatorHomeKey =
-    GlobalKey<NavigatorState>(debugLabel: 'shellHome');
+GlobalKey<NavigatorState> get shellNavigatorHomeKey => _shellNavigatorHomeKey;
 
-/// 推荐 Tab 导航器键
-final shellNavigatorRecommendKey =
+GlobalKey<NavigatorState> _shellNavigatorRecommendKey =
     GlobalKey<NavigatorState>(debugLabel: 'shellRecommend');
 
-/// 发现 Tab 导航器键
-final shellNavigatorExploreKey =
+/// 推荐 Tab 导航器键
+GlobalKey<NavigatorState> get shellNavigatorRecommendKey =>
+    _shellNavigatorRecommendKey;
+
+GlobalKey<NavigatorState> _shellNavigatorExploreKey =
     GlobalKey<NavigatorState>(debugLabel: 'shellExplore');
 
+/// 发现 Tab 导航器键
+GlobalKey<NavigatorState> get shellNavigatorExploreKey =>
+    _shellNavigatorExploreKey;
+
+GlobalKey<NavigatorState> _shellNavigatorGamesKey = GlobalKey<NavigatorState>(
+  debugLabel: 'shellGames',
+);
+
 /// 游戏 Tab 导航器键
-final shellNavigatorGamesKey =
-    GlobalKey<NavigatorState>(debugLabel: 'shellGames');
+GlobalKey<NavigatorState> get shellNavigatorGamesKey => _shellNavigatorGamesKey;
+
+GlobalKey<NavigatorState> _shellNavigatorProfileKey =
+    GlobalKey<NavigatorState>(debugLabel: 'shellProfile');
 
 /// 我的 Tab 导航器键
-final shellNavigatorProfileKey =
-    GlobalKey<NavigatorState>(debugLabel: 'shellProfile');
+GlobalKey<NavigatorState> get shellNavigatorProfileKey =>
+    _shellNavigatorProfileKey;
 
 /// ============================================================================
 /// 路由刷新通知器
@@ -138,6 +165,26 @@ void _configureRouterUrlStrategy() {
 /// - refreshListenable：监听认证状态变化
 /// - redirect：路由守卫逻辑
 final routerProvider = Provider<GoRouter>((ref) {
+  // 每次创建新 GoRouter 都换一套全新的导航 GlobalKey。
+  // 【为什么】软重启（iOS 登出）重建 ProviderScope 时，新 router 若复用
+  // 旧 GlobalKey，GlobalKey reparenting 会把已 dispose 的旧 Navigator
+  // 搬进新树 —— 表现为首页内容区空白、切 tab 才显示。键跟着 router 走，
+  // 重启后所有导航器都是全新的。
+  _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+  _shellNavigatorHomeKey = GlobalKey<NavigatorState>(debugLabel: 'shellHome');
+  _shellNavigatorRecommendKey = GlobalKey<NavigatorState>(
+    debugLabel: 'shellRecommend',
+  );
+  _shellNavigatorExploreKey = GlobalKey<NavigatorState>(
+    debugLabel: 'shellExplore',
+  );
+  _shellNavigatorGamesKey = GlobalKey<NavigatorState>(
+    debugLabel: 'shellGames',
+  );
+  _shellNavigatorProfileKey = GlobalKey<NavigatorState>(
+    debugLabel: 'shellProfile',
+  );
+
   final refreshNotifier = _RouterRefreshNotifier(ref);
 
   return GoRouter(
