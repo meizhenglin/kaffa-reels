@@ -2,7 +2,7 @@ name: qahwa_tv
 description: "Kaffa Reels App - A short drama streaming application for Arabic region."
 publish_to: 'none'
 
-version: 1.5.0+2027
+version: 1.5.0+2028
 
 environment:
   sdk: ^3.12.0  # 改成 3.12.0 

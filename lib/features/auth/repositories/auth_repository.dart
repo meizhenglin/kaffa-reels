@@ -897,29 +897,55 @@ class AuthRepository {
       '[AppleLoginFlow] Apple 授权完成, 同步后端 '
       '(token长度=${appleCredential.identityToken?.length ?? 0})',
     );
-    final backendSynced = await _syncBackendToken(
-      () => apiServiceProvider.appleLogin(
-        identityToken: appleCredential.identityToken ?? '',
-        authorizationCode: appleCredential.authorizationCode,
-        fullName:
-            [
-              appleCredential.givenName,
-              if (appleCredential.familyName != null)
-                appleCredential.familyName,
-            ].join(' ').trim().isEmpty
-            ? null
-            : [
+    // 直接调用并解析响应（不走 _syncBackendToken），把后端返回的 code/msg
+    // 带进错误信息，方便联调时定位是哪一层拒绝。
+    final ApiResponse backendResp;
+    try {
+      backendResp = await RetryHelper.retry(
+        () => apiServiceProvider.appleLogin(
+          identityToken: appleCredential.identityToken ?? '',
+          authorizationCode: appleCredential.authorizationCode,
+          fullName:
+              [
                 appleCredential.givenName,
                 if (appleCredential.familyName != null)
                   appleCredential.familyName,
-              ].join(' '),
-      ),
+              ].join(' ').trim().isEmpty
+              ? null
+              : [
+                  appleCredential.givenName,
+                  if (appleCredential.familyName != null)
+                    appleCredential.familyName,
+                ].join(' '),
+        ),
+        maxAttempts: 3,
+        baseDelay: const Duration(milliseconds: 800),
+      );
+    } catch (e) {
+      throw StateError('Apple backend sync network failure: $e');
+    }
+    debugPrint(
+      '[AppleLoginFlow] 后端响应: isSuccess=${backendResp.isSuccess} '
+      'code=${backendResp.code} error=${backendResp.error}',
     );
-    if (!backendSynced) {
+
+    if (!backendResp.isSuccess) {
       throw StateError(
-        'Apple sign-in succeeded, but backend token sync failed.',
+        'Backend rejected Apple login: '
+        'code=${backendResp.code}, msg=${backendResp.error}',
       );
     }
+
+    final data = backendResp.data;
+    final backendToken = data is Map<String, dynamic>
+        ? data['token'] as String?
+        : null;
+    if (backendToken == null || backendToken.isEmpty) {
+      throw StateError(
+        'Backend response missing token for Apple login: data=$data',
+      );
+    }
+    await _storage.saveToken(backendToken);
     debugPrint('[AppleLoginFlow] 后端登录成功');
 
     // ------------------------------------------------------------
