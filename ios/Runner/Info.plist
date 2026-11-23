@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<!-- 出口合规声明：仅使用系统标准加密（HTTPS 等），属豁免范围，
+	     免去每次上传构建后在 ASC 手动回答出口合规问题 -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<!-- Facebook Login / Share (FBSDK) -->
