@@ -114,7 +114,12 @@ class UnlockProduct extends Equatable {
       case TargetPlatform.android:
         return googlePlayId ?? '';
       case TargetPlatform.iOS:
-        return iosProductId ?? '';
+        // 后台 goodsIosId 没配时兜底 Google ID：
+        // App Store / Google Play 两边用的是同一套产品 ID
+        // （如 com.qahwatv.1unlock），缺省不兜底的话 iOS 端永远查不到商品。
+        final ios = iosProductId;
+        if (ios != null && ios.isNotEmpty) return ios;
+        return googlePlayId ?? '';
       default:
         return googlePlayId ?? '';
     }

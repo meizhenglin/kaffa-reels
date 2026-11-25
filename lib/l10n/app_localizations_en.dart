@@ -1217,6 +1217,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'After deletion, all your data will be permanently erased and cannot be recovered.';
 
   @override
+  String get deleteAccountFinalConfirm =>
+      'This action is permanent and cannot be undone. Your balance, membership and unlock records will all be lost. Are you sure you want to delete your account?';
+
+  @override
   String get personalInfo => 'Personal Info';
 
   @override

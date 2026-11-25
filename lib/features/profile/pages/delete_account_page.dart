@@ -124,6 +124,43 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
 
   Future<void> _deleteAccount() async {
     final l10n = AppLocalizations.of(context);
+
+    // 【最终确认】注销不可逆（余额/会员/解锁记录全部丢失），
+    // 直接一点就注销太危险，先弹确认框。
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: const Color(0xFF2C2C2E),
+        title: Text(
+          AppLocalizations.of(dialogContext).deleteAccount,
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          AppLocalizations.of(dialogContext).deleteAccountFinalConfirm,
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(
+              AppLocalizations.of(dialogContext).cancel,
+              style: const TextStyle(color: Colors.white54),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(
+              AppLocalizations.of(dialogContext).delete,
+              style: const TextStyle(color: Color(0xFFFF6B6B)),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
     setState(() => _isLoading = true);
 
     final messenger = ScaffoldMessenger.of(context);

@@ -625,8 +625,11 @@ class PaymentService {
             '[PaymentService] Purchase timeout after ${purchaseTimeout.inSeconds}s '
             'for ${product.id}',
           );
+          // 平台中立的文案（iOS 也走这个超时），别让 iOS 用户看到
+          // 「Google Play」的字样误以为设备出问题了。
           _lastError =
-              'Google Play did not complete the purchase in time. Please try again.';
+              'The store did not complete the purchase in time. '
+              'Please try again.';
           // 关键：超时后必须把 pending 状态清掉，
           // 否则 _pendingPurchaseCompleter 会一直非空，后续购买会被并发保护挡掉。
           finalizePendingPurchase();

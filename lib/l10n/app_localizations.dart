@@ -2384,6 +2384,12 @@ abstract class AppLocalizations {
   /// **'After deletion, all your data will be permanently erased and cannot be recovered.'**
   String get deleteAccountWarning;
 
+  /// No description provided for @deleteAccountFinalConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'This action is permanent and cannot be undone. Your balance, membership and unlock records will all be lost. Are you sure you want to delete your account?'**
+  String get deleteAccountFinalConfirm;
+
   /// No description provided for @personalInfo.
   ///
   /// In en, this message translates to:

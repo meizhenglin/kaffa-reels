@@ -1215,6 +1215,10 @@ class AppLocalizationsAr extends AppLocalizations {
       'بعد الحذف، سيتم محو جميع بياناتك بشكل دائم ولا يمكن استعادتها.';
 
   @override
+  String get deleteAccountFinalConfirm =>
+      'هذا الإجراء نهائي ولا يمكن التراجع عنه. سيتم فقدان رصيدك وعضويتك وسجلات الفتح. هل أنت متأكد من رغبتك في حذف حسابك؟';
+
+  @override
   String get personalInfo => 'المعلومات الشخصية';
 
   @override
