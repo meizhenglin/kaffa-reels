@@ -9,7 +9,7 @@ import '../../../features/auth/providers/auth_provider.dart';
 import '../../../features/recommend/utils/drama_navigation.dart';
 import '../../../core/widgets/app_snack_bar.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../core/config/build_flavor.dart';
+import '../models/payment_channel.dart';
 import '../../home/models/home_card_layout.dart';
 import '../models/recharge_product.dart';
 import '../providers/coin_record_provider.dart' as coin_record;
@@ -83,8 +83,9 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
     setState(() => _isPurchasing = true);
 
     try {
-      // Google flavor: skip channel selection, go straight to Google Play.
-      if (BuildFlavor.isGoogle) {
+      // Google 渠道包（Android）与 iOS：跳过渠道选择，直接走商店内购
+      // （iOS 上 rechargePurchaseHandler 最终路由 /notice/apple）。
+      if (shouldUseStoreDirectly()) {
         final handler = ref.read(rechargePurchaseHandlerProvider);
         final success = await handler.purchase(product);
         if (!success && mounted) {

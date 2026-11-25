@@ -290,8 +290,9 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
       return;
     }
 
-    // Google flavor: skip HaiPay entirely — go straight to Google Play.
-    if (BuildFlavor.isGoogle) {
+    // Google 渠道包（Android）与 iOS：跳过 HaiPay 选择器，直接走商店内购
+    // （iOS 上是 StoreKit，回调自动路由 /notice/apple）。
+    if (shouldUseStoreDirectly()) {
       final memberNotifier = ref.read(memberStateProvider.notifier);
       await memberNotifier.purchase(selectedProduct: product);
       _isPurchasing = false;

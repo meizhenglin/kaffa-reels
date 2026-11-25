@@ -1,7 +1,28 @@
 import 'dart:ui';
 
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
+
+import '../../../core/config/build_flavor.dart';
 import 'hai_pay_models.dart';
+
+/// 当前环境是否应跳过渠道选择器、直接走应用商店内购。
+///
+/// 【为什么 iOS 也要跳过】
+/// iOS 包用的是 platform 渠道，以前会弹「Google Play / HaiPay」选择器，
+/// 用户选 HaiPay 就拉起 H5 支付 —— 虚拟商品绕开苹果支付违反 App Store
+/// 审核 3.1.1，而且 App Store 收据链路（/notice/apple）也对不上。
+/// 现在 iOS 的 StoreKit 内购已接通，所以 iOS 一律直接走内购：
+///   - 会员：memberStateProvider.purchase → buyNonConsumable
+///   - K币/解锁：rechargePurchaseHandler / GooglePlay 分支
+///     （这两个在 iOS 上都会经 confirmStorePurchase 路由到 /notice/apple）
+///
+/// Android 平台渠道包与 Web 保持原有选择器（HaiPay 与商店并存）。
+bool shouldUseStoreDirectly() {
+  if (kIsWeb) return false;
+  if (BuildFlavor.isGoogle) return true;
+  return defaultTargetPlatform == TargetPlatform.iOS;
+}
 
 /// Payment channel types supported by the app
 enum PaymentChannelKind { googlePlay, haiPay }

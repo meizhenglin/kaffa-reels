@@ -14,7 +14,6 @@ import '../services/payment_service.dart';
 import '../services/unified_payment_handler.dart';
 import '../widgets/payment_channel_selector.dart';
 import '../../../app/providers/app_providers.dart';
-import '../../../core/config/build_flavor.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/service/pay_service.dart';
 import '../../../core/widgets/app_snack_bar.dart';
@@ -678,7 +677,8 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     _setProcessing(product.goodsId, true);
     try {
       final rechargeProduct = product.toRechargeProduct();
-      if (BuildFlavor.isGoogle) {
+      // iOS / Google 渠道包直接走商店内购，不弹 HaiPay 选择器。
+      if (shouldUseStoreDirectly()) {
         final handler = ref.read(rechargePurchaseHandlerProvider);
         final success = await handler.purchase(rechargeProduct);
         if (!mounted) return;
@@ -865,9 +865,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       if (confirmed != true) return;
     }
 
-    // Google flavor: skip HaiPay entirely — there is only one channel
-    // and we go straight to the Google Play billing flow.
-    if (BuildFlavor.isGoogle) {
+    // iOS / Google 渠道包直接走商店内购（iOS 上是 StoreKit 链路），
+    // 不弹渠道选择器 —— 虚拟商品绕开苹果支付有 3.1.1 拒审风险。
+    if (shouldUseStoreDirectly()) {
       await _performUnlockByGooglePlay(product);
       return;
     }
@@ -1346,9 +1346,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     _setProcessing(product.goodsId, true);
 
     try {
-      // Google flavor: skip HaiPay entirely — there is only one channel
-      // and we go straight to the Google Play billing flow.
-      if (BuildFlavor.isGoogle) {
+      // iOS / Google 渠道包直接走商店内购（iOS 上是 StoreKit 链路），
+      // 不弹渠道选择器。
+      if (shouldUseStoreDirectly()) {
         await _performVipByGooglePlay(product);
         return;
       }

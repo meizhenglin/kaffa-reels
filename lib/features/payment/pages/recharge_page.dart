@@ -6,7 +6,6 @@ import '../../../app/providers/app_providers.dart';
 import '../../../components/rtl_back_button.dart';
 import '../../../core/widgets/app_snack_bar.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../../core/config/build_flavor.dart';
 import '../models/payment_channel.dart';
 import '../providers/recharge_provider.dart';
 import '../services/unified_payment_handler.dart';
@@ -70,8 +69,10 @@ class _RechargePageState extends ConsumerState<RechargePage> {
 
     if (confirmed != true) return;
 
-    // Google flavor: skip HaiPay entirely — go straight to Google Play.
-    if (BuildFlavor.isGoogle) {
+    // Google 渠道包（Android）与 iOS：跳过 HaiPay 选择器，直接走商店内购
+    // （iOS 上 rechargePurchaseHandler 最终经 confirmStorePurchase
+    // 路由到 /notice/apple）。
+    if (shouldUseStoreDirectly()) {
       final handler = ref.read(rechargePurchaseHandlerProvider);
       await handler.purchase(product);
       return;
