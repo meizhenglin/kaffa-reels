@@ -686,10 +686,18 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         if (success) {
           await _unlockCurrentEpisodeAfterRecharge(product.goodsId);
         } else {
-          AppSnackBar.show(
-            context,
-            message: handler.lastError ?? l10n.purchaseFailed,
-          );
+          // 【用户可读的错误提示】商品查不到时 handler 会带出内部错误码
+          // （如 play-item-not-found / ios-item-not-found），直接弹出来
+          // 用户完全看不懂。统一映射成「商品暂不可用」；
+          // 其余错误码照原样显示（排障时仍能看到细节）。
+          final err = handler.lastError ?? '';
+          final friendly =
+              err.contains('not-found') ||
+                  err.contains('item-unavailable') ||
+                  err.contains('unavailable')
+              ? l10n.productUnavailable
+              : (err.isNotEmpty ? err : l10n.purchaseFailed);
+          AppSnackBar.show(context, message: friendly);
         }
         return;
       }

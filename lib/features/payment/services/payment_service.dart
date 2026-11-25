@@ -790,12 +790,36 @@ class PaymentService {
     }
 
     // 同一时间只允许一笔购买在飞。
+    //
+    // 【僵死复位】与 [purchase] 的并发保护保持一致：上一笔购买如果事件
+    // 丢失导致 completer 悬着（比如用户在 VIP 支付台里异常退出、StoreKit
+    // 没回任何事件），这里不能永远拦住后续的 K币 购买——超过
+    // [_stalePendingPurchase] 就复位重来，否则用户点金币包只会在
+    // 转圈后看到「A purchase is already in progress」，拉不起支付。
     if (_pendingPurchaseCompleter != null) {
+      final startedAt = _pendingPurchaseStartedAt;
+      final age = startedAt == null
+          ? null
+          : DateTime.now().difference(startedAt);
+      final isStale = age == null || age >= _stalePendingPurchase;
+
+      if (!isStale) {
+        debugPrint(
+          '[PaymentService] purchaseConsumable() rejected: a purchase is '
+          'already in progress (pending product: $_pendingPurchaseProductId)',
+        );
+        _lastError = 'A purchase is already in progress. Please wait.';
+        return false;
+      }
+
       debugPrint(
-        '[PaymentService] purchaseConsumable() rejected: a purchase is already in progress',
+        '[PaymentService] purchaseConsumable() reset stale pending purchase '
+        '(product: $_pendingPurchaseProductId, age: ${age?.inSeconds ?? "-"}s)',
       );
-      _lastError = 'A purchase is already in progress. Please wait.';
-      return false;
+      _pendingPurchaseCompleter!.complete(false);
+      _pendingPurchaseCompleter = null;
+      _pendingPurchaseProductId = null;
+      _pendingPurchaseStartedAt = null;
     }
 
     // 登记商品用途 + 完成回调，purchase stream 那边靠这个分流。
@@ -807,6 +831,7 @@ class PaymentService {
     final completer = Completer<bool>();
     _pendingPurchaseCompleter = completer;
     _pendingPurchaseProductId = product.id;
+    _pendingPurchaseStartedAt = DateTime.now();
 
     Timer? timeoutTimer;
 
@@ -920,6 +945,23 @@ class PaymentService {
         onPurchaseComplete: _onPurchaseComplete,
         onPurchaseError: _onPurchaseError,
       );
+    }
+
+    // 【iOS 分支】iOS 没有 queryPastPurchases 这种直接查询接口，
+    // 之前直接调 Android 的 platform addition 会抛异常，
+    // 导致 iOS 上 queryExistingPurchases 永远返回空（checkIsVip 永远 false）。
+    // 走 restorePurchases 让 StoreKit 把已有交易重新投递一遍，
+    // _handlePurchaseUpdate 会把它们缓存下来。
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      try {
+        await _inAppPurchase.restorePurchases(applicationUserName: _resolveUserId());
+        // 稍等 purchaseStream 把 restored 事件投递完
+        await Future<void>.delayed(const Duration(milliseconds: 800));
+      } catch (e) {
+        debugPrint('[PaymentService] iOS restore during query failed: $e');
+      }
+      _lastPurchaseQueryTime = DateTime.now();
+      return _cachedPurchases;
     }
 
     try {
