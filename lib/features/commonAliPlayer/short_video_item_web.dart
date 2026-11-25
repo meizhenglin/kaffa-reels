@@ -603,6 +603,13 @@ class ShortVideoItemState extends State<ShortVideoItem> {
   }
 
   void pause() {
+    // 【外部暂停必须标记 _userPaused】切 tab / 被全屏覆盖时父级走的是
+    // 这里（不是 _togglePlayPause）。若不标记，_watchForStall 会把
+    // 「暂停 + 缓冲中 position 不动」误判成卡死，position 停滞超过
+    // _stallTimeout 后触发 _recoverFromStall → seek + play()，
+    // 结果就是：用户已经切到别的 tab，视频缓冲一好就在后台自动开播。
+    // 切回本 tab 时 resume() 会清掉该标记，不影响恢复播放。
+    _userPaused = true;
     _playbackRequested = false;
     PlaybackBufferGuard.clearActive(this);
     unawaited(_controller?.pause());

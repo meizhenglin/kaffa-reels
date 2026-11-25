@@ -2,9 +2,34 @@
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 【Google Play 政策】广告 ID：应用使用 AdMob / Meta Audience Network，
+         已在 Play Console 申报「使用广告 ID」。Android 13+ 要求显式持有
+         com.google.android.gms.permission.AD_ID 才能读取广告 ID，
+         否则标识符变成一串 0。google_mobile_ads 的库清单虽然会自动
+         合并此权限，但这里显式声明一份，保证最终清单一定包含，
+         避免 Play 发布校验报错。 -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
     <uses-permission
         android:name="com.google.android.providers.gsf.permission.READ_GSERVICES"
         tools:node="remove" />
+    <!-- 【Google Play 政策】QUERY_ALL_PACKAGES 是敏感权限，本应用核心功能
+         不需要扫描全部已安装应用。它由依赖 SDK（ShareSDK/MobSDK、
+         Meta Audience Network 等）的清单合并进来，这里强制从最终
+         合并清单中移除，否则提交 AAB 时 Play 会报权限政策警告。
+         分享 SDK 需要的应用可见性已由下方 <queries> 白名单合规覆盖。 -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:node="remove" />
+
+    <!-- 【Google Play 政策】android.hardware.wifi 被依赖 SDK（Meta Audience
+         Network / MobSDK）在清单里声明成 required="true"，导致不支持
+         Wi-Fi 的设备（平板/桌面/Android XR）无法安装。
+         这里显式声明为可选，覆盖 SDK 的必需声明；应用通过移动网络
+         也能正常工作，Wi-Fi 不是硬件必需项。 -->
+    <uses-feature
+        android:name="android.hardware.wifi"
+        android:required="false"
+        tools:replace="android:required" />
 
     <application
         android:label="@string/app_name"

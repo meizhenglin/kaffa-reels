@@ -105,3 +105,50 @@ dependencies {
     implementation 'com.facebook.android:facebook-login:17.0.2'
     implementation 'com.facebook.android:audience-network-sdk:6.17.0'
 }
+
+// ============================================================================
+// 【Google Play 政策】剔除 MobSDK 动态注入的 QUERY_ALL_PACKAGES
+//
+// 背景：AndroidManifest.xml 里已经用 tools:node="remove" 声明移除该权限，
+// 第一轮清单合并（processXXXMainManifest）确实是干净的；但 MobSDK 的
+// Gradle 插件会在**合并之后的清单任务**（processXXXManifest /
+// processXXXManifestForPackage / processApplicationManifestXXXForBundle）
+// 中把它重新注入最终清单，tools:node="remove" 拦不住这种动态注入。
+//
+// 做法：给所有清单处理任务挂 doLast，在任务输出落盘后把该权限行删掉。
+// 这些任务完成后才轮到 bundle/packager 读清单，因此打出来的
+// AAB/APK 最终不含 QUERY_ALL_PACKAGES。
+// ============================================================================
+def stripQueryAllPackages(File file) {
+    if (!file.exists()) return
+    def text = file.getText('UTF-8')
+    def cleaned = text.replaceAll(
+            /<uses-permission\s+android:name="android\.permission\.QUERY_ALL_PACKAGES"\s*\/>/, '')
+    if (cleaned != text) {
+        file.write(cleaned, 'UTF-8')
+        println "[ManifestStrip] removed QUERY_ALL_PACKAGES from ${file.path}"
+    }
+}
+
+// 注意：MobSDK 插件是在 afterEvaluate 阶段往清单任务上追加自己的 doLast
+// （mobsdk.gradle 在本文件第 14 行 apply，其回调先注册，先执行）。
+// 我们的剔除钩子必须在它之后执行，所以把 doLast 的注册也放进
+// afterEvaluate —— 本文件写在 android{} 之后，回调注册晚于 MobSDK，
+// doLast 队列顺序：MobSDK 注入 → 本钩子剔除。✔
+afterEvaluate {
+    tasks.matching { it.name ==~ /process\w*Manifest\w*/ }.configureEach { task ->
+        task.doLast {
+            task.outputs.files.each { f ->
+                if (f.isDirectory()) {
+                    f.eachFileRecurse { entry ->
+                        if (entry.name == 'AndroidManifest.xml') {
+                            stripQueryAllPackages(entry)
+                        }
+                    }
+                } else if (f.name == 'AndroidManifest.xml') {
+                    stripQueryAllPackages(f)
+                }
+            }
+        }
+    }
+}
