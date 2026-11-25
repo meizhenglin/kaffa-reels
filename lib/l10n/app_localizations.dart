@@ -1277,7 +1277,7 @@ abstract class AppLocalizations {
   /// No description provided for @membershipPlayStoreUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'Google Play Store is not available on this device.'**
+  /// **'Google Play billing is unavailable right now. Please make sure you are signed in with a Google account that has access to this app (e.g. a tester account), then try again later.'**
   String get membershipPlayStoreUnavailable;
 
   /// No description provided for @membershipPlayNetworkError.
@@ -1303,6 +1303,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This plan exists in Google Play, but it is not available for your account or country yet. Please try again later or contact support.'**
   String get membershipPlayNoEligibleOffer;
+
+  /// No description provided for @membershipIosStoreUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The App Store is unavailable right now. Please make sure you are signed in with your Apple ID, then try again later.'**
+  String get membershipIosStoreUnavailable;
+
+  /// No description provided for @membershipIosNetworkError.
+  ///
+  /// In en, this message translates to:
+  /// **'Network error while contacting the App Store. Please check your connection.'**
+  String get membershipIosNetworkError;
+
+  /// No description provided for @membershipIosStoreError.
+  ///
+  /// In en, this message translates to:
+  /// **'The App Store returned an error. Please try again later.'**
+  String get membershipIosStoreError;
+
+  /// No description provided for @membershipIosItemNotAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This subscription is not available in the App Store. It may not be approved yet, or the product ID does not match.'**
+  String get membershipIosItemNotAvailable;
+
+  /// No description provided for @membershipStoreCallbackFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment completed, but activation is not confirmed yet. It will be retried automatically — if your membership does not update shortly, please contact support.'**
+  String get membershipStoreCallbackFailed;
 
   /// No description provided for @watchLockedReminderTitle.
   ///

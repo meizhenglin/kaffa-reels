@@ -653,8 +653,7 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
           // 用 Play 返回的**真实原因**决定提示，而不是笼统地说
           // 「商品未配置」。Play 根本没受理请求时（code=2 SERVICE_UNAVAILABLE），
           // 让用户去查 Play Console 商品配置是完全指错方向的。
-          errorMessage:
-              _paymentService.lastPlayFailureCode ?? 'play-item-not-found',
+          errorMessage: _storeFailureCode,
           clearPendingOrder: true,
         );
         return false;
@@ -673,8 +672,7 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
             isLoading: false,
             // 用 Play 的真实原因：`play-no-eligible-offer` 表示商品在商店里
             // 存在但当前账号/国家买不了，`play-item-not-found` 才是真的没有。
-            errorMessage: _paymentService.lastPlayFailureCode ??
-                'Product not available in Google Play: $platformProductId',
+            errorMessage: _storeFailureCode,
             clearPendingOrder: true,
           );
           return false;
@@ -811,7 +809,15 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
 
         if (!confirmed) {
           debugPrint(
-            '[Purchase] Step 4: /notice/google failed — kept in pending queue',
+            '[Purchase] Step 4: store callback failed — kept in pending queue',
+          );
+          // 【必须让用户知道】钱已经付了，但后端没确认开通（收据校验失败 /
+          // 后端接口异常都会走到这）。静默的话用户付完钱看不到任何反馈，
+          // 会员状态也不更新，还以为白花了。订单已落本地待补队列，
+          // 会自动重试，所以提示口径是「开通确认中」而不是「失败」。
+          state = state.copyWith(
+            isLoading: false,
+            errorMessage: 'store-callback-failed',
           );
         } else {
           // 后端已确认，出队。
@@ -862,6 +868,19 @@ class MemberStateNotifier extends StateNotifier<MemberState> {
     );
     debugPrint('[Purchase]   两者逐字符必须完全一致（含点号 / 下划线 / 大小写）');
     debugPrint('[Purchase] ────────────────────────────────────────────');
+  }
+
+  /// 当前平台商店侧最近一次失败原因码（Android: `play-*`，iOS: `ios-*`）。
+  ///
+  /// 【为什么分开】Play 探针只在 Android 跑；iOS 的失败原因由
+  /// PaymentService 从 StoreKit 返回中归因（`ios-*`）。
+  /// iOS 端商品查不到时如果落到 `play-item-not-found`，
+  /// UI 会显示「去查 Google Play 后台」的误导提示。
+  String get _storeFailureCode {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      return _paymentService.lastIosFailureCode ?? 'ios-item-not-found';
+    }
+    return _paymentService.lastPlayFailureCode ?? 'play-item-not-found';
   }
 
   Future<String?> _resolveUserId() async {

@@ -622,7 +622,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get membershipPlayStoreUnavailable =>
-      'متجر Google Play غير متاح على هذا الجهاز.';
+      'خدمة الفوترة عبر Google Play غير متاحة حاليًا. تأكد من تسجيل الدخول بحساب Google يملك صلاحية الوصول إلى هذا التطبيق (مثل حساب مختبِر)، ثم أعد المحاولة لاحقًا.';
 
   @override
   String get membershipPlayNetworkError =>
@@ -639,6 +639,26 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get membershipPlayNoEligibleOffer =>
       'الخطة موجودة في Google Play، لكنها غير متاحة لحسابك أو لدولتك حاليًا. يرجى المحاولة لاحقًا أو التواصل مع الدعم.';
+
+  @override
+  String get membershipIosStoreUnavailable =>
+      'متجر التطبيقات غير متاح حاليًا. تأكد من تسجيل الدخول بحساب Apple ID الخاص بك ثم حاول مرة أخرى لاحقًا.';
+
+  @override
+  String get membershipIosNetworkError =>
+      'حدث خطأ في الشبكة أثناء الاتصال بمتجر التطبيقات. يرجى التحقق من اتصالك.';
+
+  @override
+  String get membershipIosStoreError =>
+      'أعاد متجر التطبيقات خطأً. يرجى المحاولة مرة أخرى لاحقًا.';
+
+  @override
+  String get membershipIosItemNotAvailable =>
+      'هذا الاشتراك غير متاح في متجر التطبيقات حاليًا. قد لا يكون معتمدًا بعد أو أن معرّف المنتج غير مطابق.';
+
+  @override
+  String get membershipStoreCallbackFailed =>
+      'تم الدفع بنجاح، لكن تأكيد التفعيل لم يكتمل بعد وسيُعاد تلقائيًا. إذا لم تُحدَّث العضوية قريبًا، يرجى التواصل مع الدعم.';
 
   @override
   String get watchLockedReminderTitle => 'تذكير';

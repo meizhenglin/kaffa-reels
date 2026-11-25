@@ -65,6 +65,10 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         if (playDebug != null && playDebug.isNotEmpty) {
           displayMessage = '$displayMessage\n(Play: $playDebug)';
         }
+        final iosDebug = PaymentService.instance.lastIosDebugMessage;
+        if (iosDebug != null && iosDebug.isNotEmpty) {
+          displayMessage = '$displayMessage\n(App Store: $iosDebug)';
+        }
         _lastShownError = displayMessage;
         AppSnackBar.show(context, message: displayMessage);
       }
@@ -146,6 +150,19 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         return l10n.membershipPlayNoEligibleOffer;
       case 'play-not-subscription':
         return l10n.membershipPlayNotSubscription;
+      // iOS StoreKit 侧的失败码（PaymentService.lastIosFailureCode）。
+      // 文案指向 App Store，不要让 iOS 用户看到「去查 Google Play」。
+      case 'ios-store-unavailable':
+        return l10n.membershipIosStoreUnavailable;
+      case 'ios-network-error':
+        return l10n.membershipIosNetworkError;
+      case 'ios-store-error':
+        return l10n.membershipIosStoreError;
+      case 'ios-item-not-found':
+        return l10n.membershipIosItemNotAvailable;
+      // 支付已成功但后端回调没确认（收据校验失败 / 后端接口异常）。
+      case 'store-callback-failed':
+        return l10n.membershipStoreCallbackFailed;
       default:
         return null;
     }

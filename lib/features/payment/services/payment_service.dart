@@ -94,6 +94,26 @@ class PaymentService {
   Set<String> get lastMissingProductIds => _lastMissingProductIds;
   Set<String> _lastMissingProductIds = <String>{};
 
+  /// 最近一次 iOS StoreKit 侧的失败原因码（iOS 专用，Android 恒为 null）。
+  ///
+  /// Android 有 Billing 探针拿原始响应码（`lastPlayFailureCode`），
+  /// iOS 没有等价探针，只能从 queryProductDetails 的返回里归因：
+  ///
+  /// - `ios-store-unavailable`：App Store 结算不可用（未登录 Apple ID /
+  ///   屏幕使用时间限制 / 系统过旧）
+  /// - `ios-network-error`：StoreKit 报网络错误
+  /// - `ios-store-error`：StoreKit 返回了其他 SKError（详情在
+  ///   [lastIosDebugMessage]）
+  /// - `ios-item-not-found`：StoreKit 受理了请求但拿不到商品详情 ——
+  ///   商品未批准 / 未上线、产品 ID 拼错、建到了别的 App（Bundle ID）下、
+  ///   付费协议（Paid Apps Agreement）没签署
+  String? get lastIosFailureCode => _lastIosFailureCode;
+  String? _lastIosFailureCode;
+
+  /// 最近一次 iOS StoreKit 的原始错误描述（排障用，测试时带到 UI 上）。
+  String? get lastIosDebugMessage => _lastIosDebugMessage;
+  String? _lastIosDebugMessage;
+
   /// Last error message from purchase operations
   String? get lastError => _lastError;
 
@@ -129,6 +149,13 @@ class PaymentService {
       final isAvailable = await _inAppPurchase.isAvailable();
       if (!isAvailable) {
         _lastError = 'Google Play billing is not available on this device.';
+        // iOS：结算不可用通常是没登录 Apple ID / 屏幕使用时间限制，
+        // 单独归因，别让 UI 落到「商品未配置」的误导提示上。
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+          _lastIosFailureCode = 'ios-store-unavailable';
+          _lastIosDebugMessage =
+              'StoreKit isAvailable=false（未登录 Apple ID / 系统限制）';
+        }
         _onPurchaseError?.call(
           'Google Play billing is not available on this device.',
         );
@@ -166,6 +193,8 @@ class PaymentService {
     _lastPlayFailureCode = null;
     _lastPlayDebugMessage = null;
     _lastMissingProductIds = <String>{};
+    _lastIosFailureCode = null;
+    _lastIosDebugMessage = null;
 
     // Auto-initialize if needed
     if (!_isInitialized) {
@@ -232,6 +261,12 @@ class PaymentService {
         debugPrint(
           '[PaymentService] notFoundIDs (Play could not fetch): ${response.notFoundIDs.join(", ")}',
         );
+      }
+
+      // 【iOS 诊断】Play 探针只在 Android 跑，iOS 的失败原因要从
+      // queryProductDetails 的返回里归因（SKError / 拿到的商品集合）。
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        _diagnoseIosProducts(sanitizedIds, response);
       }
 
       if (response.error != null) {
@@ -331,6 +366,61 @@ class PaymentService {
       _lastError = 'Failed to fetch products: $e';
       _onPurchaseError?.call('Failed to fetch products: $e');
       return [];
+    }
+  }
+
+  /// 从 StoreKit 的返回中归因 iOS 侧「商品查不到」的原因。
+  ///
+  /// Android 有 Billing 探针拿原始响应码，iOS 没有等价探针 —— 只能靠
+  /// queryProductDetails 的 error / productDetails / notFoundIDs 推断：
+  ///
+  ///   - `response.error != null` → StoreKit 直接报错（网络 → ios-network-error，
+  ///     其他 SKError → ios-store-error）
+  ///   - 受理了请求但一个商品都没给 → `ios-item-not-found`
+  ///     （商品未批准 / 产品 ID 拼错 / 建到别的 Bundle 下 / 付费协议未签）
+  ///   - 部分命中 → 缺的 ID 单独按 ios-item-not-found 记录
+  void _diagnoseIosProducts(
+    List<String> productIds,
+    ProductDetailsResponse response,
+  ) {
+    final error = response.error;
+    if (error != null) {
+      final code = error.code.toLowerCase();
+      final message = error.message.toLowerCase();
+      final isNetwork =
+          code.contains('network') ||
+          message.contains('network') ||
+          message.contains('offline');
+      _lastIosFailureCode = isNetwork ? 'ios-network-error' : 'ios-store-error';
+      _lastIosDebugMessage = 'SKError code=${error.code}, '
+          'message=${error.message}';
+      debugPrint(
+        '[PaymentService] iOS: StoreKit 报错 → '
+        'code=${error.code}, message=${error.message}',
+      );
+      return;
+    }
+
+    final fetched = response.productDetails.map((p) => p.id).toSet();
+    final missing = productIds.where((id) => !fetched.contains(id)).toList();
+
+    if (response.productDetails.isEmpty) {
+      _lastIosFailureCode = 'ios-item-not-found';
+      _lastIosDebugMessage =
+          'StoreKit 未返回任何商品（请求过: ${productIds.join(", ")}）。'
+          '请检查：1) App Store Connect 里商品是否「已批准」；'
+          '2) 产品 ID 是否逐字符一致；'
+          '3) 商品是否建在当前 App 的 Bundle ID 下；'
+          '4) 付费协议（Paid Apps Agreement）是否已签署；'
+          '5) 沙盒测试是否登录了对应地区的 Apple ID。';
+      debugPrint('[PaymentService] iOS: StoreKit 没有返回任何商品 → $missing');
+      return;
+    }
+
+    if (missing.isNotEmpty) {
+      _lastIosFailureCode = 'ios-item-not-found';
+      _lastIosDebugMessage = 'StoreKit 未返回这些商品: ${missing.join(", ")}';
+      debugPrint('[PaymentService] iOS: StoreKit 未返回的商品 → $missing');
     }
   }
 

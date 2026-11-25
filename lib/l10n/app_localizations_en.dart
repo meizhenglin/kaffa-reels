@@ -620,7 +620,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get membershipPlayStoreUnavailable =>
-      'Google Play Store is not available on this device.';
+      'Google Play billing is unavailable right now. Please make sure you are signed in with a Google account that has access to this app (e.g. a tester account), then try again later.';
 
   @override
   String get membershipPlayNetworkError =>
@@ -637,6 +637,26 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get membershipPlayNoEligibleOffer =>
       'This plan exists in Google Play, but it is not available for your account or country yet. Please try again later or contact support.';
+
+  @override
+  String get membershipIosStoreUnavailable =>
+      'The App Store is unavailable right now. Please make sure you are signed in with your Apple ID, then try again later.';
+
+  @override
+  String get membershipIosNetworkError =>
+      'Network error while contacting the App Store. Please check your connection.';
+
+  @override
+  String get membershipIosStoreError =>
+      'The App Store returned an error. Please try again later.';
+
+  @override
+  String get membershipIosItemNotAvailable =>
+      'This subscription is not available in the App Store. It may not be approved yet, or the product ID does not match.';
+
+  @override
+  String get membershipStoreCallbackFailed =>
+      'Payment completed, but activation is not confirmed yet. It will be retried automatically — if your membership does not update shortly, please contact support.';
 
   @override
   String get watchLockedReminderTitle => 'Reminder';

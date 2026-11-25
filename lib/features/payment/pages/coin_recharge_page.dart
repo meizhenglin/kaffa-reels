@@ -204,6 +204,15 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
       case 'play-developer-error':
       case 'play-not-subscription':
         return l10n.membershipPlayItemNotAvailable;
+      // iOS StoreKit 侧的失败码（iOS 商品查不到 / 商店不可用）。
+      case 'ios-store-unavailable':
+        return l10n.membershipIosStoreUnavailable;
+      case 'ios-network-error':
+        return l10n.membershipIosNetworkError;
+      case 'ios-store-error':
+        return l10n.membershipIosStoreError;
+      case 'ios-item-not-found':
+        return l10n.membershipIosItemNotAvailable;
       default:
         return code;
     }
