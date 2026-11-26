@@ -105,7 +105,9 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
           AppSnackBar.show(context, message: reason);
         } else if (success && mounted) {
           AppSnackBar.show(context, message: l10n.purchaseSuccessful);
-          await ref.read(coin_record.coinBalanceInfoProvider.notifier).load();
+          await ref
+              .read(coin_record.coinBalanceInfoProvider.notifier)
+              .load(force: true);
         }
         return;
       }
@@ -142,7 +144,9 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
           AppSnackBar.show(context, message: reason);
         } else if (success && mounted) {
           AppSnackBar.show(context, message: l10n.purchaseSuccessful);
-          await ref.read(coin_record.coinBalanceInfoProvider.notifier).load();
+          await ref
+              .read(coin_record.coinBalanceInfoProvider.notifier)
+              .load(force: true);
         }
       } else {
         // HaiPay completion is handled silently. The gateway may update the

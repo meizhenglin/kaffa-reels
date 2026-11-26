@@ -36,10 +36,30 @@ class CoinBalanceNotifier extends StateNotifier<CoinBalance> {
   /// （解锁页轮询余额判断充值是否到账，依赖 await 之后状态已更新）。
   Future<void>? _inFlight;
 
+  /// 上次成功拉取时间，用于 TTL 节流。
+  ///
+  /// 【为什么需要】余额接口复用 `/api/user/userPersonalCenter`，充值页一进来
+  /// K币组件、余额组件、解锁弹窗懒加载会先后触发多次 load()，每次都实打实
+  /// 打一次用户中心接口——后端日志里表现成「进入充值页频繁调 usercenter」。
+  /// 10 秒内的重复调用直接复用上一次结果（余额这种数据 10 秒的陈旧度足够）；
+  /// 支付成功后要立刻刷新的地方传 [force] = true 绕过节流。
+  static const _minLoadInterval = Duration(seconds: 10);
+  DateTime? _lastLoadedAt;
+
   /// Load coin balance from API
-  Future<void> load() {
+  ///
+  /// [force] = true 时无视节流强制请求（支付到账后刷新余额等场景）。
+  Future<void> load({bool force = false}) {
     final inFlight = _inFlight;
     if (inFlight != null) return inFlight;
+
+    // TTL 节流：刚拉过就不再打接口。
+    final lastLoadedAt = _lastLoadedAt;
+    if (!force &&
+        lastLoadedAt != null &&
+        DateTime.now().difference(lastLoadedAt) < _minLoadInterval) {
+      return Future.value();
+    }
 
     final future = _loadFromApi();
     _inFlight = future;
@@ -54,6 +74,7 @@ class CoinBalanceNotifier extends StateNotifier<CoinBalance> {
       if (resp.isSuccess && resp.data != null) {
         final data = resp.data as Map<String, dynamic>;
         state = CoinBalance.fromJson(data);
+        _lastLoadedAt = DateTime.now();
       }
     } catch (e) {
       // Handle error silently, keep current balance

@@ -196,7 +196,9 @@ class RechargePurchaseHandler {
   /// 刷新服务端余额
   Future<void> _refreshServerBalance() async {
     try {
-      await _ref.read(coin_record.coinBalanceInfoProvider.notifier).load();
+      await _ref
+          .read(coin_record.coinBalanceInfoProvider.notifier)
+          .load(force: true);
     } catch (e) {
       debugPrint('[Recharge] refresh balance failed: $e');
     }

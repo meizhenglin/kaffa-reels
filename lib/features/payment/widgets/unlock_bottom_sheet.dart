@@ -762,7 +762,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     // 海派支付/Google Play 充值到账通常是异步的,后端可能需要数秒。
     // 我们轮询余额,只要余额有增长就视为到账(避免误报"余额不足")。
     for (var attempt = 0; attempt < 10; attempt++) {
-      await balanceNotifier.load();
+      await balanceNotifier.load(force: true);
       if (!mounted) return;
       balance = ref.read(coinBalanceInfoProvider).balance;
       if (balance > lastBalance) {
@@ -799,7 +799,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
     _setProcessing(rechargeGoodsId, false);
     if (response.isSuccess) {
-      await balanceNotifier.load();
+      await balanceNotifier.load(force: true);
       if (!mounted) return;
       widget.onUnlockSuccess.call(widget.episodeIndex);
       AppSnackBar.show(context, message: l10n.unlockSuccess);
@@ -942,7 +942,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       if (success) {
         final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
         coinNotifier.deductCoins(product.price.toInt());
-        await coinNotifier.load();
+        await coinNotifier.load(force: true);
 
         AppSnackBar.show(context, message: l10n.unlockSuccess);
         Navigator.of(context).pop(
@@ -1193,7 +1193,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       );
 
       final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
-      await coinNotifier.load();
+      await coinNotifier.load(force: true);
 
       if (ok) {
         AppSnackBar.show(context, message: l10n.unlockSuccess);
@@ -1456,7 +1456,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         }
 
         final coinNotifier = ref.read(coinBalanceInfoProvider.notifier);
-        await coinNotifier.load();
+        await coinNotifier.load(force: true);
 
         AppSnackBar.show(context, message: l10n.vipSubscriptionSuccess);
         Navigator.of(

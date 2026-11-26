@@ -8,6 +8,7 @@ import '../../../core/widgets/app_snack_bar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../models/payment_channel.dart';
 import '../providers/recharge_provider.dart';
+import '../services/payment_service.dart';
 import '../services/unified_payment_handler.dart';
 import '../widgets/payment_channel_selector.dart';
 
@@ -45,7 +46,10 @@ class _RechargePageState extends ConsumerState<RechargePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              product.price,
+              // 价格无货币符号时补 $：后端下发的可能是裸数字（如 "1.0"）。
+              RegExp(r'^[\d.,\s]+$').hasMatch(product.price.trim())
+                  ? '\$${product.price.trim()}'
+                  : product.price.trim(),
               style: Theme.of(
                 ctx,
               ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
@@ -74,7 +78,26 @@ class _RechargePageState extends ConsumerState<RechargePage> {
     // 路由到 /notice/apple）。
     if (shouldUseStoreDirectly()) {
       final handler = ref.read(rechargePurchaseHandlerProvider);
-      await handler.purchase(product);
+      final success = await handler.purchase(product);
+      if (!mounted) return;
+      // 【失败必须提示】之前静默 return，用户点了购买什么反馈都没有，
+      // 只看到弹窗关掉，以为 App 没反应。
+      if (!success) {
+        final raw = handler.lastError;
+        final reason = (raw == null || raw.isEmpty)
+            ? l10n.purchaseFailedPleaseRetry
+            : (raw.contains('not-found') || raw.contains('unavailable')
+                  ? l10n.productUnavailable
+                  : raw);
+        final storeDebug = <String?>[
+          PaymentService.instance.lastIosDebugMessage,
+          PaymentService.instance.lastPlayDebugMessage,
+        ].whereType<String>().toList();
+        final message = storeDebug.isNotEmpty
+            ? '$reason\n(${storeDebug.join(' | ')})'
+            : reason;
+        AppSnackBar.show(context, message: message);
+      }
       return;
     }
 

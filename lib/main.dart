@@ -192,7 +192,9 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
       // 无条件刷新会让每次启动都多打一次用户中心接口。
       if (retried == 0) return;
       try {
-        await ref.read(coin_record.coinBalanceInfoProvider.notifier).load();
+        await ref
+            .read(coin_record.coinBalanceInfoProvider.notifier)
+            .load(force: true);
       } catch (e) {
         debugPrint('[MAIN] startup coin balance refresh failed: $e');
       }
