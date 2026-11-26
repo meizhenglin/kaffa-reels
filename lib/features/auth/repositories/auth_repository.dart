@@ -130,21 +130,32 @@ class AuthRepository {
     );
   }
 
+  /// 用 userPersonalCenter 响应里的会员字段本地合成会员态。
+  ///
+  /// 【为什么要拆出来】TikTok / Apple 登录流程此前是
+  /// `getUserCenter()` 拿到 userData 后，紧接着又调
+  /// `_refreshVipStatusFromBackend()` **再打一次同一个接口**只为读
+  /// isVip / vipEndTime —— 而这两个字段第一次响应里就有。
+  /// 有了这个纯本地方法，登录流程只需请求一次 usercenter。
+  UserModel _applyVipStatus(UserModel model, Map<String, dynamic> userCenterData) {
+    final isVip = userCenterData['isVip'] as int? ?? 0;
+    final vipEndTime = userCenterData['vipEndTime'] as String?;
+    return model.copyWith(
+      membershipType: isVip == 1
+          ? MembershipType.premium
+          : MembershipType.regular,
+      membershipExpiryDate: vipEndTime != null
+          ? DateTime.tryParse(vipEndTime)
+          : null,
+    );
+  }
+
   Future<UserModel> _refreshVipStatusFromBackend(UserModel model) async {
     try {
       final resp = await apiService.getUserCenter();
       if (resp.isSuccess && resp.data != null) {
         final userCenterData = resp.data as Map<String, dynamic>;
-        final isVip = userCenterData['isVip'] as int? ?? 0;
-        final vipEndTime = userCenterData['vipEndTime'] as String?;
-        return model.copyWith(
-          membershipType: isVip == 1
-              ? MembershipType.premium
-              : MembershipType.regular,
-          membershipExpiryDate: vipEndTime != null
-              ? DateTime.tryParse(vipEndTime)
-              : null,
-        );
+        return _applyVipStatus(model, userCenterData);
       }
     } catch (e, stackTrace) {
       debugPrint('[AuthRepo] Failed to refresh VIP status from backend: $e');
@@ -839,7 +850,9 @@ class AuthRepository {
         final incomingUser = UserModel.fromJson(
           userData,
         ).copyWith(isGuest: false);
-        final updatedModel = await _refreshVipStatusFromBackend(incomingUser);
+        // 会员字段就在这次响应里，本地合成即可——原来这里又调了一次
+        // _refreshVipStatusFromBackend，登录一次连打两遍 usercenter。
+        final updatedModel = _applyVipStatus(incomingUser, userData);
         await cacheUser(updatedModel);
         debugPrint(
           '[TikTokLoginFlow] finished via getUserCenter total=${stopwatch.elapsedMilliseconds}ms',
@@ -993,7 +1006,8 @@ class AuthRepository {
       final incomingUser = UserModel.fromJson(userData).copyWith(
         isGuest: false,
       );
-      final updatedModel = await _refreshVipStatusFromBackend(incomingUser);
+      // 同 TikTok 流程：会员字段就在响应里，本地合成，不再二次请求。
+      final updatedModel = _applyVipStatus(incomingUser, userData);
       await cacheUser(updatedModel);
       return updatedModel;
     }

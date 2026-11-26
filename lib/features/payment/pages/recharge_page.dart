@@ -8,8 +8,8 @@ import '../../../core/widgets/app_snack_bar.dart';
 import '../../../l10n/app_localizations.dart';
 import '../models/payment_channel.dart';
 import '../providers/recharge_provider.dart';
-import '../services/payment_service.dart';
 import '../services/unified_payment_handler.dart';
+import '../utils/store_error_message.dart';
 import '../widgets/payment_channel_selector.dart';
 
 /// Recharge coins page (K币充值)
@@ -83,20 +83,10 @@ class _RechargePageState extends ConsumerState<RechargePage> {
       // 【失败必须提示】之前静默 return，用户点了购买什么反馈都没有，
       // 只看到弹窗关掉，以为 App 没反应。
       if (!success) {
-        final raw = handler.lastError;
-        final reason = (raw == null || raw.isEmpty)
-            ? l10n.purchaseFailedPleaseRetry
-            : (raw.contains('not-found') || raw.contains('unavailable')
-                  ? l10n.productUnavailable
-                  : raw);
-        final storeDebug = <String?>[
-          PaymentService.instance.lastIosDebugMessage,
-          PaymentService.instance.lastPlayDebugMessage,
-        ].whereType<String>().toList();
-        final message = storeDebug.isNotEmpty
-            ? '$reason\n(${storeDebug.join(' | ')})'
-            : reason;
-        AppSnackBar.show(context, message: message);
+        AppSnackBar.show(
+          context,
+          message: friendlyStorePurchaseError(l10n, handler.lastError),
+        );
       }
       return;
     }

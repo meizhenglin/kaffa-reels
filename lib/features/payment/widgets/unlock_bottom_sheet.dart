@@ -12,6 +12,7 @@ import '../providers/coin_record_provider.dart';
 import '../providers/recharge_provider.dart';
 import '../services/payment_service.dart';
 import '../services/unified_payment_handler.dart';
+import '../utils/store_error_message.dart';
 import '../widgets/payment_channel_selector.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../core/network/api_service.dart';
@@ -686,18 +687,14 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         if (success) {
           await _unlockCurrentEpisodeAfterRecharge(product.goodsId);
         } else {
-          // 【用户可读的错误提示】商品查不到时 handler 会带出内部错误码
-          // （如 play-item-not-found / ios-item-not-found），直接弹出来
-          // 用户完全看不懂。统一映射成「商品暂不可用」；
-          // 其余错误码照原样显示（排障时仍能看到细节）。
-          final err = handler.lastError ?? '';
-          final friendly =
-              err.contains('not-found') ||
-                  err.contains('item-unavailable') ||
-                  err.contains('unavailable')
-              ? l10n.productUnavailable
-              : (err.isNotEmpty ? err : l10n.purchaseFailed);
-          AppSnackBar.show(context, message: friendly);
+          // 【用户可读的错误提示】商品查不到/StoreKit 报错时 handler 会带出
+          // 内部错误码（ios-store-error 等），直接弹出来用户完全看不懂。
+          // 统一走 friendlyStorePurchaseError：映射成人话并附上
+          // StoreKit/Play 原始错误细节（排障用）。
+          AppSnackBar.show(
+            context,
+            message: friendlyStorePurchaseError(l10n, handler.lastError),
+          );
         }
         return;
       }
@@ -726,7 +723,10 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         } else if (mounted) {
           AppSnackBar.show(
             context,
-            message: rechargeHandler.lastError ?? l10n.purchaseFailed,
+            message: friendlyStorePurchaseError(
+              l10n,
+              rechargeHandler.lastError,
+            ),
           );
         }
       } else {
@@ -1265,6 +1265,10 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         'source': purchase.verificationData.source,
       },
     };
+
+    // 【iOS 必须带 receipt】与 K币链路一致：/notice/apple 约定收据
+    // 同时放在 receipt 字段（见 api_service.appleCallBack 注释）。
+    callbackPayload['receipt'] = purchase.verificationData.localVerificationData;
 
     await storage.savePendingPayment(callbackPayload);
     debugPrint('[Unlock] Google callback payload: $callbackPayload');

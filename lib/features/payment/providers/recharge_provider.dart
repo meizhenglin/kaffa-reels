@@ -145,6 +145,12 @@ class RechargePurchaseHandler {
       },
     };
 
+    // 【iOS 必须带 receipt】/notice/apple 的后端约定（见 api_service.appleCallBack
+    // 的注释）：App Store 收据（Base64）要同时放在 receipt 字段里。
+    // iOS 上 serverVerificationData 就是收据，补一个 receipt 键；
+    // Android 多一个字段无副作用，统一加省去平台判断。
+    callbackPayload['receipt'] = purchase.verificationData.localVerificationData;
+
     // 【先存后发】发送前先把回调参数落盘（同 orderId 去重），成功后再出队。
     // 和会员链路（membership_provider Step 4）同一套事务模式：
     // App 在发送过程中被杀/断网，下次启动或进入会员页时

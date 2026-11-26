@@ -583,86 +583,43 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// Google 登录
+  ///
+  /// 【不再 post-login 刷新】repository.signInWithGoogle 内部
+  /// （_userModelFromFirebaseUser → _refreshVipStatusFromBackend）已经拉过
+  /// 一次 userPersonalCenter 并把结果合进返回的 UserModel，_runAuth 会把
+  /// 它写进 state。这里原来又 refreshUserInfo 风格地打一遍同一接口，纯属重复。
   Future<bool> signInWithGoogle() async {
     final success = await _runAuth(_repository.signInWithGoogle);
     if (!success) return false;
 
     state = state.copyWith(clearRegistrationSession: true);
-
-    try {
-      final resp = await apiServiceProvider.getUserCenter();
-      if (resp.isSuccess && resp.data != null) {
-        await updateUserFromData(resp.data as Map<String, dynamic>);
-      }
-    } catch (e) {
-      debugPrint(
-        '[AuthNotifier] signInWithGoogle post-login profile refresh failed: $e',
-      );
-    }
-
     return true;
   }
 
-  /// Facebook 登录
+  /// Facebook 登录（理由同 signInWithGoogle，repository 内部已拉过用户信息）
   Future<bool> signInWithFacebook() async {
     final success = await _runAuth(_repository.signInWithFacebook);
     if (!success) return false;
 
     state = state.copyWith(clearRegistrationSession: true);
-
-    try {
-      final resp = await apiServiceProvider.getUserCenter();
-      if (resp.isSuccess && resp.data != null) {
-        await updateUserFromData(resp.data as Map<String, dynamic>);
-      }
-    } catch (e) {
-      debugPrint(
-        '[AuthNotifier] signInWithFacebook post-login profile refresh failed: $e',
-      );
-    }
-
     return true;
   }
 
-  /// TikTok 登录
+  /// TikTok 登录（理由同 signInWithGoogle，TikTokLoginFlow 内部已拉过用户信息）
   Future<bool> signInWithTikTok() async {
     final success = await _runAuth(_repository.signInWithTikTok);
     if (!success) return false;
 
     state = state.copyWith(clearRegistrationSession: true);
-
-    try {
-      final resp = await apiServiceProvider.getUserCenter();
-      if (resp.isSuccess && resp.data != null) {
-        await updateUserFromData(resp.data as Map<String, dynamic>);
-      }
-    } catch (e) {
-      debugPrint(
-        '[AuthNotifier] signInWithTikTok post-login profile refresh failed: $e',
-      );
-    }
-
     return true;
   }
 
-  /// Apple 登录
+  /// Apple 登录（理由同 signInWithGoogle，AppleLoginFlow 内部已拉过用户信息）
   Future<bool> signInWithApple() async {
     final success = await _runAuth(_repository.signInWithApple);
     if (!success) return false;
 
     state = state.copyWith(clearRegistrationSession: true);
-
-    try {
-      final resp = await apiServiceProvider.getUserCenter();
-      if (resp.isSuccess && resp.data != null) {
-        await updateUserFromData(resp.data as Map<String, dynamic>);
-      }
-    } catch (e) {
-      debugPrint(
-        '[AuthNotifier] signInWithApple post-login profile refresh failed: $e',
-      );
-    }
-
     return true;
   }
 

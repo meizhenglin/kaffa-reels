@@ -878,8 +878,11 @@ class PaymentService {
           '[PaymentService] Consumable purchase timeout after '
           '${purchaseTimeout.inSeconds}s for ${product.id}',
         );
+        // 【平台中立文案】K币这条链路 iOS 也走（StoreKit），原文案
+        // 「Google Play did not complete...」会让 iOS 用户一头雾水。
         _lastError =
-            'Google Play did not complete the purchase in time. Please try again.';
+            'The store did not complete the purchase in time. '
+            'Please try again.';
         _productHandlers.remove(product.id);
         finalizePendingPurchase();
       }

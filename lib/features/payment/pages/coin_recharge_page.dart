@@ -346,64 +346,71 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
     RechargeProduct product,
     AppLocalizations l10n,
   ) {
-    return ColoredBox(
-      color: const Color(0xFF121212),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            0,
-            16,
-            MediaQuery.of(context).padding.bottom + 10,
-          ),
-          child: SizedBox(
-            width: double.infinity,
-            height: 42,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0xFFFEE7A3), Color(0xFFDE962B)],
-                ),
-                borderRadius: BorderRadius.circular(21),
+    // 【悬浮按钮】去掉黑色底条，按钮悬浮在列表上（金色光晕代替底色，
+    // 和商品卡片的渐变色调呼应）。
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.of(context).padding.bottom + 10,
+        ),
+        child: SizedBox(
+          width: double.infinity,
+          height: 42,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFFFEE7A3), Color(0xFFDE962B)],
               ),
-              child: FilledButton(
-                onPressed: _isPurchasing
-                    ? null
-                    : () => _handlePurchase(product),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  disabledBackgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  foregroundColor: const Color(0xFF753900),
-                  disabledForegroundColor: const Color(
-                    0xFF753900,
-                  ).withAlpha(153),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(21),
-                  ),
-                  padding: EdgeInsets.zero,
+              borderRadius: BorderRadius.circular(21),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFDE962B).withAlpha(90),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
                 ),
-                child: _isPurchasing
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Color(0xFF753900),
-                        ),
-                      )
-                    : Text(
-                        l10n.payPrice(product.price),
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF753900),
-                        ),
+              ],
+            ),
+            child: FilledButton(
+              onPressed: _isPurchasing
+                  ? null
+                  : () => _handlePurchase(product),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                disabledBackgroundColor: Colors.transparent,
+                shadowColor: Colors.transparent,
+                foregroundColor: const Color(0xFF753900),
+                disabledForegroundColor: const Color(
+                  0xFF753900,
+                ).withAlpha(153),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(21),
+                ),
+                padding: EdgeInsets.zero,
+              ),
+              child: _isPurchasing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFF753900),
                       ),
-              ),
+                    )
+                  : Text(
+                      // 价格带货币符号，和商品卡片上的「$68.0」保持一致
+                      l10n.payPrice('\$${product.price}'),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF753900),
+                      ),
+                    ),
             ),
           ),
         ),

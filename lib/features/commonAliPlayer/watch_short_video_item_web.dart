@@ -1451,17 +1451,47 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
   }
 
   Widget _buildPurchaseVipButton() {
+    // 【实心按钮】原来是金色下划线裸文字，压在视频封面（尤其是金色剧名
+    // 大字）上几乎看不见。改成和 Pay 按钮同款的金色渐变实心胶囊按钮，
+    // 带光晕阴影，任何封面上都醒目。
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: widget.onLockedWatchNowTap,
-      child: const Text(
-        'Purchase VIP',
-        style: TextStyle(
-          color: Color(0xFFFFE389),
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          decoration: TextDecoration.underline,
-          decorationColor: Color(0xFFFFE389),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 9),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFEE7A3), Color(0xFFDE962B)],
+          ),
+          borderRadius: BorderRadius.circular(21),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFDE962B).withAlpha(110),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.workspace_premium,
+              size: 18,
+              color: Color(0xFF753900),
+            ),
+            const SizedBox(width: 6),
+            const Text(
+              'Purchase VIP',
+              style: TextStyle(
+                color: Color(0xFF753900),
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
       ),
     );
