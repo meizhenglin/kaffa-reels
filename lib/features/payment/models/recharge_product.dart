@@ -44,10 +44,28 @@ class RechargeProduct extends Equatable {
       case TargetPlatform.iOS:
         // 后台 goodsIosId 没配时兜底 Google ID：
         // App Store / Google Play 两边用的是同一套产品 ID。
-        return iosProductId.isNotEmpty ? iosProductId : googlePlayId;
+        final raw = iosProductId.isNotEmpty ? iosProductId : googlePlayId;
+        return _correctIosProductId(raw);
       default:
         return googlePlayId;
     }
+  }
+
+  /// iOS 端产品 ID 定向纠错。
+  ///
+  /// 【根因】后端 rechargeGoodsConfig 只在 `remarks` 里配了一个商品 ID，
+  /// 且 6 个金币包全部把 dollar 拼成了 **doller**
+  /// （com.qahwa.1doller / com.qahwa.3doller / com.qahwa.5doller /
+  /// com.qahwatv.10doller / com.qahwatv.16doller / com.qahwatv.68doller），
+  /// 而 App Store Connect 里真实的产品 ID 是 **dollar** 拼写
+  /// （com.qahwa.1dollar 等，全部已过审）。StoreKit 按拼错的 ID 查询
+  /// 返回空 → iOS 上「获取不到商品」，K币包一个都买不了。
+  ///
+  /// Android 端 Play 后台建的商品是什么拼写就用什么（行为不变）；
+  /// iOS 端纠正到 ASC 的真实 ID。若后端日后把 remarks 改对或配了
+  /// goodsIosId，此替换为 no-op，不受影响。
+  static String _correctIosProductId(String id) {
+    return id.replaceAll('doller', 'dollar');
   }
 
   factory RechargeProduct.fromGoodsConfig(RechargeGoodsConfigItem item) {

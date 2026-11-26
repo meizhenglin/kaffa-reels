@@ -1,7 +1,9 @@
-﻿import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:in_app_purchase/in_app_purchase.dart' show PurchaseDetails, PurchaseStatus;
+import 'package:in_app_purchase/in_app_purchase.dart'
+    show PurchaseDetails, PurchaseStatus;
 
 import '../../../l10n/app_localizations.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -90,6 +92,7 @@ class UnlockBottomSheet extends ConsumerStatefulWidget {
 class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
   /// 正在处理的商品ID集合，支持同时处理多个商品
   final Set<int> _processingProductIds = {};
+
   /// 余额是否已懒加载过（避免重复请求）
   bool _balanceLazyLoaded = false;
 
@@ -202,7 +205,11 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
                 ),
               ],
             ),
-            child: const Icon(Icons.lock_outline, color: Colors.white, size: 22),
+            child: const Icon(
+              Icons.lock_outline,
+              color: Colors.white,
+              size: 22,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -272,10 +279,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.07),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.1),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
       ),
       child: Row(
         children: [
@@ -349,9 +353,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
     if (allProducts.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(32),
-          child: Text(
-            l10n.noProductsAvailable,
-            style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14),
+        child: Text(
+          l10n.noProductsAvailable,
+          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14),
           textAlign: TextAlign.center,
         ),
       );
@@ -433,89 +437,80 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           ),
           child: Stack(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (product.goodsName.isNotEmpty) ...[
-                      Text(
-                        product.goodsName,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.85),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
+              // 【居中修复】Padding 直接作为 Stack 子级时，Column 宽度收缩
+              // 成内容宽度、被 Stack 摆到左上角，导致标题/价格整体左对齐。
+              // 用 Positioned.fill 撑满卡片后，Column 的 CrossAxisAlignment
+              // .center 才真正在卡片宽度内居中。
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (product.goodsName.isNotEmpty) ...[
                         Text(
-                          '\$${price.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: -0.5,
+                          product.goodsName,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.85),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      // 【只显示价格】去掉价格旁边的 K-Coin 小字，金额本身
+                      // 就是美元价，带个 K-Coin 后缀反而让人误以为是货币单位。
+                      Text(
+                        '\$${price.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      if (hasDiscount) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '\$${originalPrice.toStringAsFixed(0)}',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.4),
+                            fontSize: 12,
+                            decoration: TextDecoration.lineThrough,
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 2),
+                      ],
+                      if (tagLabel != null) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: tagColor.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: tagColor.withOpacity(0.4),
+                              width: 1,
+                            ),
+                          ),
                           child: Text(
-                            l10n.kCoin,
+                            tagLabel,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.5),
-                              fontSize: 12,
+                              color: tagColor,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
                       ],
-                    ),
-                    if (hasDiscount) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '\$${originalPrice.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.4),
-                          fontSize: 12,
-                          decoration: TextDecoration.lineThrough,
-                        ),
-                      ),
                     ],
-                    if (tagLabel != null) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: tagColor.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: tagColor.withOpacity(0.4),
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          tagLabel,
-                          style: TextStyle(
-                            color: tagColor,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
               if (isProcessing)
@@ -616,10 +611,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         product.type == UnlockProductType.season) {
       final confirmed = await _confirmPurchase(product);
       if (confirmed != true) return;
-      await _confirmAndUnlockByPurchase(
-        product,
-        showBalanceDialog: false,
-      );
+      await _confirmAndUnlockByPurchase(product, showBalanceDialog: false);
       return;
     }
 
@@ -1019,7 +1011,10 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
               ? Map<String, dynamic>.from(data['data'] as Map)
               : const <String, dynamic>{};
           final rawOrderNo =
-              data['orderNo'] ?? nested['orderNo'] ?? data['orderId'] ?? nested['orderId'];
+              data['orderNo'] ??
+              nested['orderNo'] ??
+              data['orderId'] ??
+              nested['orderId'];
           orderNo = rawOrderNo?.toString();
         }
         debugPrint(
@@ -1035,8 +1030,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       PurchaseDetails? completedPurchase;
       final paid = await paymentService.purchaseConsumable(
         product: products.first,
-        applicationUserName:
-            await ref.read(storageServiceProvider).getUserIdAsync(),
+        applicationUserName: await ref
+            .read(storageServiceProvider)
+            .getUserIdAsync(),
         onComplete: (purchase) => completedPurchase = purchase,
       );
 
@@ -1052,7 +1048,8 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         // itemAlreadyOwned 说明用户之前已经为这个商品付过钱（旧版本把
         // 一次性商品买成了非消耗型，Play 账户里还留着）。消耗掉旧购买
         // 并直接补发解锁接口，让用户不用再付一次钱。
-        if (err.contains('itemAlreadyOwned') || err.contains('ITEM_ALREADY_OWNED')) {
+        if (err.contains('itemAlreadyOwned') ||
+            err.contains('ITEM_ALREADY_OWNED')) {
           debugPrint(
             '[Unlock] itemAlreadyOwned detected — recovering previous purchase '
             'and calling unlock API directly (goodsId=${product.goodsId})',
@@ -1092,7 +1089,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
     try {
       final paymentService = PaymentService.instance;
-      final past = await paymentService.queryExistingPurchases(forceRefresh: true);
+      final past = await paymentService.queryExistingPurchases(
+        forceRefresh: true,
+      );
       final playId = product.googlePlayId ?? '';
       PurchaseDetails? ownedPurchase;
       for (final p in past) {
@@ -1214,10 +1213,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           'episodesId': widget.episodeId,
           'episodesNum': widget.episodesNum,
         });
-        AppSnackBar.show(
-          context,
-          message: resp?.error ?? l10n.unlockFailed,
-        );
+        AppSnackBar.show(context, message: resp?.error ?? l10n.unlockFailed);
       }
     } catch (e) {
       if (mounted) {
@@ -1268,7 +1264,8 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
     // 【iOS 必须带 receipt】与 K币链路一致：/notice/apple 约定收据
     // 同时放在 receipt 字段（见 api_service.appleCallBack 注释）。
-    callbackPayload['receipt'] = purchase.verificationData.localVerificationData;
+    callbackPayload['receipt'] =
+        purchase.verificationData.localVerificationData;
 
     await storage.savePendingPayment(callbackPayload);
     debugPrint('[Unlock] Google callback payload: $callbackPayload');
@@ -1284,9 +1281,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           params: callbackPayload,
         );
       } catch (e) {
-        debugPrint(
-          '[Unlock] store callback failed (attempt ${retry + 1}): $e',
-        );
+        debugPrint('[Unlock] store callback failed (attempt ${retry + 1}): $e');
       }
     }
 
@@ -1463,9 +1458,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         await coinNotifier.load(force: true);
 
         AppSnackBar.show(context, message: l10n.vipSubscriptionSuccess);
-        Navigator.of(
-          context,
-        ).pop(UnlockResult.vip());
+        Navigator.of(context).pop(UnlockResult.vip());
       } else {
         AppSnackBar.show(
           context,
