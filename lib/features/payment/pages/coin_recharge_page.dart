@@ -93,10 +93,14 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
           var reason = raw == null
               ? l10n.purchaseFailedPleaseRetry
               : _localizePlayFailure(raw, l10n);
-          // 同会员页：把 Play 原始 debugMessage 带出来，方便测试排障。
-          final playDebug = PaymentService.instance.lastPlayDebugMessage;
-          if (playDebug != null && playDebug.isNotEmpty) {
-            reason = '$reason\n(Play: $playDebug)';
+          // 把商店原始 debugMessage 带出来，方便测试排障。
+          // 【iOS 也要带】之前只带 Play 的 debugMessage，iOS 上排障信息丢失。
+          final storeDebug = <String?>[
+            PaymentService.instance.lastIosDebugMessage,
+            PaymentService.instance.lastPlayDebugMessage,
+          ].whereType<String>().toList();
+          if (storeDebug.isNotEmpty) {
+            reason = '$reason\n(${storeDebug.join(' | ')})';
           }
           AppSnackBar.show(context, message: reason);
         } else if (success && mounted) {

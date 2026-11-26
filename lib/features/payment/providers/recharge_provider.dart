@@ -52,8 +52,13 @@ class RechargePurchaseHandler {
     );
 
     if (products.isEmpty) {
-      // 同会员链路：用 Play 返回的真实原因，不要笼统地让用户去查网络。
-      lastError = paymentService.lastPlayFailureCode ?? 'play-item-not-found';
+      // 同会员链路：用商店返回的真实原因，不要笼统地让用户去查网络。
+      // 【按平台取失败码】之前固定取 Play 的失败码，iOS 上 Play 码永远是
+      // null → 落到 'play-item-not-found' → 页面弹「Google Play 不可用」，
+      // 真实的 StoreKit 失败原因（商品没批准 / ID 不匹配）全被掩盖了。
+      lastError = (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS)
+          ? (paymentService.lastIosFailureCode ?? 'ios-item-not-found')
+          : (paymentService.lastPlayFailureCode ?? 'play-item-not-found');
       pendingProduct = null;
       return false;
     }
