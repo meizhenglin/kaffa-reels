@@ -269,6 +269,33 @@ class PaymentService {
         _diagnoseIosProducts(sanitizedIds, response);
       }
 
+      // 【iOS 瞬时错误自动重试】
+      // StoreKit 在沙盒/TestFlight 上偶发 storekit_no_response
+      // （SKError: Failed to get response from platform）之类的瞬时错误，
+      // 一次失败不代表商品有问题。等 2 秒重查一次：成功就当无事发生，
+      // 仍失败才把错误交还给上层归因（用户看到的还是明确的失败提示）。
+      if (!kIsWeb &&
+          defaultTargetPlatform == TargetPlatform.iOS &&
+          response.error != null &&
+          response.productDetails.isEmpty) {
+        debugPrint(
+          '[PaymentService] iOS: StoreKit 瞬时错误，2 秒后重试一次商品查询',
+        );
+        await Future<void>.delayed(const Duration(seconds: 2));
+        final retry = await _inAppPurchase.queryProductDetails(
+          sanitizedIds.toSet(),
+        );
+        if (retry.error == null && retry.productDetails.isNotEmpty) {
+          debugPrint(
+            '[PaymentService] iOS: 商品查询重试成功，拿到 ${retry.productDetails.length} 个商品',
+          );
+          _availableProducts = retry.productDetails;
+          return _availableProducts;
+        }
+        // 重试也失败：用重试结果做 iOS 归因，失败信息更接近当下真实状态
+        _diagnoseIosProducts(sanitizedIds, retry);
+      }
+
       if (response.error != null) {
         _lastError = response.error!.message;
         debugPrint(

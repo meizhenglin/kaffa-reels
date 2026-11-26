@@ -871,9 +871,19 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         ? products[_selectedIndex]
         : null;
     final isDisabled = _hasActiveSubscription || product == null;
+    // 按钮价格兜底带 $：后端下发的 price 可能是裸数字（如 "15"），
+    // 显示成 "Pay 15" 很奇怪；已带货币符号（StoreKit 本地化价格
+    // 如 "$15.00"、或 "SAR ..."）时保持原样不重复加。
+    String? priceLabel;
+    if (product != null) {
+      final trimmed = product.price.trim();
+      priceLabel = RegExp(r'^[\d.,\s]+$').hasMatch(trimmed)
+          ? '\$$trimmed'
+          : trimmed;
+    }
     final buttonLabel = _hasActiveSubscription
         ? l10n.alreadySubscribed
-        : (product != null ? '${l10n.pay} ${product.price.trim()}' : l10n.pay);
+        : (product != null ? '${l10n.pay} $priceLabel' : l10n.pay);
 
     return ColoredBox(
       color: const Color(0xFF121212),
