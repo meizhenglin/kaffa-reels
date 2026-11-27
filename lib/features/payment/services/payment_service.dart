@@ -227,16 +227,32 @@ class PaymentService {
   Future<void> prewarmProducts({required List<String> productIds}) async {
     if (productIds.isEmpty) return;
     try {
-      await getProducts(productIds: productIds);
+      // 【快速失败】预热最多占闸门 8 秒、瞬时错误不重试：
+      // 预热失败零成本（缓存没灌上，用户购买时自己查），但预热占着
+      // 闸门的每一秒都在拖累「刚进应用就点确认」的排队用户。
+      // 之前预热走完整路径（15s 查询 + 2s + 10s 重试 ≈ 27s），用户
+      // 排队最多等 30s，撞上预热挂死就是「查询商品超时」。
+      await getProducts(
+        productIds: productIds,
+        queryTimeout: const Duration(seconds: 8),
+        retryOnTransientError: false,
+      );
     } catch (e) {
       debugPrint('[PaymentService] prewarmProducts failed (ignored): $e');
     }
   }
 
   /// Get available subscription products
+  /// [queryTimeout] 单次 StoreKit/Play 查询的超时。
+  /// [retryOnTransientError] iOS 瞬时错误（SKError）是否自动重试一次。
+  /// 【预热专用的快速失败】预热只是缓存优化，失败静默；但查询方占用
+  /// 闸门的时长直接决定「刚进应用就购买」的用户要排队等多久——预热
+  /// 用短超时 + 不重试（最多占闸门 ~8s），用户购买用完整超时 + 重试。
   Future<List<ProductDetails>> getProducts({
     required List<String> productIds,
     bool requireSubscriptionOnAndroid = false,
+    Duration queryTimeout = const Duration(seconds: 15),
+    bool retryOnTransientError = true,
   }) async {
     debugPrint('[PaymentService] getProducts() called with IDs: $productIds');
     debugPrint(
@@ -291,11 +307,22 @@ class PaymentService {
     final pendingGate = _storeQueryGate;
     if (pendingGate != null) {
       try {
-        // 【超时兜底】闸门正常由查询方在 finally 里 complete；万一查询方
-        // 被 StoreKit 卡死（queryProductDetails 不返回），排队者不能陪葬，
-        // 最多等 12 秒就自己往下走（走自己的现场查询）。
-        await pendingGate.future.timeout(const Duration(seconds: 12));
-      } catch (_) {}
+        // 【超时兜底】闸门由查询方在 finally 里 complete（成功/失败/超时
+        // 全都会走到），所以正常情况排队者会在查询方结束后被放行。
+        // 等待上限必须 ≥ 查询方自己的最坏总耗时：
+        // iOS = 初始化 + 15s 查询 + 2s 延迟 + 10s 重试 ≈ 28s。
+        // 【为什么是 30s】之前设 12s，查询方还没结束时排队者就提前放行，
+        // 自己再发一个 SKProductsRequest → 与原查询并发 → iOS 并发
+        // StoreKit 查询不稳定（实测必现无响应），反复「15 秒未响应」。
+        // 30s 只在闸门彻底异常（查询方永远不 complete）时才触发。
+        debugPrint('[PaymentService] queued query: waiting for in-flight query');
+        await pendingGate.future.timeout(const Duration(seconds: 30));
+        debugPrint('[PaymentService] queued query: gate released');
+      } catch (_) {
+        debugPrint(
+          '[PaymentService] queued query: gate wait timed out (30s), proceeding',
+        );
+      }
       final queued = _readFreshCache(sanitizedIds);
       if (queued != null) {
         debugPrint(
@@ -321,16 +348,18 @@ class PaymentService {
       try {
         response = await _inAppPurchase
             .queryProductDetails(sanitizedIds.toSet())
-            .timeout(const Duration(seconds: 15));
+            .timeout(queryTimeout);
       } on TimeoutException {
         debugPrint(
-          '[PaymentService] queryProductDetails timed out (15s) '
-          'after ${queryStopwatch.elapsedMilliseconds}ms',
+          '[PaymentService] queryProductDetails timed out '
+          '(${queryTimeout.inSeconds}s) after '
+          '${queryStopwatch.elapsedMilliseconds}ms',
         );
         _lastError = 'Product query timed out';
         if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
           _lastIosFailureCode = 'ios-store-error';
-          _lastIosDebugMessage = 'StoreKit queryProductDetails 15 秒无响应（已超时中断）';
+          _lastIosDebugMessage =
+              'StoreKit queryProductDetails ${queryTimeout.inSeconds} 秒无响应（已超时中断）';
         }
         return [];
       }
@@ -380,6 +409,7 @@ class PaymentService {
       // 仍失败才把错误交还给上层归因（用户看到的还是明确的失败提示）。
       if (!kIsWeb &&
           defaultTargetPlatform == TargetPlatform.iOS &&
+          retryOnTransientError &&
           response.error != null &&
           response.productDetails.isEmpty) {
         debugPrint('[PaymentService] iOS: StoreKit 瞬时错误，2 秒后重试一次商品查询');
@@ -1162,6 +1192,17 @@ class PaymentService {
           //   2. 事件落到会员处理器 → 没有 pendingOrderId → 抛 StateError
           //      → 用户买完币看到「Failed to process purchase」
           if (_productKinds[purchase.productID] == PlayProductKind.consumable) {
+            // 【先放行 UI 再收尾】StoreKit 报 purchased（商店成功弹窗已出）
+            // 时立刻 complete 掉 completer 让全屏遮罩马上关闭；
+            // finishTransaction 和后端回调继续在后台跑。
+            // 之前 await completePurchase 排在 completer 前面，iOS 上
+            // finishTransaction 要 1-2 秒，用户付完款还盯着 loading。
+            if (isPendingProduct) {
+              _pendingPurchaseCompleter?.complete(true);
+              _pendingPurchaseCompleter = null;
+              _pendingPurchaseProductId = null;
+              _pendingPurchaseStartedAt = null;
+            }
             // 【iOS 必须手动 finishTransaction】
             // buyConsumable 的 autoConsume 只在 Android（Google Play）生效，
             // iOS 的交易不会自动结束 —— 不 completePurchase 的话交易一直
@@ -1174,12 +1215,6 @@ class PaymentService {
               } catch (e) {
                 debugPrint('[PaymentService] iOS completePurchase failed: $e');
               }
-            }
-            if (isPendingProduct) {
-              _pendingPurchaseCompleter?.complete(true);
-              _pendingPurchaseCompleter = null;
-              _pendingPurchaseProductId = null;
-              _pendingPurchaseStartedAt = null;
             }
             final handler = _productHandlers.remove(purchase.productID);
             if (handler != null) {
@@ -1195,19 +1230,21 @@ class PaymentService {
             break;
           }
 
+          // 【先放行 UI 再收尾】同 K币 路径：遮罩立刻关闭，acknowledge
+          // 与会员回调后台继续。
+          if (isPendingProduct) {
+            _pendingPurchaseCompleter?.complete(true);
+            _pendingPurchaseCompleter = null;
+            _pendingPurchaseProductId = null;
+            _pendingPurchaseStartedAt = null;
+          }
+
           if (purchase.pendingCompletePurchase) {
             try {
               await _inAppPurchase.completePurchase(purchase);
             } catch (e) {
               // Silently handle acknowledge errors
             }
-          }
-
-          if (isPendingProduct) {
-            _pendingPurchaseCompleter?.complete(true);
-            _pendingPurchaseCompleter = null;
-            _pendingPurchaseProductId = null;
-            _pendingPurchaseStartedAt = null;
           }
 
           _onPurchaseComplete?.call(purchase);
