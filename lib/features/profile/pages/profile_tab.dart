@@ -144,9 +144,13 @@ class _ProfileTabState extends ConsumerState<ProfileTab>
         final resp = await ref.read(apiServiceProviderRef).getUserCenter();
         if (resp.isSuccess && resp.data != null && mounted) {
           final userData = resp.data as Map<String, dynamic>;
-          // 同时更新余额状态和用户信息（同一个接口返回的数据，不重复请求）
+          // 【先更新 auth 再写余额】余额 provider 有账号一致性守卫
+          // （只采纳「当前是正式登录账号」的余额），登录瞬间必须先把
+          // auth 状态更新成正式账号，余额才不会被守卫拦掉。
+          // updateUserFromData 内部也会同步一次余额，这里的显式调用
+          // 兜底（两份数据来自同一响应，内容一致）。
+          await ref.read(authProvider.notifier).updateUserFromData(userData);
           ref.read(coinBalanceInfoProvider.notifier).updateFromData(userData);
-          ref.read(authProvider.notifier).updateUserFromData(userData);
           _lastUserInfoLoad = DateTime.now();
         }
       } catch (e) {

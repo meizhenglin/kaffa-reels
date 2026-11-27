@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_service.dart';
 import '../../../app/providers/app_providers.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../models/coin_record_model.dart';
 
 /// Record type enum
@@ -21,13 +23,33 @@ final coinBalanceInfoProvider =
     dioClient: ref.read(dioClientProvider),
     storage: ref.read(storageServiceProvider),
   );
-  return CoinBalanceNotifier(apiService);
+  return CoinBalanceNotifier(apiService, ref);
 });
 
 class CoinBalanceNotifier extends StateNotifier<CoinBalance> {
-  CoinBalanceNotifier(this._apiService) : super(const CoinBalance());
+  CoinBalanceNotifier(this._apiService, this._ref) : super(const CoinBalance());
 
   final ApiService _apiService;
+  final Ref _ref;
+
+  /// 【账号一致性守卫】余额只属于「已登录的正式账号」。
+  ///
+  /// 游客/未登录态下到达的余额响应一律丢弃：
+  /// - 登出瞬间还在飞的用户中心请求（带着旧账号 token 出去的），落地时
+  ///   会把旧账号余额写进游客视角 —— 实测登出后个人中心显示旧账号余额。
+  /// - KCoinWidget/解锁弹窗/充值页等处的 initState load() 不区分登录态，
+  ///   响应落地时的登录态可能已经变了。
+  bool _isFormalLoggedInUser() {
+    try {
+      final authState = _ref.read(authProvider);
+      final user = authState.user;
+      return authState.status == AuthStatus.authenticated &&
+          user != null &&
+          !user.isTourist;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// 正在进行中的请求。
   ///
@@ -72,6 +94,13 @@ class CoinBalanceNotifier extends StateNotifier<CoinBalance> {
     try {
       final resp = await _apiService.getUserCenter();
       if (resp.isSuccess && resp.data != null) {
+        // 【游客/登出态丢弃】响应落地时的登录态可能和发起时不同。
+        if (!_isFormalLoggedInUser()) {
+          debugPrint(
+            '[CoinBalance] drop load() result: not a formal logged-in user',
+          );
+          return;
+        }
         final data = resp.data as Map<String, dynamic>;
         state = CoinBalance.fromJson(data);
         _lastLoadedAt = DateTime.now();
@@ -83,6 +112,13 @@ class CoinBalanceNotifier extends StateNotifier<CoinBalance> {
 
   /// Update balance from raw API response data (avoids a second HTTP request)
   void updateFromData(Map<String, dynamic> data) {
+    // 【游客/登出态丢弃】防止登出瞬间的在飞响应把旧账号余额写回游客视角。
+    if (!_isFormalLoggedInUser()) {
+      debugPrint(
+        '[CoinBalance] drop updateFromData: not a formal logged-in user',
+      );
+      return;
+    }
     state = CoinBalance(
       balance: data['balance'] as int? ??
           data['userAmount'] as int? ??

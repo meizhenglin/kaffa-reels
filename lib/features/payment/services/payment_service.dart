@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 import 'package:in_app_purchase_android/billing_client_wrappers.dart'
@@ -197,6 +198,86 @@ class PaymentService {
   /// 查缓存（预热成功的话直接命中返回，实际零等待），没命中才自己查。
   Completer<void>? _storeQueryGate;
 
+  /// 【iOS StoreKit2 商品查询桥】SK1 的 SKProductsRequest（delegate 模式）
+  /// 在沙盒环境高频挂死：请求发出后委托回调永远不来，插件没有取消 API，
+  /// 客户端只能超时放弃（反复「15 秒无响应」）。SK2 的
+  /// Product.products(for:) 是 async/await 语义，要么返回要么抛错。
+  /// 只替代「商品列表查询」；购买/收据仍走插件 SK1 链路，后端
+  /// /notice/apple 的收据格式不受任何影响。原生桥注册失败/超时/报错时
+  /// 返回 null，自动回退 SK1 现有路径。
+  static const MethodChannel _sk2QueryChannel = MethodChannel(
+    'kaffa/storekit2_query',
+  );
+
+  /// iOS 优先走 StoreKit2 查询商品。成功返回商品列表（可为空列表，
+  /// 表示商店明确答复「查无此商品」）；SK2 不可用/超时/报错返回 null。
+  Future<List<ProductDetails>?> _sk2QueryProducts(
+    List<String> ids,
+    Duration timeout,
+  ) async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return null;
+    final stopwatch = Stopwatch()..start();
+    try {
+      final raw = await _sk2QueryChannel
+          .invokeMethod<List<dynamic>>('queryProducts', ids)
+          .timeout(timeout);
+      final list = raw ?? const <dynamic>[];
+      final products = <ProductDetails>[];
+      for (final item in list) {
+        final map = item as Map;
+        products.add(
+          ProductDetails(
+            id: map['id'] as String,
+            title: (map['displayName'] as String?)?.isNotEmpty == true
+                ? map['displayName'] as String
+                : (map['id'] as String),
+            description: map['description'] as String? ?? '',
+            price: (map['displayPrice'] as String?)?.isNotEmpty == true
+                ? map['displayPrice'] as String
+                : (map['price'] as String? ?? ''),
+            rawPrice: double.tryParse(map['price'] as String? ?? '') ?? 0,
+            currencyCode: map['currencyCode'] as String? ?? 'USD',
+          ),
+        );
+      }
+      debugPrint(
+        '[PaymentService] StoreKit2 query took '
+        '${stopwatch.elapsedMilliseconds}ms, got ${products.length}/${ids.length}',
+      );
+      final foundIds = products.map((p) => p.id).toSet();
+      final notFound = ids.where((id) => !foundIds.contains(id)).toList();
+      _lastMissingProductIds = notFound.toSet();
+      if (notFound.isNotEmpty) {
+        debugPrint('[PaymentService] SK2 notFound: ${notFound.join(", ")}');
+      }
+      // 成功返回 → 清掉上一次残留的 iOS 失败诊断；全部查不到时给出明确归因。
+      _lastIosFailureCode = notFound.length == ids.length
+          ? 'ios-item-not-found'
+          : null;
+      _lastIosDebugMessage = notFound.length == ids.length
+          ? 'StoreKit2 明确返回：所有商品 ID 都查不到（$notFound）'
+          : null;
+      return products;
+    } on MissingPluginException {
+      debugPrint('[PaymentService] SK2 bridge not registered → fallback to SK1');
+    } on TimeoutException {
+      debugPrint(
+        '[PaymentService] SK2 query timed out (${timeout.inSeconds}s) '
+        'after ${stopwatch.elapsedMilliseconds}ms → fallback to SK1',
+      );
+    } on PlatformException catch (e) {
+      debugPrint(
+        '[PaymentService] SK2 query failed: ${e.code} ${e.message} '
+        'after ${stopwatch.elapsedMilliseconds}ms → fallback to SK1',
+      );
+    } catch (e) {
+      debugPrint(
+        '[PaymentService] SK2 query unexpected error: $e → fallback to SK1',
+      );
+    }
+    return null;
+  }
+
   /// 全部请求的 ID 都有新鲜缓存时返回商品列表，否则返回 null。
   List<ProductDetails>? _readFreshCache(List<String> ids) {
     final now = DateTime.now();
@@ -336,6 +417,18 @@ class PaymentService {
     _storeQueryGate = gate;
 
     try {
+      // 【iOS 优先 SK2 查询】SK1 委托查询在沙盒环境高频挂死（15 秒无响应）。
+      // SK2 成功（包括明确返回空列表）直接灌缓存并返回；SK2 不可用/
+      // 超时/报错时返回 null，落到下面的 SK1 路径兜底。
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        final sk2Products = await _sk2QueryProducts(sanitizedIds, queryTimeout);
+        if (sk2Products != null) {
+          _availableProducts = sk2Products;
+          _cacheProducts(sk2Products);
+          return sk2Products;
+        }
+      }
+
       debugPrint(
         '[PaymentService] Calling _inAppPurchase.queryProductDetails with: $sanitizedIds',
       );

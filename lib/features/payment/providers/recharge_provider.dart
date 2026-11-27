@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
@@ -195,6 +197,19 @@ class RechargePurchaseHandler {
     // 之前那段本地 addCoins 会和服务端记账重复，
     // 而且本地余额存在 SharedPreferences 里，清缓存就没了。
     await _refreshServerBalance();
+
+    // 【二段刷新】confirm 接口返回成功时，后端账务可能还没落库——立刻
+    // 拉 userPersonalCenter 拿到的还是充值前的余额（实测：购买完返回
+    // 个人中心显示旧余额，切 tab 之后才更新）。2 秒后强制再刷一次兜底，
+    // 个人中心 watch 余额 provider，数据落了 UI 自动更新。
+    if (confirmed) {
+      unawaited(
+        Future<void>(() async {
+          await Future<void>.delayed(const Duration(seconds: 2));
+          await _refreshServerBalance();
+        }),
+      );
+    }
 
     return confirmed;
   }
