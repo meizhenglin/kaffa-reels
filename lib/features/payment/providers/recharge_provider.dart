@@ -196,22 +196,43 @@ class RechargePurchaseHandler {
     // 余额以服务端为准。这里**不能**在本地加币 ——
     // 之前那段本地 addCoins 会和服务端记账重复，
     // 而且本地余额存在 SharedPreferences 里，清缓存就没了。
+    final baselineBalance = _ref.read(coin_record.coinBalanceInfoProvider).balance;
     await _refreshServerBalance();
 
-    // 【二段刷新】confirm 接口返回成功时，后端账务可能还没落库——立刻
-    // 拉 userPersonalCenter 拿到的还是充值前的余额（实测：购买完返回
-    // 个人中心显示旧余额，切 tab 之后才更新）。2 秒后强制再刷一次兜底，
-    // 个人中心 watch 余额 provider，数据落了 UI 自动更新。
+    // 【轮询刷新】confirm 返回成功 ≠ 后端账务已落库：实测 confirm 成功后
+    // 立刻拉 userPersonalCenter 拿到的还是旧余额（购买完返回个人中心
+    // 显示旧值，切 tab 之后才更新——切 tab 是 15 秒节流过期后重新拉才
+    // 拿到新值，说明落库延迟 > 2 秒）。固定重试一次不够，改成轮询：
+    // 每 2 秒强制刷一次，最多 6 次 / 12 秒，余额一变（到账）就提前收兵。
+    // 个人中心 watch 余额 provider，数据落了 UI 自动更新，不用切 tab。
     if (confirmed) {
-      unawaited(
-        Future<void>(() async {
-          await Future<void>.delayed(const Duration(seconds: 2));
-          await _refreshServerBalance();
-        }),
-      );
+      final current = _ref.read(coin_record.coinBalanceInfoProvider).balance;
+      // 第一次刷新就已经拿到新余额则无需轮询；否则轮询等后端落库。
+      if (current == baselineBalance) {
+        unawaited(_pollBalanceUntilCredited(baselineBalance));
+      }
     }
 
     return confirmed;
+  }
+
+  /// confirm 成功后轮询余额直到后端落库（余额变化）或超次放弃。
+  Future<void> _pollBalanceUntilCredited(int baselineBalance) async {
+    for (var attempt = 0; attempt < 6; attempt++) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      await _refreshServerBalance();
+      final current = _ref
+          .read(coin_record.coinBalanceInfoProvider)
+          .balance;
+      if (current != baselineBalance) {
+        debugPrint(
+          '[Recharge] balance credited after polling '
+          '(attempt ${attempt + 1}): $baselineBalance -> $current',
+        );
+        return;
+      }
+    }
+    debugPrint('[Recharge] balance polling exhausted, backend may still be pending');
   }
 
   /// 刷新服务端余额

@@ -55,7 +55,10 @@ class _KCoinModule extends ConsumerWidget {
   Future<void> _refreshBalanceAfterRecharge(WidgetRef ref) async {
     final balanceNotifier = ref.read(coinBalanceInfoProvider.notifier);
     var previousBalance = ref.read(coinBalanceInfoProvider).balance;
-    for (var attempt = 0; attempt < 3; attempt++) {
+    // 【轮询直到落库】后端 confirm 成功 ≠ 账务已落库，userPersonalCenter
+    // 可能持续返回旧余额一段时间。3 次 × 2 秒实测不够，放宽到 6 次 × 2 秒，
+    // 余额一变（充值到账）就提前收兵。
+    for (var attempt = 0; attempt < 6; attempt++) {
       if (attempt > 0) {
         await Future<void>.delayed(const Duration(seconds: 2));
       }
