@@ -291,7 +291,10 @@ class PaymentService {
     final pendingGate = _storeQueryGate;
     if (pendingGate != null) {
       try {
-        await pendingGate.future;
+        // 【超时兜底】闸门正常由查询方在 finally 里 complete；万一查询方
+        // 被 StoreKit 卡死（queryProductDetails 不返回），排队者不能陪葬，
+        // 最多等 12 秒就自己往下走（走自己的现场查询）。
+        await pendingGate.future.timeout(const Duration(seconds: 12));
       } catch (_) {}
       final queued = _readFreshCache(sanitizedIds);
       if (queued != null) {
@@ -311,9 +314,23 @@ class PaymentService {
       );
 
       // queryProductDetails already queries both INAPP and SUBS on Android
-      final response = await _inAppPurchase.queryProductDetails(
-        sanitizedIds.toSet(),
-      );
+      // 【超时保护】StoreKit/Play 偶发不回调（无响应也不报错），不设超时
+      // 会把闸门一直占住，后续所有查询全部排队卡死 → 支付台拉不起来。
+      ProductDetailsResponse response;
+      try {
+        response = await _inAppPurchase
+            .queryProductDetails(sanitizedIds.toSet())
+            .timeout(const Duration(seconds: 15));
+      } on TimeoutException {
+        debugPrint('[PaymentService] queryProductDetails timed out (15s)');
+        _lastError = 'Product query timed out';
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+          _lastIosFailureCode = 'ios-store-error';
+          _lastIosDebugMessage =
+              'StoreKit queryProductDetails 15 秒无响应（已超时中断）';
+        }
+        return [];
+      }
       debugPrint(
         '[PaymentService] queryProductDetails response.error: ${response.error}',
       );
@@ -362,9 +379,16 @@ class PaymentService {
           '[PaymentService] iOS: StoreKit 瞬时错误，2 秒后重试一次商品查询',
         );
         await Future<void>.delayed(const Duration(seconds: 2));
-        final retry = await _inAppPurchase.queryProductDetails(
-          sanitizedIds.toSet(),
-        );
+        final retry = await _inAppPurchase
+            .queryProductDetails(sanitizedIds.toSet())
+            .timeout(const Duration(seconds: 10), onTimeout: () {
+          debugPrint('[PaymentService] retry query timed out (10s)');
+          return ProductDetailsResponse(
+            error: null,
+            productDetails: const [],
+            notFoundIDs: sanitizedIds,
+          );
+        });
         if (retry.error == null && retry.productDetails.isNotEmpty) {
           debugPrint(
             '[PaymentService] iOS: 商品查询重试成功，拿到 ${retry.productDetails.length} 个商品',
@@ -478,6 +502,12 @@ class PaymentService {
     } finally {
       // 查询结束（成功/失败/任何中途 return 都会走 finally）放行排队者。
       _storeQueryGate = null;
+      // 【关键修复】必须 complete 闸门本身。之前只置空了字段，等待中的
+      // pendingGate.future 永远不会完成 → 后续所有 getProducts 卡死在
+      // 排队等待，支付台永远拉不起来（「拉起支付特别慢/拉不起来」的根因）。
+      if (!gate.isCompleted) {
+        gate.complete();
+      }
     }
   }
 
