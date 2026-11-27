@@ -189,6 +189,29 @@ class PaymentService {
   _productDetailCache = {};
   static const Duration _productDetailCacheTtl = Duration(minutes: 10);
 
+  /// 在飞的商店查询闸门（启动预热与用户点击确认共用一个标志位）。
+  ///
+  /// 【为什么必须串行】iOS StoreKit 并发查询不稳定：预热还没结束时用户
+  /// 点「确认」又发一个查询，实测第二次返回 SKError/空 → 支付台拉不起
+  /// 来；两个查询还互相抢带宽，双双变慢。后来者先等闸门放行，醒来先
+  /// 查缓存（预热成功的话直接命中返回，实际零等待），没命中才自己查。
+  Completer<void>? _storeQueryGate;
+
+  /// 全部请求的 ID 都有新鲜缓存时返回商品列表，否则返回 null。
+  List<ProductDetails>? _readFreshCache(List<String> ids) {
+    final now = DateTime.now();
+    final cached = <ProductDetails>[];
+    for (final id in ids) {
+      final entry = _productDetailCache[id];
+      if (entry == null ||
+          now.difference(entry.fetchedAt) >= _productDetailCacheTtl) {
+        return null;
+      }
+      cached.add(entry.details);
+    }
+    return cached;
+  }
+
   void _cacheProducts(List<ProductDetails> products) {
     final now = DateTime.now();
     for (final p in products) {
@@ -258,23 +281,29 @@ class PaymentService {
 
     // 【缓存命中】所有请求的 ID 都有新鲜缓存时直接返回，不再打商店。
     // 启动预热完成后，点「确认」购买基本都命中这里，支付弹窗秒开。
-    final now = DateTime.now();
-    final cachedResults = <ProductDetails>[];
-    var allCached = true;
-    for (final id in sanitizedIds) {
-      final entry = _productDetailCache[id];
-      if (entry == null ||
-          now.difference(entry.fetchedAt) >= _productDetailCacheTtl) {
-        allCached = false;
-        cachedResults.clear();
-        break;
-      }
-      cachedResults.add(entry.details);
-    }
-    if (allCached) {
+    final cachedResults = _readFreshCache(sanitizedIds);
+    if (cachedResults != null) {
       debugPrint('[PaymentService] getProducts cache hit: $sanitizedIds');
       return cachedResults;
     }
+
+    // 【查询串行化】有查询在飞（比如启动预热）就先等它结束。
+    final pendingGate = _storeQueryGate;
+    if (pendingGate != null) {
+      try {
+        await pendingGate.future;
+      } catch (_) {}
+      final queued = _readFreshCache(sanitizedIds);
+      if (queued != null) {
+        debugPrint(
+          '[PaymentService] getProducts cache hit after queued query: '
+          '$sanitizedIds',
+        );
+        return queued;
+      }
+    }
+    final gate = Completer<void>();
+    _storeQueryGate = gate;
 
     try {
       debugPrint(
@@ -446,6 +475,9 @@ class PaymentService {
       _lastError = 'Failed to fetch products: $e';
       _onPurchaseError?.call('Failed to fetch products: $e');
       return [];
+    } finally {
+      // 查询结束（成功/失败/任何中途 return 都会走 finally）放行排队者。
+      _storeQueryGate = null;
     }
   }
 

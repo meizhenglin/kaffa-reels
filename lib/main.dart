@@ -182,21 +182,6 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
     _startupPaymentRetryDone = true;
 
     Future.microtask(() async {
-      // 【商品预取】登录态就绪后立刻把后端金币包配置 + 商店商品详情
-      // 拉好：用户点「确认」时不再等配置接口 + StoreKit 往返，
-      // 支付弹窗秒开。失败静默 —— 各购买入口自己仍会现场加载兜底。
-      try {
-        await ref.read(rechargeProductsProvider.notifier).load();
-        final products = ref.read(rechargeProductsProvider).products;
-        await PaymentService.instance.prewarmProducts(
-          productIds: products
-              .map((p) => p.getProductId(defaultTargetPlatform))
-              .toList(),
-        );
-      } catch (e) {
-        debugPrint('[MAIN] startup product prefetch failed: $e');
-      }
-
       int retried = 0;
       try {
         retried = await ref
@@ -208,13 +193,31 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
       // 只有在**真的补发过**订单时才刷新 K币余额：
       // K币余额接口复用的也是 /api/user/userPersonalCenter，
       // 无条件刷新会让每次启动都多打一次用户中心接口。
-      if (retried == 0) return;
+      if (retried > 0) {
+        try {
+          await ref
+              .read(coin_record.coinBalanceInfoProvider.notifier)
+              .load(force: true);
+        } catch (e) {
+          debugPrint('[MAIN] startup coin balance refresh failed: $e');
+        }
+      }
+
+      // 【商品预取】延后 3 秒再预热：启动头几秒封面图/首集预取在抢带宽，
+      // 同时打 StoreKit 查询一来两边都更慢、二来 iOS 并发查询不稳（实测
+      // 会 SKError → 支付台拉不起来）。避峰启动 + PaymentService 内部
+      // 查询已串行化，用户点确认最多排一次队，且会直接命中预热缓存。
+      await Future<void>.delayed(const Duration(seconds: 3));
       try {
-        await ref
-            .read(coin_record.coinBalanceInfoProvider.notifier)
-            .load(force: true);
+        await ref.read(rechargeProductsProvider.notifier).load();
+        final products = ref.read(rechargeProductsProvider).products;
+        await PaymentService.instance.prewarmProducts(
+          productIds: products
+              .map((p) => p.getProductId(defaultTargetPlatform))
+              .toList(),
+        );
       } catch (e) {
-        debugPrint('[MAIN] startup coin balance refresh failed: $e');
+        debugPrint('[MAIN] startup product prefetch failed: $e');
       }
     });
   }
