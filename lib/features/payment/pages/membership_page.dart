@@ -17,6 +17,7 @@ import '../../payment/services/payment_service.dart';
 import '../../payment/models/payment_channel.dart';
 import '../../payment/services/unified_payment_handler.dart';
 import '../../payment/widgets/payment_channel_selector.dart';
+import '../../payment/widgets/payment_loading_overlay.dart';
 import '../../../components/rtl_back_button.dart';
 
 class MembershipPage extends ConsumerStatefulWidget {
@@ -294,7 +295,20 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
     // （iOS 上是 StoreKit，回调自动路由 /notice/apple）。
     if (shouldUseStoreDirectly()) {
       final memberNotifier = ref.read(memberStateProvider.notifier);
-      await memberNotifier.purchase(selectedProduct: product);
+      // 【支付统一遮罩】订阅确认后全屏拦截交互；超时只解除遮罩，
+      // 购买在后台继续（内部有 120 秒超时与结果提示）。
+      try {
+        await PaymentLoadingOverlay.run(
+          context,
+          message: l10n.paymentProcessing,
+          timeout: const Duration(seconds: 130),
+          task: () => memberNotifier.purchase(selectedProduct: product),
+        );
+      } on PaymentProcessingTimeoutException {
+        if (mounted) {
+          AppSnackBar.show(context, message: l10n.paymentProcessingTimeout);
+        }
+      }
       _isPurchasing = false;
       if (mounted) setState(() {});
       return;
@@ -324,7 +338,19 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
 
     if (channel.isGooglePlay) {
       final memberNotifier = ref.read(memberStateProvider.notifier);
-      success = await memberNotifier.purchase(selectedProduct: product);
+      // 【支付统一遮罩】同商店直购路径。
+      try {
+        success = await PaymentLoadingOverlay.run(
+          context,
+          message: l10n.paymentProcessing,
+          timeout: const Duration(seconds: 130),
+          task: () => memberNotifier.purchase(selectedProduct: product),
+        );
+      } on PaymentProcessingTimeoutException {
+        if (mounted) {
+          AppSnackBar.show(context, message: l10n.paymentProcessingTimeout);
+        }
+      }
       if (!success) {
         final memberState = ref.read(memberStateProvider);
         errorMessage = memberState.errorMessage;

@@ -92,6 +92,7 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
         final success = await PaymentLoadingOverlay.run(
           context,
           message: l10n.paymentProcessing,
+          timeout: const Duration(seconds: 130),
           task: () => handler.purchase(product),
         );
         if (!success && mounted) {
@@ -140,6 +141,7 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
         final success = await PaymentLoadingOverlay.run(
           context,
           message: l10n.paymentProcessing,
+          timeout: const Duration(seconds: 130),
           task: () => handler.purchase(product),
         );
         if (!success && mounted) {
@@ -405,24 +407,15 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
                 ),
                 padding: EdgeInsets.zero,
               ),
-              child: _isPurchasing
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFF753900),
-                      ),
-                    )
-                  : Text(
-                      // 价格带货币符号，和商品卡片上的「$68.0」保持一致
-                      l10n.payPrice('\$${product.price}'),
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF753900),
-                      ),
-                    ),
+              child: Text(
+                // 价格带货币符号，和商品卡片上的「$68.0」保持一致
+                l10n.payPrice('\$${product.price}'),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF753900),
+                ),
+              ),
             ),
           ),
         ),

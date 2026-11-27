@@ -514,25 +514,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
                   ),
                 ),
               ),
-              if (isProcessing)
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Center(
-                      child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+              // 【卡片内 loading 已移除】支付处理统一走 PaymentLoadingOverlay
+              // 全屏遮罩 + 居中 loading，卡片上再叠一层小转圈属于重复视觉。
+              // isProcessing 仍保留用于禁点（onTap）和半透明置灰。
             ],
           ),
         ),
@@ -679,6 +663,9 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         final success = await PaymentLoadingOverlay.run(
           context,
           message: l10n.paymentProcessing,
+          // 商店购买包含用户在系统支付弹窗里的操作时间，超时对齐
+          // PaymentService 内部的 120 秒购买超时。
+          timeout: const Duration(seconds: 130),
           task: () => handler.purchase(rechargeProduct),
         );
         if (!mounted) return;
@@ -720,6 +707,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         final success = await PaymentLoadingOverlay.run(
           context,
           message: l10n.paymentProcessing,
+          timeout: const Duration(seconds: 130),
           task: () => rechargeHandler.purchase(rechargeProduct),
         );
         if (success) {
@@ -1069,6 +1057,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       final paid = await PaymentLoadingOverlay.run(
         context,
         message: l10n.paymentProcessing,
+        timeout: const Duration(seconds: 130),
         task: () => paymentService.purchaseConsumable(
           product: products.first,
           applicationUserName: userId,
@@ -1479,6 +1468,7 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       final success = await PaymentLoadingOverlay.run(
         context,
         message: l10n.paymentProcessing,
+        timeout: const Duration(seconds: 130),
         task: () => paymentService.purchase(
           product: products.first,
           applicationUserName: userId,

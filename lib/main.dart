@@ -182,6 +182,27 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
     _startupPaymentRetryDone = true;
 
     Future.microtask(() async {
+      // 【商品预取】独立于补单流程并发跑，1 秒避峰启动。
+      // 之前预热被放在「补单完成 + 3 秒」之后串行执行——补单是网络请求
+      // 可能好几秒，预热被拖到启动后 5-10 秒才开始，用户一进充值页点
+      // 确认时缓存还没灌上 → 全部走现场查询 → 支付台特别慢。
+      // 预热是支付台秒弹的前提，越早越好；查询已在 PaymentService 内部
+      // 串行化 + 超时保护，不会再有并发 StoreKit 问题。
+      Future<void>(() async {
+        await Future<void>.delayed(const Duration(seconds: 1));
+        try {
+          await ref.read(rechargeProductsProvider.notifier).load();
+          final products = ref.read(rechargeProductsProvider).products;
+          await PaymentService.instance.prewarmProducts(
+            productIds: products
+                .map((p) => p.getProductId(defaultTargetPlatform))
+                .toList(),
+          );
+        } catch (e) {
+          debugPrint('[MAIN] startup product prefetch failed: $e');
+        }
+      });
+
       int retried = 0;
       try {
         retried = await ref
@@ -201,23 +222,6 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
         } catch (e) {
           debugPrint('[MAIN] startup coin balance refresh failed: $e');
         }
-      }
-
-      // 【商品预取】延后 3 秒再预热：启动头几秒封面图/首集预取在抢带宽，
-      // 同时打 StoreKit 查询一来两边都更慢、二来 iOS 并发查询不稳（实测
-      // 会 SKError → 支付台拉不起来）。避峰启动 + PaymentService 内部
-      // 查询已串行化，用户点确认最多排一次队，且会直接命中预热缓存。
-      await Future<void>.delayed(const Duration(seconds: 3));
-      try {
-        await ref.read(rechargeProductsProvider.notifier).load();
-        final products = ref.read(rechargeProductsProvider).products;
-        await PaymentService.instance.prewarmProducts(
-          productIds: products
-              .map((p) => p.getProductId(defaultTargetPlatform))
-              .toList(),
-        );
-      } catch (e) {
-        debugPrint('[MAIN] startup product prefetch failed: $e');
       }
     });
   }

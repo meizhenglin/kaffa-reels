@@ -317,20 +317,27 @@ class PaymentService {
       // 【超时保护】StoreKit/Play 偶发不回调（无响应也不报错），不设超时
       // 会把闸门一直占住，后续所有查询全部排队卡死 → 支付台拉不起来。
       ProductDetailsResponse response;
+      final queryStopwatch = Stopwatch()..start();
       try {
         response = await _inAppPurchase
             .queryProductDetails(sanitizedIds.toSet())
             .timeout(const Duration(seconds: 15));
       } on TimeoutException {
-        debugPrint('[PaymentService] queryProductDetails timed out (15s)');
+        debugPrint(
+          '[PaymentService] queryProductDetails timed out (15s) '
+          'after ${queryStopwatch.elapsedMilliseconds}ms',
+        );
         _lastError = 'Product query timed out';
         if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
           _lastIosFailureCode = 'ios-store-error';
-          _lastIosDebugMessage =
-              'StoreKit queryProductDetails 15 秒无响应（已超时中断）';
+          _lastIosDebugMessage = 'StoreKit queryProductDetails 15 秒无响应（已超时中断）';
         }
         return [];
       }
+      debugPrint(
+        '[PaymentService] queryProductDetails took '
+        '${queryStopwatch.elapsedMilliseconds}ms',
+      );
       debugPrint(
         '[PaymentService] queryProductDetails response.error: ${response.error}',
       );
@@ -375,20 +382,21 @@ class PaymentService {
           defaultTargetPlatform == TargetPlatform.iOS &&
           response.error != null &&
           response.productDetails.isEmpty) {
-        debugPrint(
-          '[PaymentService] iOS: StoreKit 瞬时错误，2 秒后重试一次商品查询',
-        );
+        debugPrint('[PaymentService] iOS: StoreKit 瞬时错误，2 秒后重试一次商品查询');
         await Future<void>.delayed(const Duration(seconds: 2));
         final retry = await _inAppPurchase
             .queryProductDetails(sanitizedIds.toSet())
-            .timeout(const Duration(seconds: 10), onTimeout: () {
-          debugPrint('[PaymentService] retry query timed out (10s)');
-          return ProductDetailsResponse(
-            error: null,
-            productDetails: const [],
-            notFoundIDs: sanitizedIds,
-          );
-        });
+            .timeout(
+              const Duration(seconds: 10),
+              onTimeout: () {
+                debugPrint('[PaymentService] retry query timed out (10s)');
+                return ProductDetailsResponse(
+                  error: null,
+                  productDetails: const [],
+                  notFoundIDs: sanitizedIds,
+                );
+              },
+            );
         if (retry.error == null && retry.productDetails.isNotEmpty) {
           debugPrint(
             '[PaymentService] iOS: 商品查询重试成功，拿到 ${retry.productDetails.length} 个商品',
@@ -534,7 +542,8 @@ class PaymentService {
           message.contains('network') ||
           message.contains('offline');
       _lastIosFailureCode = isNetwork ? 'ios-network-error' : 'ios-store-error';
-      _lastIosDebugMessage = 'SKError code=${error.code}, '
+      _lastIosDebugMessage =
+          'SKError code=${error.code}, '
           'message=${error.message}';
       debugPrint(
         '[PaymentService] iOS: StoreKit 报错 → '
@@ -658,9 +667,7 @@ class PaymentService {
       );
     }
     if (noOffer.isNotEmpty) {
-      debugPrint(
-        '[PaymentService] 判定：商品存在但当前账号/国家买不了 → ${noOffer.join(", ")}',
-      );
+      debugPrint('[PaymentService] 判定：商品存在但当前账号/国家买不了 → ${noOffer.join(", ")}');
     }
 
     // 失败码的优先级：只要出现「存在但买不了」，就以它为准 ——
@@ -718,7 +725,9 @@ class PaymentService {
       // 只能干等 120 秒超时。所以超过 [_stalePendingPurchase] 就直接复位重来。
       if (_pendingPurchaseCompleter != null) {
         final startedAt = _pendingPurchaseStartedAt;
-        final age = startedAt == null ? null : DateTime.now().difference(startedAt);
+        final age = startedAt == null
+            ? null
+            : DateTime.now().difference(startedAt);
         final isStale = age == null || age >= _stalePendingPurchase;
 
         if (!isStale) {
@@ -1099,7 +1108,9 @@ class PaymentService {
     // _handlePurchaseUpdate 会把它们缓存下来。
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
       try {
-        await _inAppPurchase.restorePurchases(applicationUserName: _resolveUserId());
+        await _inAppPurchase.restorePurchases(
+          applicationUserName: _resolveUserId(),
+        );
         // 稍等 purchaseStream 把 restored 事件投递完
         await Future<void>.delayed(const Duration(milliseconds: 800));
       } catch (e) {
@@ -1161,9 +1172,7 @@ class PaymentService {
               try {
                 await _inAppPurchase.completePurchase(purchase);
               } catch (e) {
-                debugPrint(
-                  '[PaymentService] iOS completePurchase failed: $e',
-                );
+                debugPrint('[PaymentService] iOS completePurchase failed: $e');
               }
             }
             if (isPendingProduct) {
