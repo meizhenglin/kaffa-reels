@@ -649,8 +649,7 @@ class AppLocalizationsAr extends AppLocalizations {
       'حدث خطأ في الشبكة أثناء الاتصال بمتجر التطبيقات. يرجى التحقق من اتصالك.';
 
   @override
-  String get membershipIosStoreError =>
-      'أعاد متجر التطبيقات خطأً. يرجى المحاولة مرة أخرى لاحقًا.';
+  String get membershipIosStoreError => 'يرجى المحاولة مرة أخرى لاحقًا.';
 
   @override
   String get membershipIosItemNotAvailable =>

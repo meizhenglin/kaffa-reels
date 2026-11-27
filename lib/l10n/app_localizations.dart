@@ -1319,7 +1319,7 @@ abstract class AppLocalizations {
   /// No description provided for @membershipIosStoreError.
   ///
   /// In en, this message translates to:
-  /// **'The App Store returned an error. Please try again later.'**
+  /// **'Please try again later.'**
   String get membershipIosStoreError;
 
   /// No description provided for @membershipIosItemNotAvailable.

@@ -935,18 +935,10 @@ class PaymentService {
           '[PaymentService] buyNonConsumable returned: $purchaseResult',
         );
 
-        // buyNonConsumable 正常返回（不抛异常）只说明 Google Play 尝试打开了
-        // 实际的购买结果需要通过 purchaseStream 返回
-        // 如果 3 秒内 completer 还没完成，说明 Google Play 可能没有真正打开
-        await Future.delayed(const Duration(seconds: 3));
-        if (!completer.isCompleted) {
-          debugPrint(
-            '[PaymentService] WARNING: Google Play may not have opened (no purchase result after 3s)',
-          );
-          // 不直接返回 false，因为 Google Play 可能只是卡住了
-          // 让它继续等待，或者等待 timeout
-        }
-
+        // 【不要在这里睡等】原这里有无条件 await 3 秒，用于诊断「商店可能
+        // 没拉起」。但成功/取消事件到达时 completer 已经完成，这 3 秒只会
+        // 白白拖住全屏遮罩的关闭——用户在支付台点取消后，loading 还要多转
+        // 最多 3 秒才消失。「商店没拉起」的场景由 120 秒购买超时兜底。
         return completer.future;
       } catch (e) {
         final message = e.toString();

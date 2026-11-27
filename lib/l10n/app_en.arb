@@ -213,7 +213,7 @@
   "membershipPlayNoEligibleOffer": "This plan exists in Google Play, but it is not available for your account or country yet. Please try again later or contact support.",
   "membershipIosStoreUnavailable": "The App Store is unavailable right now. Please make sure you are signed in with your Apple ID, then try again later.",
   "membershipIosNetworkError": "Network error while contacting the App Store. Please check your connection.",
-  "membershipIosStoreError": "The App Store returned an error. Please try again later.",
+  "membershipIosStoreError": "Please try again later.",
   "membershipIosItemNotAvailable": "This subscription is not available in the App Store. It may not be approved yet, or the product ID does not match.",
   "membershipStoreCallbackFailed": "Payment completed, but activation is not confirmed yet. It will be retried automatically — if your membership does not update shortly, please contact support.",
   "watchLockedReminderTitle": "Reminder",

@@ -59,17 +59,8 @@ class _MembershipPageState extends ConsumerState<MembershipPage> {
         } else {
           displayMessage = _localizePlayFailure(message, l10n) ?? message;
         }
-        // 把 Play 给出的原始 debugMessage 带到提示上（测试排障用）：
-        // 本地化文案只说「结算不可用」，Play 的 debugMessage 才是
-        // 真正原因（账号无资格 / 应用未发布 / 地区不支持等）。
-        final playDebug = PaymentService.instance.lastPlayDebugMessage;
-        if (playDebug != null && playDebug.isNotEmpty) {
-          displayMessage = '$displayMessage\n(Play: $playDebug)';
-        }
-        final iosDebug = PaymentService.instance.lastIosDebugMessage;
-        if (iosDebug != null && iosDebug.isNotEmpty) {
-          displayMessage = '$displayMessage\n(App Store: $iosDebug)';
-        }
+        // 【不带调试详情】商店原始 debugMessage 只进日志，不进提示
+        // （之前拼过中文排障文案，正式包不允许）。
         _lastShownError = displayMessage;
         AppSnackBar.show(context, message: displayMessage);
       }

@@ -104,6 +104,7 @@ class CoinBalanceNotifier extends StateNotifier<CoinBalance> {
         final data = resp.data as Map<String, dynamic>;
         state = CoinBalance.fromJson(data);
         _lastLoadedAt = DateTime.now();
+        debugPrint('[CoinBalance] loaded balance=${state.balance}');
       }
     } catch (e) {
       // Handle error silently, keep current balance

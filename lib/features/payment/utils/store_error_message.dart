@@ -1,5 +1,4 @@
 import '../../../l10n/app_localizations.dart';
-import '../services/payment_service.dart';
 
 /// 把商店购买失败的内部归因码（`ios-store-error`、`play-item-not-found` 之类）
 /// 转成用户能看懂的文案，并把 StoreKit / Play 的原始错误细节附在第二行。
@@ -38,9 +37,8 @@ String friendlyStorePurchaseError(AppLocalizations l10n, String? rawError) {
     reason = err;
   }
 
-  final debugParts = <String?>[
-    PaymentService.instance.lastIosDebugMessage,
-    PaymentService.instance.lastPlayDebugMessage,
-  ].whereType<String>().toList();
-  return debugParts.isEmpty ? reason : '$reason\n(${debugParts.join(' | ')})';
+  // 【不带调试详情】StoreKit / Play 的原始错误细节只进日志
+  // （PaymentService 内部已 debugPrint），不再拼进用户可见的提示——
+  // 提示里出现过中文排障文案，正式包不允许。
+  return reason;
 }

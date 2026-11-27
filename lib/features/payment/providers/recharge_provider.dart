@@ -217,22 +217,34 @@ class RechargePurchaseHandler {
   }
 
   /// confirm 成功后轮询余额直到后端落库（余额变化）或超次放弃。
+  ///
+  /// 【为什么窗口这么大】实测 confirm 成功后 userPersonalCenter 里的余额
+  /// 并不会立刻变新——固定 2 秒 × 6 次（12 秒窗口）覆盖不住，用户切 tab
+  /// 很久后才拿到新值。后端可能是异步记账（队列 / App Store S2S 通知），
+  /// 客户端只能轮询同一个接口等它落库。这里改成退避轮询：
+  /// 2s→3s→5s→8s→12s→15s→20s，总窗口约 65 秒，余额一变立即收兵。
   Future<void> _pollBalanceUntilCredited(int baselineBalance) async {
-    for (var attempt = 0; attempt < 6; attempt++) {
-      await Future<void>.delayed(const Duration(seconds: 2));
+    const delays = [2, 3, 5, 8, 12, 15, 20];
+    var attempt = 0;
+    for (final seconds in delays) {
+      await Future<void>.delayed(Duration(seconds: seconds));
       await _refreshServerBalance();
       final current = _ref
           .read(coin_record.coinBalanceInfoProvider)
           .balance;
+      attempt++;
+      debugPrint(
+        '[Recharge] balance poll#$attempt (+${seconds}s): '
+        'current=$current baseline=$baselineBalance',
+      );
       if (current != baselineBalance) {
-        debugPrint(
-          '[Recharge] balance credited after polling '
-          '(attempt ${attempt + 1}): $baselineBalance -> $current',
-        );
+        debugPrint('[Recharge] balance credited, UI will refresh automatically');
         return;
       }
     }
-    debugPrint('[Recharge] balance polling exhausted, backend may still be pending');
+    debugPrint(
+      '[Recharge] balance polling exhausted (~65s), backend still pending',
+    );
   }
 
   /// 刷新服务端余额

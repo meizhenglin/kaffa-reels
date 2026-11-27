@@ -647,8 +647,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Network error while contacting the App Store. Please check your connection.';
 
   @override
-  String get membershipIosStoreError =>
-      'The App Store returned an error. Please try again later.';
+  String get membershipIosStoreError => 'Please try again later.';
 
   @override
   String get membershipIosItemNotAvailable =>
