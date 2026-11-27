@@ -11,6 +11,7 @@ import '../../../core/providers/auth_provider.dart'
 import '../../../core/constants/app_constants.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/network/session_expired_bus.dart';
+import '../../payment/providers/coin_record_provider.dart' as coin_record;
 import '../../payment/providers/membership_provider.dart';
 import '../models/user_model.dart';
 import '../repositories/auth_repository.dart';
@@ -352,6 +353,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
     // Clear VIP/membership state for the old account
     try {
       await _ref.read(memberStateProvider.notifier).clearAll();
+    } catch (_) {}
+
+    // 【K币余额清零】重置余额状态与节流时间戳，避免旧账号余额串到
+    // 游客视角，也保证重新登录后的余额刷新不会被 TTL 节流跳过。
+    try {
+      _ref.read(coin_record.coinBalanceInfoProvider.notifier).reset();
     } catch (_) {}
 
     state = state.copyWith(clearRegistrationSession: true);
@@ -721,6 +728,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
       clearError: true,
       isLoading: false,
     );
+
+    // 【K币余额同步刷新】这里的数据来自 userPersonalCenter，顺带把
+    // K币余额也更新了 —— 以前只有 ProfileTab._loadUserInfo 会更新余额，
+    // 而它有 15 秒 TTL 节流，登出后马上重新登录时刷新会被跳过，
+    // 个人中心就显示 0。登录路径在这里直接同步，不再依赖节流窗口。
+    try {
+      _ref.read(coin_record.coinBalanceInfoProvider.notifier).updateFromData(
+        data,
+      );
+    } catch (e) {
+      debugPrint('[AuthNotifier] update coin balance from data failed: $e');
+    }
 
     debugPrint(
       '[AuthNotifier] user data updated from backend: '

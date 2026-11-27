@@ -186,11 +186,26 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
     super.didUpdateWidget(oldWidget);
     // 【清晰度热切换】必须比较 quality：videoUrlOne/videoUrlTwo 为空时
     // 切档不改 URL，之前只改了角标文字、流根本没换。
+    final urlChanged = _url != _urlFor(oldWidget);
+    final qualityChanged = widget.quality != oldWidget.quality;
+    final episodeChanged = widget.videoInfo.id != oldWidget.videoInfo.id;
     final changed =
-        _url != _urlFor(oldWidget) ||
-        widget.videoInfo.id != oldWidget.videoInfo.id ||
+        urlChanged ||
+        episodeChanged ||
         widget.lockedPreviewMode != oldWidget.lockedPreviewMode ||
-        widget.quality != oldWidget.quality;
+        qualityChanged;
+    // 【仅切清晰度】同一集内 480P↔720P↔1080P 走专门的慢决策路径：
+    // 先解析两档的实际播放地址，同流就跳过重建（原生 master 档），
+    // web 则先预热新档位再换流。旧逻辑无脑重建播放器，把缓冲全扔掉
+    // 从头转圈 —— 这就是「480P 切 720P 很卡」的直接原因。
+    if (changed &&
+        qualityChanged &&
+        !urlChanged &&
+        !episodeChanged &&
+        widget.lockedPreviewMode == oldWidget.lockedPreviewMode) {
+      unawaited(_handleQualityOnlySwitch(oldQuality: oldWidget.quality));
+      return;
+    }
     if (changed) {
       _hideControls();
       _webPrefetchWarmed = false;
@@ -235,6 +250,80 @@ class WatchShortVideoItemState extends State<WatchShortVideoItem> {
     return urls
         .map((e) => (e ?? '').toString().trim())
         .firstWhere((e) => e.isNotEmpty, orElse: () => '');
+  }
+
+  /// 【仅切清晰度】同一集内 480P↔720P↔1080P 的热切换。
+  ///
+  /// 流程：先解析新旧两档的实际播放地址（缓存命中是同步级速度）——
+  /// 1. 两档解析出**同一路流**（原生端 master 输入必然如此，实际档位
+  ///    交给 ABR 按带宽自适应）：什么都不做。旧逻辑这里会重建播放器，
+  ///    结果是同一路流从头转圈缓冲一遍，用户感受到的就是「切 720P 卡死」。
+  /// 2. 流真的变了且在 **web** 上：先把新档位的首分片并行灌进浏览器
+  ///    HTTP 缓存（4 秒上限），等待期间旧档**继续播**，然后才重建换流 ——
+  ///    换流瞬间字节已在缓存，起播不再长时间黑屏。
+  /// 3. 流变了且在**原生**端（后端直接给单码率媒体清单的资产）：
+  ///    按旧逻辑重建，进度 seek 回来。
+  Future<void> _handleQualityOnlySwitch({required String oldQuality}) async {
+    final url = _url;
+    final newQuality = widget.quality;
+    final videoIdAtCall = widget.videoInfo.id;
+    try {
+      final oldRendition = await HlsPrefetcher.resolveRendition(
+        url,
+        quality: oldQuality,
+      );
+      final newRendition = await HlsPrefetcher.resolveRendition(
+        url,
+        quality: newQuality,
+      );
+      // 等待期间用户又动了（换集/再切档/暂停）：放弃本次，交给下一次
+      // didUpdateWidget 按最新状态决策。
+      if (!mounted ||
+          widget.videoInfo.id != videoIdAtCall ||
+          widget.quality != newQuality ||
+          _url != url) {
+        return;
+      }
+      if (oldRendition == newRendition) {
+        debugPrint(
+          '[WatchShortVideoItem] quality switch no-op, stream unchanged '
+          '($newQuality)',
+        );
+        return;
+      }
+      if (kIsWeb) {
+        // 预热新档位首分片（warmUp 内部会先解析 media playlist）。
+        try {
+          await HlsPrefetcher.warmUp(url, quality: newQuality).timeout(
+            const Duration(seconds: 4),
+            onTimeout: () => false,
+          );
+        } catch (_) {}
+        if (!mounted ||
+            widget.videoInfo.id != videoIdAtCall ||
+            widget.quality != newQuality ||
+            _url != url ||
+            _userPaused) {
+          return;
+        }
+      }
+      _hideControls();
+      _webPrefetchWarmed = false;
+      _userPaused = false;
+      _playRequestedAt = null;
+      _playLatencyReported = false;
+      _stallWindowStart = null;
+      _stallAccumulated = Duration.zero;
+      // 切档前进度在换流瞬间才采样（旧档在预热期间还在播），损失最小。
+      _resumePosition = _controller?.value.position;
+      if (widget.autoPlay && !widget.lockedPreviewMode) {
+        _initialize();
+      } else {
+        unawaited(_release());
+      }
+    } catch (e) {
+      debugPrint('[WatchShortVideoItem] quality-only switch failed: $e');
+    }
   }
 
   Future<void> releasePrefetched() async {

@@ -179,6 +179,37 @@ class PaymentService {
     }
   }
 
+  /// 【商品详情缓存】启动预热后，用户点「确认」时直接命中缓存返回，
+  /// 省掉一次 StoreKit / Play 的网络往返，支付弹窗秒开。
+  ///
+  /// 带时间戳做 TTL（10 分钟）：过期后照常重新查商店，避免商店改价后
+  /// 展示旧价。按商品 ID 为键缓存，只要有一个请求的 ID 不在缓存里
+  /// （或已过期）就走完整的商店查询并整体刷新。
+  final Map<String, ({ProductDetails details, DateTime fetchedAt})>
+  _productDetailCache = {};
+  static const Duration _productDetailCacheTtl = Duration(minutes: 10);
+
+  void _cacheProducts(List<ProductDetails> products) {
+    final now = DateTime.now();
+    for (final p in products) {
+      _productDetailCache[p.id] = (details: p, fetchedAt: now);
+    }
+  }
+
+  /// 【启动预热】App 启动/登录就绪后异步查一遍商店商品，把详情灌进缓存。
+  ///
+  /// 之后用户在解锁弹窗/充值页点「确认」时 getProducts 直接命中缓存，
+  /// 不用再等 StoreKit 往返，支付弹窗立刻弹出。失败静默 —— 预热只是
+  /// 优化，真正的购买路径仍会现场查询兜底。
+  Future<void> prewarmProducts({required List<String> productIds}) async {
+    if (productIds.isEmpty) return;
+    try {
+      await getProducts(productIds: productIds);
+    } catch (e) {
+      debugPrint('[PaymentService] prewarmProducts failed (ignored): $e');
+    }
+  }
+
   /// Get available subscription products
   Future<List<ProductDetails>> getProducts({
     required List<String> productIds,
@@ -223,6 +254,26 @@ class PaymentService {
     if (sanitizedIds.isEmpty || sanitizedIds.every((id) => id.isEmpty)) {
       _lastError = 'No valid product IDs provided';
       return [];
+    }
+
+    // 【缓存命中】所有请求的 ID 都有新鲜缓存时直接返回，不再打商店。
+    // 启动预热完成后，点「确认」购买基本都命中这里，支付弹窗秒开。
+    final now = DateTime.now();
+    final cachedResults = <ProductDetails>[];
+    var allCached = true;
+    for (final id in sanitizedIds) {
+      final entry = _productDetailCache[id];
+      if (entry == null ||
+          now.difference(entry.fetchedAt) >= _productDetailCacheTtl) {
+        allCached = false;
+        cachedResults.clear();
+        break;
+      }
+      cachedResults.add(entry.details);
+    }
+    if (allCached) {
+      debugPrint('[PaymentService] getProducts cache hit: $sanitizedIds');
+      return cachedResults;
     }
 
     try {
@@ -290,6 +341,7 @@ class PaymentService {
             '[PaymentService] iOS: 商品查询重试成功，拿到 ${retry.productDetails.length} 个商品',
           );
           _availableProducts = retry.productDetails;
+          _cacheProducts(retry.productDetails);
           return _availableProducts;
         }
         // 重试也失败：用重试结果做 iOS 归因，失败信息更接近当下真实状态
@@ -325,6 +377,7 @@ class PaymentService {
       }
 
       _availableProducts = response.productDetails;
+      _cacheProducts(response.productDetails);
 
       // 混合结果：有的商品查到了，有的没查到。
       //

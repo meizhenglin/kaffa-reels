@@ -27,6 +27,9 @@ import 'features/auth/providers/auth_provider.dart';
 import 'features/payment/providers/coin_record_provider.dart' as coin_record;
 import 'features/payment/providers/membership_provider.dart'
     show memberStateProvider;
+import 'features/payment/providers/recharge_provider.dart'
+    show rechargeProductsProvider;
+import 'features/payment/services/payment_service.dart' show PaymentService;
 import 'features/payment/services/play_billing_native_probe.dart';
 import 'core/storage/storage_service.dart';
 import 'services/share_service.dart';
@@ -179,6 +182,21 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
     _startupPaymentRetryDone = true;
 
     Future.microtask(() async {
+      // 【商品预取】登录态就绪后立刻把后端金币包配置 + 商店商品详情
+      // 拉好：用户点「确认」时不再等配置接口 + StoreKit 往返，
+      // 支付弹窗秒开。失败静默 —— 各购买入口自己仍会现场加载兜底。
+      try {
+        await ref.read(rechargeProductsProvider.notifier).load();
+        final products = ref.read(rechargeProductsProvider).products;
+        await PaymentService.instance.prewarmProducts(
+          productIds: products
+              .map((p) => p.getProductId(defaultTargetPlatform))
+              .toList(),
+        );
+      } catch (e) {
+        debugPrint('[MAIN] startup product prefetch failed: $e');
+      }
+
       int retried = 0;
       try {
         retried = await ref

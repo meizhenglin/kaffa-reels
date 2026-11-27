@@ -1,3 +1,6 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -26,7 +29,13 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   late final Future<String> _appVersionFuture = _loadAppVersion();
 
-  /// 设置页显示的版本号，格式 `1.0.6-p · Platform`。
+  /// 设置页显示的版本号。
+  ///
+  /// Android / Web：格式 `1.0.6-p · Platform` / `1.0.6-g · Google` / `1.0.6-w · Web`。
+  /// iOS：显示 iOS 专属身份 `1.0.6-i · iOS` —— iOS 包实际走 platform 渠道
+  /// （支付、HaiPay 开关都按 platform 渠道跑），但这个「渠道」概念对用户
+  /// 没有意义，展示层换成 iOS 身份更直观。**只改展示**，X-Client 的
+  /// channel= / build= 上报和构建逻辑不受影响。
   ///
   /// 优先用构建脚本注入的 dart-define —— 它和打包产物严格一致。
   /// 没有 define（在 Android Studio 里直接 Run）时回退到原生 versionName：
@@ -42,6 +51,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       }
     }
     if (version.isEmpty) version = BuildInfo.baseVersion;
+
+    // 【iOS 专属展示】把渠道短码换成 -i，label 显示 iOS。
+    if (!kIsWeb && Platform.isIOS) {
+      final iosVersion = version.replaceFirst(RegExp(r'-(g|p|w)$'), '-i');
+      return '$iosVersion · iOS';
+    }
     return '$version · ${BuildFlavor.label}';
   }
 

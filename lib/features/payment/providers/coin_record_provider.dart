@@ -118,6 +118,18 @@ class CoinBalanceNotifier extends StateNotifier<CoinBalance> {
       giveAmount: state.giveAmount,
     );
   }
+
+  /// 【退出登录】清零余额并重置节流状态。
+  ///
+  /// 之前登出后 state 里可能残留上一个账号的余额（串号风险），
+  /// 而且节流时间戳没重置 —— 重新登录后 15 秒内触发的刷新会被跳过，
+  /// 个人中心的 K币 余额就停留在 0，直到下一次充值强制刷新才恢复。
+  /// 登出时统一 reset，一次解决。
+  void reset() {
+    _inFlight = null;
+    _lastLoadedAt = null;
+    state = const CoinBalance();
+  }
 }
 
 /// Recharge records provider
