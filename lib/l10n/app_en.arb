@@ -319,6 +319,8 @@
   "unlockSuccess": "Unlock successful!",
   "unlockFailed": "Unlock failed",
   "rechargeProcessing": "Recharge received, please try unlocking again in a moment",
+  "paymentProcessing": "Processing payment...",
+  "paymentProcessingTimeout": "Payment is taking longer than expected. Please check the result in your balance later.",
   "unlockToContinue": "Unlock to Continue",
   "productUnavailable": "Product unavailable, please try again later",
   "purchaseSuccess": "Purchase successful!",

@@ -904,6 +904,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'تم استلام عملية الشحن، يرجى المحاولة مرة أخرى بعد لحظات';
 
   @override
+  String get paymentProcessing => 'جارٍ معالجة الدفع...';
+
+  @override
+  String get paymentProcessingTimeout =>
+      'عملية الدفع تستغرق وقتًا أطول من المتوقع. يرجى التحقق من النتيجة في رصيدك لاحقًا.';
+
+  @override
   String get unlockToContinue => 'فتح للمتابعة';
 
   @override

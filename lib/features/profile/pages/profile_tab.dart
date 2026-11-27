@@ -43,8 +43,15 @@ class _ProfileTabState extends ConsumerState<ProfileTab>
       }
     });
 
-    // 监听认证状态从游客切到正式登录的瞬间，立即刷新 Profile 资料。
+    // 监听认证状态变化，立即刷新 Profile 资料。
     // 否则页面如果没有发生路由重建，只靠 didChangeDependencies 不一定能及时拉到邮箱用户信息。
+    // 【force 必须带】这里要绕过 15 秒 TTL 节流：登出会 reset 余额为 0，
+    // 用户随即重新登录时，距上一次 _loadUserInfo 往往不足 15 秒（登出时
+    // didChangeDependencies 刚刷过一次游客数据），节流会把这次刷新跳过 →
+    // 个人中心 K币余额停在 0，直到切 tab 才恢复。登录/登出是低频关键
+    // 状态切换，多打一次 userPersonalCenter 换取余额正确显示是值得的。
+    // 社交登录（Google/Apple/TikTok/Facebook）不走 updateUserFromData
+    // 同步余额，这里就是它们唯一的余额刷新入口。
     _authStateSubscription = ref.listenManual<AuthState>(authProvider, (
       previous,
       next,
@@ -58,9 +65,17 @@ class _ProfileTabState extends ConsumerState<ProfileTab>
           !nextUser.isTourist;
       final switchedFromNoUserToLoggedIn =
           previousUser == null && nextUser != null && !nextUser.isTourist;
+      // 登出（正式账号 → 游客）也要强刷：把游客身份的余额/资料立刻拉平。
+      final switchedToGuest =
+          previousUser != null &&
+          !previousUser.isTourist &&
+          nextUser != null &&
+          nextUser.isTourist;
 
-      if (switchedFromGuestToLoggedIn || switchedFromNoUserToLoggedIn) {
-        Future.microtask(_loadUserInfo);
+      if (switchedFromGuestToLoggedIn ||
+          switchedFromNoUserToLoggedIn ||
+          switchedToGuest) {
+        Future.microtask(() => _loadUserInfo(force: true));
       }
     });
 
@@ -97,7 +112,7 @@ class _ProfileTabState extends ConsumerState<ProfileTab>
     }
   }
 
-  Future<void> _loadUserInfo() async {
+  Future<void> _loadUserInfo({bool force = false}) async {
     // 防止多个 listenManual（tab 切换 / AuthState 变化 / didChangeDependencies /
     // VIP 变化 / 应用前后台切换）在同一帧内并发触发 _loadUserInfo 导致
     // getUserCenter 被连续调用多次。
@@ -107,8 +122,10 @@ class _ProfileTabState extends ConsumerState<ProfileTab>
     // VIP 变化 / App 回前台），短时间内常连环触发。间隔内的调用直接复用
     // 上一次结果，避免"进会员页再返回"这类操作连打两次 userPersonalCenter。
     // 购买成功等关键状态更新由 authProvider.refreshUserInfo 主动推送，不依赖这里。
-    if (DateTime.now().difference(_lastUserInfoLoad) <
-        _userInfoRefreshInterval) {
+    // [force] 用于登录/登出等关键状态切换，绕过节流保证余额立刻正确。
+    if (!force &&
+        DateTime.now().difference(_lastUserInfoLoad) <
+            _userInfoRefreshInterval) {
       return;
     }
 
@@ -507,7 +524,9 @@ class _ProfileTabState extends ConsumerState<ProfileTab>
   Widget _buildLoginButton(BuildContext context, AppLocalizations l10n) {
     return GestureDetector(
       onTap: () {
-        final backTarget = Uri.encodeComponent(GoRouterState.of(context).uri.toString());
+        final backTarget = Uri.encodeComponent(
+          GoRouterState.of(context).uri.toString(),
+        );
         context.push('/auth/login?redirect=/membership&back=$backTarget');
       },
       child: Container(

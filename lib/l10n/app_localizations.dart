@@ -1796,6 +1796,18 @@ abstract class AppLocalizations {
   /// **'Recharge received, please try unlocking again in a moment'**
   String get rechargeProcessing;
 
+  /// No description provided for @paymentProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing payment...'**
+  String get paymentProcessing;
+
+  /// No description provided for @paymentProcessingTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment is taking longer than expected. Please check the result in your balance later.'**
+  String get paymentProcessingTimeout;
+
   /// No description provided for @unlockToContinue.
   ///
   /// In en, this message translates to:

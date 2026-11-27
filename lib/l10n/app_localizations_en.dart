@@ -903,6 +903,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Recharge received, please try unlocking again in a moment';
 
   @override
+  String get paymentProcessing => 'Processing payment...';
+
+  @override
+  String get paymentProcessingTimeout =>
+      'Payment is taking longer than expected. Please check the result in your balance later.';
+
+  @override
   String get unlockToContinue => 'Unlock to Continue';
 
   @override

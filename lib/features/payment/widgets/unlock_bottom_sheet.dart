@@ -16,6 +16,7 @@ import '../services/payment_service.dart';
 import '../services/unified_payment_handler.dart';
 import '../utils/store_error_message.dart';
 import '../widgets/payment_channel_selector.dart';
+import '../widgets/payment_loading_overlay.dart';
 import '../../../app/providers/app_providers.dart';
 import '../../../core/network/api_service.dart';
 import '../../../core/service/pay_service.dart';
@@ -673,7 +674,13 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       // iOS / Google 渠道包直接走商店内购，不弹 HaiPay 选择器。
       if (shouldUseStoreDirectly()) {
         final handler = ref.read(rechargePurchaseHandlerProvider);
-        final success = await handler.purchase(rechargeProduct);
+        // 【支付统一遮罩】确认后全屏拦截交互，防止遮罩期间连点其他商品
+        // 或关闭弹窗造成重复支付。超时只解除遮罩，支付在后台继续。
+        final success = await PaymentLoadingOverlay.run(
+          context,
+          message: l10n.paymentProcessing,
+          task: () => handler.purchase(rechargeProduct),
+        );
         if (!mounted) return;
         _setProcessing(product.goodsId, false);
         if (success) {
@@ -709,7 +716,12 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
       if (channel.isGooglePlay) {
         final rechargeHandler = ref.read(rechargePurchaseHandlerProvider);
-        final success = await rechargeHandler.purchase(rechargeProduct);
+        // 【支付统一遮罩】同商店直购路径。
+        final success = await PaymentLoadingOverlay.run(
+          context,
+          message: l10n.paymentProcessing,
+          task: () => rechargeHandler.purchase(rechargeProduct),
+        );
         if (success) {
           await _unlockCurrentEpisodeAfterRecharge(product.goodsId);
         } else if (mounted) {
@@ -733,6 +745,11 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
             }
           },
         );
+      }
+    } on PaymentProcessingTimeoutException {
+      // 超时只解除遮罩并提示，支付仍在后台进行，到账后原有提示照常弹出。
+      if (mounted) {
+        AppSnackBar.show(context, message: l10n.paymentProcessingTimeout);
       }
     } finally {
       if (mounted) {
@@ -910,20 +927,31 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       ApiResponse? resp;
 
       if (product.type == UnlockProductType.episode) {
-        resp = await apiService.getUserPayEpisodes(
-          videoId: widget.videoId,
-          episodesId: widget.episodeId,
-          episodesNum: widget.episodesNum,
-          goodsId: product.goodsId,
+        // 【支付统一遮罩】余额解锁请求期间全屏拦截交互。
+        resp = await PaymentLoadingOverlay.run<ApiResponse>(
+          context,
+          message: l10n.paymentProcessing,
+          timeout: const Duration(seconds: 30),
+          task: () => apiService.getUserPayEpisodes(
+            videoId: widget.videoId,
+            episodesId: widget.episodeId,
+            episodesNum: widget.episodesNum,
+            goodsId: product.goodsId,
+          ),
         );
         success = resp.isSuccess;
       } else if (product.type == UnlockProductType.season) {
-        resp = await apiService.userRechange(
-          // 【按平台传 payType】5=Android(Google Play)，6=iOS(App Store)。
-          // 之前写死 5，iOS 建出来的订单会被记成 Google 渠道。
-          payType: defaultTargetPlatform == TargetPlatform.iOS ? 6 : 5,
-          payConfigId: product.goodsId,
-          videoId: widget.videoId,
+        resp = await PaymentLoadingOverlay.run<ApiResponse>(
+          context,
+          message: l10n.paymentProcessing,
+          timeout: const Duration(seconds: 30),
+          task: () => apiService.userRechange(
+            // 【按平台传 payType】5=Android(Google Play)，6=iOS(App Store)。
+            // 之前写死 5，iOS 建出来的订单会被记成 Google 渠道。
+            payType: defaultTargetPlatform == TargetPlatform.iOS ? 6 : 5,
+            payConfigId: product.goodsId,
+            videoId: widget.videoId,
+          ),
         );
         success = resp.isSuccess;
       }
@@ -945,6 +973,11 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         );
       } else {
         AppSnackBar.show(context, message: resp?.error ?? l10n.unlockFailed);
+      }
+    } on PaymentProcessingTimeoutException {
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+        AppSnackBar.show(context, message: l10n.paymentProcessingTimeout);
       }
     } catch (e) {
       if (mounted) {
@@ -969,8 +1002,11 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       // 【按平台取商品 ID】iOS 取 iosProductId（后台没配则兜底 Google ID），
       // Android 取 googlePlayId。之前写死 Google ID，iOS 上永远查不到商品。
       final platformProductId = product.getProductId(defaultTargetPlatform);
-      final products = await paymentService.getProducts(
-        productIds: [platformProductId],
+      // 【支付统一遮罩】查商品 + 拉起支付期间全屏拦截交互。
+      final products = await PaymentLoadingOverlay.run(
+        context,
+        message: l10n.paymentProcessing,
+        task: () => paymentService.getProducts(productIds: [platformProductId]),
       );
 
       if (products.isEmpty) {
@@ -1027,13 +1063,17 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
       // onComplete 在 purchaseStream 投递真实购买结果时被调用，
       // 用它把 PurchaseDetails（含 purchaseToken）带出来发后端回调。
+      // 【支付统一遮罩】商店支付弹窗是系统级 UI，盖在遮罩上方可正常操作。
       PurchaseDetails? completedPurchase;
-      final paid = await paymentService.purchaseConsumable(
-        product: products.first,
-        applicationUserName: await ref
-            .read(storageServiceProvider)
-            .getUserIdAsync(),
-        onComplete: (purchase) => completedPurchase = purchase,
+      final userId = await ref.read(storageServiceProvider).getUserIdAsync();
+      final paid = await PaymentLoadingOverlay.run(
+        context,
+        message: l10n.paymentProcessing,
+        task: () => paymentService.purchaseConsumable(
+          product: products.first,
+          applicationUserName: userId,
+          onComplete: (purchase) => completedPurchase = purchase,
+        ),
       );
 
       if (!mounted) return;
@@ -1073,6 +1113,11 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
         purchase: completedPurchase,
         orderNo: orderNo,
       );
+    } on PaymentProcessingTimeoutException {
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+        AppSnackBar.show(context, message: l10n.paymentProcessingTimeout);
+      }
     } catch (e) {
       if (mounted) {
         _setProcessing(product.goodsId, false);
@@ -1401,9 +1446,14 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
 
       // 先查商店商品（按平台取 ID），再建订单。
       // 商品根本不存在的时候没必要建订单，否则会留下一条永远不会被支付的订单。
-      final products = await paymentService.getProducts(
-        productIds: [product.getProductId(defaultTargetPlatform)],
-        requireSubscriptionOnAndroid: true,
+      // 【支付统一遮罩】查商品期间全屏拦截交互。
+      final products = await PaymentLoadingOverlay.run(
+        context,
+        message: l10n.paymentProcessing,
+        task: () => paymentService.getProducts(
+          productIds: [product.getProductId(defaultTargetPlatform)],
+          requireSubscriptionOnAndroid: true,
+        ),
       );
 
       if (products.isEmpty) {
@@ -1425,9 +1475,14 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
       // 订单等支付确认后再建（POST /api/pay/userRechange），
       // 之后验证 / acknowledge / 开通会员全部由后端完成。
       // 【不要】在拉起支付之前建订单 —— 商品买不了会留下孤儿订单。
-      final success = await paymentService.purchase(
-        product: products.first,
-        applicationUserName: userId,
+      // 【支付统一遮罩】系统支付弹窗是系统级 UI，盖在遮罩上方可正常操作。
+      final success = await PaymentLoadingOverlay.run(
+        context,
+        message: l10n.paymentProcessing,
+        task: () => paymentService.purchase(
+          product: products.first,
+          applicationUserName: userId,
+        ),
       );
 
       if (!mounted) return;
@@ -1464,6 +1519,11 @@ class _UnlockBottomSheetState extends ConsumerState<UnlockBottomSheet> {
           context,
           message: paymentService.lastError ?? l10n.vipSubscriptionFailed,
         );
+      }
+    } on PaymentProcessingTimeoutException {
+      if (mounted) {
+        _setProcessing(product.goodsId, false);
+        AppSnackBar.show(context, message: l10n.paymentProcessingTimeout);
       }
     } catch (e) {
       if (mounted) {

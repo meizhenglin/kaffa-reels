@@ -17,6 +17,7 @@ import '../providers/recharge_provider.dart';
 import '../services/unified_payment_handler.dart';
 import '../services/payment_service.dart';
 import '../widgets/payment_channel_selector.dart';
+import '../widgets/payment_loading_overlay.dart';
 
 /// K-Coin recharge products page
 /// Shows list of K-Coin packages from /api/rechargeGoodsConfig/list, select and buy via Google Pay
@@ -87,7 +88,12 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
       // （iOS 上 rechargePurchaseHandler 最终路由 /notice/apple）。
       if (shouldUseStoreDirectly()) {
         final handler = ref.read(rechargePurchaseHandlerProvider);
-        final success = await handler.purchase(product);
+        // 【支付统一遮罩】确认后全屏拦截交互，防止重复支付。
+        final success = await PaymentLoadingOverlay.run(
+          context,
+          message: l10n.paymentProcessing,
+          task: () => handler.purchase(product),
+        );
         if (!success && mounted) {
           final raw = handler.lastError;
           var reason = raw == null
@@ -130,7 +136,12 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
 
       if (channel.isGooglePlay) {
         final handler = ref.read(rechargePurchaseHandlerProvider);
-        final success = await handler.purchase(product);
+        // 【支付统一遮罩】同商店直购路径。
+        final success = await PaymentLoadingOverlay.run(
+          context,
+          message: l10n.paymentProcessing,
+          task: () => handler.purchase(product),
+        );
         if (!success && mounted) {
           final raw = handler.lastError;
           var reason = raw == null
@@ -169,6 +180,11 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
         if (completed) {
           await _refreshHaiPayBalance(balanceNotifier);
         }
+      }
+    } on PaymentProcessingTimeoutException {
+      // 超时只解除遮罩并提示，支付仍在后台进行，到账后原有提示照常弹出。
+      if (mounted) {
+        AppSnackBar.show(context, message: l10n.paymentProcessingTimeout);
       }
     } finally {
       if (mounted) {
@@ -377,17 +393,13 @@ class _CoinRechargePageState extends ConsumerState<CoinRechargePage> {
               ],
             ),
             child: FilledButton(
-              onPressed: _isPurchasing
-                  ? null
-                  : () => _handlePurchase(product),
+              onPressed: _isPurchasing ? null : () => _handlePurchase(product),
               style: FilledButton.styleFrom(
                 backgroundColor: Colors.transparent,
                 disabledBackgroundColor: Colors.transparent,
                 shadowColor: Colors.transparent,
                 foregroundColor: const Color(0xFF753900),
-                disabledForegroundColor: const Color(
-                  0xFF753900,
-                ).withAlpha(153),
+                disabledForegroundColor: const Color(0xFF753900).withAlpha(153),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(21),
                 ),
