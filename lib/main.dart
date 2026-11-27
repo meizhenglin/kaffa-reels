@@ -192,12 +192,22 @@ class _QahwaTVAppState extends ConsumerState<QahwaTVApp> {
         await Future<void>.delayed(const Duration(seconds: 1));
         try {
           await ref.read(rechargeProductsProvider.notifier).load();
-          final products = ref.read(rechargeProductsProvider).products;
-          await PaymentService.instance.prewarmProducts(
-            productIds: products
-                .map((p) => p.getProductId(defaultTargetPlatform))
-                .toList(),
-          );
+          // 【iOS 禁用 StoreKit 预热】沙盒环境下启动早期的 SKProductsRequest
+          // 频繁挂死（撞进冷启动最容易失联的窗口），且插件没有取消 API——
+          // 挂死的请求会拖死本会话后续所有 queryProductDetails（实测：
+          // 预热挂 → 用户点确认的查询也 15 秒无响应）。预热之前，用户点
+          // 确认发出的就是会话第一笔请求，反而每次都能拉起支付台。
+          // 代价只是 iOS 上第一次购买要等一次现场查询（2-5 秒），查询成功
+          // 后缓存 10 分钟，后续购买照样秒弹。预热只保留在 Android
+          // （Play 的商品查询稳定，不存在僵尸请求拖死会话的问题）。
+          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+            final products = ref.read(rechargeProductsProvider).products;
+            await PaymentService.instance.prewarmProducts(
+              productIds: products
+                  .map((p) => p.getProductId(defaultTargetPlatform))
+                  .toList(),
+            );
+          }
         } catch (e) {
           debugPrint('[MAIN] startup product prefetch failed: $e');
         }
