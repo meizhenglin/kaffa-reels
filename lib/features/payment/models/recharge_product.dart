@@ -53,17 +53,16 @@ class RechargeProduct extends Equatable {
 
   /// iOS 端产品 ID 定向纠错。
   ///
-  /// 【根因】后端 rechargeGoodsConfig 只在 `remarks` 里配了一个商品 ID，
-  /// 且 6 个金币包全部把 dollar 拼成了 **doller**
-  /// （com.qahwa.1doller / com.qahwa.3doller / com.qahwa.5doller /
-  /// com.qahwatv.10doller / com.qahwatv.16doller / com.qahwatv.68doller），
-  /// 而 App Store Connect 里真实的产品 ID 是 **dollar** 拼写
+  /// 【历史根因】后端 rechargeGoodsConfig 曾把 remarks 里的 dollar 拼成
+  /// **doller**，而 App Store Connect 里真实的产品 ID 是 **dollar**
   /// （com.qahwa.1dollar 等，全部已过审）。StoreKit 按拼错的 ID 查询
   /// 返回空 → iOS 上「获取不到商品」，K币包一个都买不了。
   ///
-  /// Android 端 Play 后台建的商品是什么拼写就用什么（行为不变）；
-  /// iOS 端纠正到 ASC 的真实 ID。若后端日后把 remarks 改对或配了
-  /// goodsIosId，此替换为 no-op，不受影响。
+  /// 【现状】2026-11 后端已把 remarks 全部改回 dollar，此替换变为
+  /// no-op（dollar 中不含 doller，原样返回）。保留它作为保险丝：
+  /// 兼容旧缓存数据 / 其他环境若再出现 doller 拼写仍能正常查询。
+  ///
+  /// Android 端 Play 后台建的商品是什么拼写就用什么（行为不变）。
   static String _correctIosProductId(String id) {
     return id.replaceAll('doller', 'dollar');
   }

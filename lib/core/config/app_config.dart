@@ -6,10 +6,12 @@
 ///
 /// 【如何修改】
 /// - 切换环境：修改 _apiBaseUrl
-/// - 切换平台：修改当前使用的 X-Client 字符串（Android/iOS）
+/// - 切换平台：X-Client 已按运行平台自动切换，无需手动改
 /// - 版本更新：修改 pubspec.yaml 里的 version（不要改这里）
 /// ============================================================================
 library;
+
+import 'dart:io' show Platform;
 
 class AppConfig {
   AppConfig._();
@@ -117,17 +119,22 @@ class AppConfig {
   /// platformId=3;platformAppId=3001  抖音
   /// platformId=2;platformAppId=2001  微信
   /// platformId=2;platformAppId=2002  Android
+  /// platformId=3;platformAppId=3002  iOS（后端已按平台区分，商品配置按此下发）
 
-  /// 越南 Android 平台标识
+  /// Android 平台标识
   static const String androidXClient = 'platformId=2;platformAppId=2002';
 
-  /// 越南 iOS 平台标识
-  static const String iOSXClient = 'platformId=3;platformAppId=3001';
+  /// iOS 平台标识（后端 platformAppId 已调整为 3002）
+  static const String iOSXClient = 'platformId=3;platformAppId=3002';
 
-  /// 当前平台 X-Client（根据运行平台切换）
-  /// 【发布前】Android 打包时改为 androidXClient
-  /// 【发布前】iOS 打包时改为 iOSXClient
-  static String get currentXClient => androidXClient;
+  /// 当前平台 X-Client（按运行平台自动切换）。
+  ///
+  /// 【重要】后端 rechargeGoodsConfig 等配置已按 platformId/platformAppId
+  /// 区分平台下发，iOS 必须带 iOS 身份（3/3002）才能拿到 iOS 侧的商品
+  /// 配置，所以不能再靠打包前手动改这里 —— 直接运行时判断。
+  /// Android 及其他平台走 Android 身份（2/2002），行为与之前一致。
+  static String get currentXClient =>
+      Platform.isIOS ? iOSXClient : androidXClient;
 
   // ==================== 版本号 ====================
   // ⚠️ 这里**不要**再写版本号。
